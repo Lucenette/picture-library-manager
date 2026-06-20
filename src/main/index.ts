@@ -98,6 +98,14 @@ function registerIpc(): void {
   ipcMain.handle('viewer:devtools', (event) => {
     event.sender.openDevTools();
   });
+
+  ipcMain.handle('dialog:exportDir', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: '选择导出目标目录',
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
 }
 
 app.whenReady().then(async () => {

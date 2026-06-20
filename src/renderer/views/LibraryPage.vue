@@ -26,8 +26,8 @@
         <el-button type="danger" @click="batchDelete" :disabled="selectedIds.length === 0">
           删除选中 ({{ selectedIds.length }})
         </el-button>
-        <el-button type="success" @click="exportImages" :disabled="processedImages.length === 0">
-          <el-icon><Download /></el-icon> 导出
+        <el-button type="success" @click="exportImages" :disabled="sortedImages.length === 0">
+          <el-icon><Download /></el-icon> 导出 ({{ selectedIds.length || sortedImages.length }})
         </el-button>
       </div>
     </div>
@@ -203,7 +203,8 @@ async function batchDelete(): Promise<void> {
  * 目标结构：{目标目录}/{角色名}/{角色名}_{0001}.{扩展名}
  */
 async function exportImages(): Promise<void> {
-  const targetDir = prompt('请输入导出目标目录的绝对路径：');
+  const { ipcRenderer } = require('electron');
+  const targetDir = await ipcRenderer.invoke('dialog:exportDir');
   if (!targetDir) return;
 
   const fs = require('fs');
@@ -214,7 +215,9 @@ async function exportImages(): Promise<void> {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
-  const allImages = await getAllProcessedImages();
+  const allImages = selectedIds.value.length > 0
+    ? sortedImages.value.filter(pi => selectedIds.value.includes(pi.id))
+    : sortedImages.value;
   if (allImages.length === 0) return;
 
   exporting.value = true;
