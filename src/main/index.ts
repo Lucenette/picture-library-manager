@@ -1,9 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
-import { join } from 'path';
+import { app, ipcMain, dialog, Menu } from 'electron';
 import * as db from './db';
+import * as wm from './window-manager';
 
-// 移除顶部菜单栏
 Menu.setApplicationMenu(null);
+process.noDeprecation = true;
 
 // 关闭所有 Chrome/Electron 安全策略
 app.commandLine.appendSwitch('disable-web-security');
@@ -12,31 +12,6 @@ app.commandLine.appendSwitch('allow-running-insecure-content');
 app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('disable-site-isolation-trials');
 app.commandLine.appendSwitch('no-sandbox');
-
-function createWindow(): void {
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    backgroundColor: '#1e1f22',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
-      allowRunningInsecureContent: true,
-      nodeIntegrationInWorker: true,
-      nodeIntegrationInSubFrames: true,
-      sandbox: false,
-      autoplayPolicy: 'no-user-gesture-required',
-    },
-  });
-
-  if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL);
-    win.webContents.openDevTools();
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'));
-  }
-}
 
 function registerIpc(): void {
   ipcMain.handle('db', async (_event, method: string, ...args: any[]) => {
@@ -62,43 +37,6 @@ function registerIpc(): void {
     return result.canceled ? [] : result.filePaths;
   });
 
-  // 图片查看器数据缓存
-  const viewerStore = new Map<number, any>();
-  let viewerWin: BrowserWindow | null = null;
-
-  ipcMain.handle('viewer:open', async (_event, data: any) => {
-    // 缓存数据，用窗口 webContents.id 做 key
-    viewerStore.set(-1, data); // -1 临时存储
-    if (viewerWin) viewerWin.close();
-    viewerWin = new BrowserWindow({
-      width: 1200, height: 800,
-      backgroundColor: '#0d0d0d',
-      title: '图片查看器',
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-        webSecurity: false,
-        sandbox: false,
-      },
-    });
-    viewerWin.setMenu(null);
-    viewerStore.set(viewerWin.webContents.id, data);
-    if (process.env.ELECTRON_RENDERER_URL) {
-      viewerWin.loadURL(`${process.env.ELECTRON_RENDERER_URL}#/viewer`);
-    } else {
-      viewerWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/viewer' });
-    }
-    viewerWin.on('closed', () => { viewerWin = null; });
-  });
-
-  ipcMain.handle('viewer:getData', (event) => {
-    return viewerStore.get(event.sender.id) ?? viewerStore.get(-1);
-  });
-
-  ipcMain.handle('viewer:devtools', (event) => {
-    event.sender.openDevTools();
-  });
-
   ipcMain.handle('dialog:exportDir', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -106,14 +44,30 @@ function registerIpc(): void {
     });
     return result.canceled ? null : result.filePaths[0];
   });
+
+  // 图片查看器
+  const viewerStore = new Map<number, any>();
+
+  ipcMain.handle('viewer:open', async (_event, data: any) => {
+    const win = wm.createViewer();
+    viewerStore.set(win.webContents.id, data);
+  });
+
+  ipcMain.handle('viewer:getData', (event) => {
+    return viewerStore.get(event.sender.id);
+  });
+
+  ipcMain.handle('viewer:devtools', (event) => {
+    event.sender.openDevTools();
+  });
 }
 
 app.whenReady().then(async () => {
   await db.initDatabase();
   registerIpc();
-  createWindow();
+  wm.createMain();
 });
 
 app.on('before-quit', () => { db.closeDatabase(); });
-app.on('window-all-closed', () => { app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('window-all-closed', () => { wm.closeAll(); app.quit(); });
+app.on('activate', () => { if (!wm.get('main')) wm.createMain(); });
