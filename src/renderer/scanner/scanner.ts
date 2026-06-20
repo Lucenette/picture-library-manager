@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { imageSize } from 'image-size';
 import { IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME } from '@/db/database';
-import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '@/types';
+import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '../../common/types';
 
 /**
  * 目录扫描器

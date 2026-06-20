@@ -5,6 +5,12 @@ import { resolve } from 'path';
 
 export default defineConfig({
   main: {
+    resolve: {
+      alias: {
+        '@common': resolve(__dirname, 'src/common'),
+        '@': resolve(__dirname, 'src/main'),
+      },
+    },
     build: {
       rollupOptions: {
         external: ['sql.js'],
@@ -15,6 +21,7 @@ export default defineConfig({
     plugins: [vue(), renderer()],
     resolve: {
       alias: {
+        '@common': resolve(__dirname, 'src/common'),
         '@': resolve(__dirname, 'src/renderer'),
       },
     },

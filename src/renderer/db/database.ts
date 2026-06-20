@@ -9,7 +9,7 @@ import type {
   ProcessedImage,
   ImageGroupView,
   ProcessedImageView,
-} from '@/types';
+} from '@common/types';
 
 /** 调用主进程数据库方法 */
 async function call<T>(method: string, ...args: any[]): Promise<T> {

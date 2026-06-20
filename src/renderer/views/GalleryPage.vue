@@ -59,7 +59,7 @@ import {
   insertImageFiles,
 } from '@/db/database';
 import { scanGallery as doScan } from '@/scanner/scanner';
-import type { Gallery, ScanProgress } from '@/types';
+import type { Gallery, ScanProgress } from '../../common/types';
 
 const galleries = ref<Gallery[]>([]);
 const scanning = ref(false);

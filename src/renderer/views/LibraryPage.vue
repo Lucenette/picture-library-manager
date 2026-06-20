@@ -89,7 +89,7 @@ import {
   getAllGalleries,
   getCharactersByGallery,
 } from '@/db/database';
-import type { ProcessedImageView, Gallery, Character } from '@/types';
+import type { ProcessedImageView, Gallery, Character } from '@common/types';
 
 /** 所有 processed_image 记录 */
 const processedImages = ref<ProcessedImageView[]>([]);

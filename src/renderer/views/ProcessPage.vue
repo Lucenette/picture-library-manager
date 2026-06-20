@@ -150,7 +150,7 @@ import {
   deleteScript,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
-import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '@/types';
+import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '../../common/types';
 
 // ============================================================
 // 数据

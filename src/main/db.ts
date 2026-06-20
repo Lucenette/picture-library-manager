@@ -2,7 +2,8 @@ import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
 import { join } from 'path';
 import { homedir } from 'os';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView } from '../renderer/types';
+import * as S from '@/sql';
+import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView } from '@common/types';
 
 // ============================================================
 // 常量
@@ -31,7 +32,6 @@ export async function initDatabase(): Promise<void> {
     db = new SQL.Database();
   }
 
-  db.run('PRAGMA foreign_keys = ON');
   createTables();
   save();
 }
@@ -83,16 +83,7 @@ function run(sql: string, params: any[] = []): { changes: number; lastInsertRowi
 }
 
 function createTables(): void {
-  const d = db!;
-  d.run(`CREATE TABLE IF NOT EXISTS gallery (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, root_path TEXT NOT NULL UNIQUE, scanned_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))`);
-  d.run(`CREATE TABLE IF NOT EXISTS character (id INTEGER PRIMARY KEY AUTOINCREMENT, gallery_id INTEGER NOT NULL REFERENCES gallery(id) ON DELETE CASCADE, name TEXT NOT NULL, source_path TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), UNIQUE(gallery_id, name))`);
-  d.run(`CREATE TABLE IF NOT EXISTS image_group (id INTEGER PRIMARY KEY AUTOINCREMENT, character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE, dir_name TEXT NOT NULL, dir_path TEXT NOT NULL UNIQUE, file_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processed','excluded')), created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))`);
-  d.run(`CREATE TABLE IF NOT EXISTS image_file (id INTEGER PRIMARY KEY AUTOINCREMENT, image_group_id INTEGER NOT NULL REFERENCES image_group(id) ON DELETE CASCADE, file_name TEXT NOT NULL, file_path TEXT NOT NULL UNIQUE, file_size INTEGER, width INTEGER, height INTEGER, extension TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))`);
-  d.run('CREATE INDEX IF NOT EXISTS idx_image_file_group ON image_file(image_group_id)');
-  d.run(`CREATE TABLE IF NOT EXISTS process_script (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, file_path TEXT NOT NULL UNIQUE, code TEXT NOT NULL, loaded_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))`);
-  d.run(`CREATE TABLE IF NOT EXISTS processed_image (id INTEGER PRIMARY KEY AUTOINCREMENT, image_group_id INTEGER NOT NULL UNIQUE REFERENCES image_group(id) ON DELETE CASCADE, character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE, gallery_id INTEGER NOT NULL REFERENCES gallery(id) ON DELETE CASCADE, original_path TEXT NOT NULL, selected_file TEXT NOT NULL, script_id INTEGER REFERENCES process_script(id) ON DELETE SET NULL, confirmed_at TEXT NOT NULL DEFAULT (datetime('now','localtime')), created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')))`);
-  d.run('CREATE INDEX IF NOT EXISTS idx_processed_character ON processed_image(character_id)');
-  d.run('CREATE INDEX IF NOT EXISTS idx_processed_gallery ON processed_image(gallery_id)');
+  for (const sql of S.DDL_ALL) db!.run(sql);
   save();
 }
 
@@ -101,24 +92,28 @@ function createTables(): void {
 // ============================================================
 
 export function addGallery(name: string, rootPath: string): Gallery {
-  const r = run('INSERT INTO gallery (name, root_path) VALUES (?, ?)', [name, rootPath]);
-  return queryOne<Gallery>('SELECT * FROM gallery WHERE id = ?', [r.lastInsertRowid])!;
+  const r = run(S.SQL_INSERT_GALLERY, [name, rootPath]);
+  return queryOne<Gallery>(S.SQL_SELECT_GALLERY_BY_ID, [r.lastInsertRowid])!;
 }
 
 export function getAllGalleries(): Gallery[] {
-  return queryAll<Gallery>('SELECT * FROM gallery ORDER BY created_at DESC');
+  return queryAll<Gallery>(S.SQL_SELECT_GALLERY_ALL);
 }
 
 export function getGalleryById(id: number): Gallery | undefined {
-  return queryOne<Gallery>('SELECT * FROM gallery WHERE id = ?', [id]);
+  return queryOne<Gallery>(S.SQL_SELECT_GALLERY_BY_ID, [id]);
 }
 
 export function deleteGallery(id: number): void {
-  run('DELETE FROM gallery WHERE id = ?', [id]);
+  run(S.SQL_DELETE_PROCESSED_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_IMAGE_FILES_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_IMAGE_GROUPS_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_CHARACTERS_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_GALLERY, [id]);
 }
 
 export function updateGalleryScannedAt(id: number): void {
-  run("UPDATE gallery SET scanned_at = datetime('now','localtime') WHERE id = ?", [id]);
+  run(S.SQL_UPDATE_GALLERY_SCAN, [id]);
 }
 
 // ============================================================
@@ -126,12 +121,12 @@ export function updateGalleryScannedAt(id: number): void {
 // ============================================================
 
 export function insertCharacter(galleryId: number, name: string, sourcePath: string): Character {
-  run('INSERT OR IGNORE INTO character (gallery_id, name, source_path) VALUES (?, ?, ?)', [galleryId, name, sourcePath]);
-  return queryOne<Character>('SELECT * FROM character WHERE gallery_id = ? AND name = ?', [galleryId, name])!;
+  run(S.SQL_INSERT_CHARACTER, [galleryId, name, sourcePath]);
+  return queryOne<Character>(S.SQL_SELECT_CHARACTER_BY_GALLERY_NAME, [galleryId, name])!;
 }
 
 export function getCharactersByGallery(galleryId: number): Character[] {
-  return queryAll<Character>('SELECT * FROM character WHERE gallery_id = ? ORDER BY name', [galleryId]);
+  return queryAll<Character>(S.SQL_SELECT_CHARACTERS_BY_GALLERY, [galleryId]);
 }
 
 // ============================================================
@@ -139,16 +134,16 @@ export function getCharactersByGallery(galleryId: number): Character[] {
 // ============================================================
 
 export function insertImageGroup(characterId: number, dirName: string, dirPath: string, fileCount: number): ImageGroup {
-  run('INSERT OR IGNORE INTO image_group (character_id, dir_name, dir_path, file_count) VALUES (?, ?, ?, ?)', [characterId, dirName, dirPath, fileCount]);
-  return queryOne<ImageGroup>('SELECT * FROM image_group WHERE dir_path = ?', [dirPath])!;
+  run(S.SQL_INSERT_IMAGE_GROUP, [characterId, dirName, dirPath, fileCount]);
+  return queryOne<ImageGroup>(S.SQL_SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
 export function updateImageGroupFileCount(id: number, count: number): void {
-  run('UPDATE image_group SET file_count = ? WHERE id = ?', [count, id]);
+  run(S.SQL_UPDATE_IMAGE_GROUP_FILE_COUNT, [count, id]);
 }
 
 export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number): ImageGroupView[] {
-  let sql = `SELECT ig.*, c.name AS characterName, g.name AS galleryName, g.id AS galleryId FROM image_group ig JOIN character c ON ig.character_id=c.id JOIN gallery g ON c.gallery_id=g.id WHERE 1=1`;
+  let sql = S.SQL_SELECT_IMAGE_GROUPS_VIEW_BASE;
   const params: any[] = [];
   if (status) { sql += ' AND ig.status = ?'; params.push(status); }
   if (galleryId) { sql += ' AND g.id = ?'; params.push(galleryId); }
@@ -157,11 +152,11 @@ export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number
 }
 
 export function updateImageGroupStatus(id: number, status: ImageGroupStatus): void {
-  run('UPDATE image_group SET status = ? WHERE id = ?', [status, id]);
+  run(S.SQL_UPDATE_IMAGE_GROUP_STATUS, [status, id]);
 }
 
 export function getImageFilesByGroup(groupId: number): ImageFile[] {
-  return queryAll<ImageFile>('SELECT * FROM image_file WHERE image_group_id = ? ORDER BY file_name', [groupId]);
+  return queryAll<ImageFile>(S.SQL_SELECT_IMAGE_FILES_BY_GROUP, [groupId]);
 }
 
 // ============================================================
@@ -172,7 +167,7 @@ export function insertImageFiles(
   groupId: number,
   files: Array<{ fileName: string; filePath: string; fileSize: number; width: number | null; height: number | null; extension: string }>,
 ): void {
-  const stmt = db!.prepare('INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const stmt = db!.prepare(S.SQL_INSERT_IMAGE_FILE);
   for (const f of files) { stmt.run([groupId, f.fileName, f.filePath, f.fileSize, f.width, f.height, f.extension]); }
   stmt.free();
   save();
@@ -183,30 +178,30 @@ export function insertImageFiles(
 // ============================================================
 
 export function upsertScript(name: string, filePath: string, code: string): ProcessScript {
-  const existing = queryOne<ProcessScript>('SELECT * FROM process_script WHERE file_path = ?', [filePath]);
+  const existing = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath]);
   if (existing) {
-    run("UPDATE process_script SET name=?, code=?, loaded_at=datetime('now','localtime') WHERE file_path=?", [name, code, filePath]);
+    run(S.SQL_UPDATE_SCRIPT, [name, code, filePath]);
   } else {
-    run("INSERT INTO process_script (name, file_path, code, loaded_at) VALUES (?, ?, ?, datetime('now','localtime'))", [name, filePath, code]);
+    run(S.SQL_INSERT_SCRIPT, [name, filePath, code]);
   }
-  return queryOne<ProcessScript>('SELECT * FROM process_script WHERE file_path = ?', [filePath])!;
+  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
 }
 
 export function reloadScript(filePath: string, code: string): ProcessScript {
-  run("UPDATE process_script SET code=?, loaded_at=datetime('now','localtime') WHERE file_path=?", [code, filePath]);
-  return queryOne<ProcessScript>('SELECT * FROM process_script WHERE file_path = ?', [filePath])!;
+  run(S.SQL_RELOAD_SCRIPT, [code, filePath]);
+  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
 }
 
 export function getAllScripts(): ProcessScript[] {
-  return queryAll<ProcessScript>('SELECT * FROM process_script ORDER BY name');
+  return queryAll<ProcessScript>(S.SQL_SELECT_SCRIPTS_ALL);
 }
 
 export function getScriptById(id: number): ProcessScript | undefined {
-  return queryOne<ProcessScript>('SELECT * FROM process_script WHERE id = ?', [id]);
+  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_ID, [id]);
 }
 
 export function deleteScript(id: number): void {
-  run('DELETE FROM process_script WHERE id = ?', [id]);
+  run(S.SQL_DELETE_SCRIPT, [id]);
 }
 
 // ============================================================
@@ -217,18 +212,18 @@ export function upsertProcessedImage(
   imageGroupId: number, characterId: number, galleryId: number,
   originalPath: string, selectedFile: string, scriptId: number | null,
 ): ProcessedImage {
-  const existing = queryOne<ProcessedImage>('SELECT * FROM processed_image WHERE image_group_id = ?', [imageGroupId]);
+  const existing = queryOne<ProcessedImage>(S.SQL_SELECT_PROCESSED_BY_GROUP, [imageGroupId]);
   if (existing) {
-    run("UPDATE processed_image SET selected_file=?, script_id=?, confirmed_at=datetime('now','localtime') WHERE image_group_id=?", [selectedFile, scriptId, imageGroupId]);
+    run(S.SQL_UPDATE_PROCESSED, [selectedFile, scriptId, imageGroupId]);
   } else {
-    run("INSERT INTO processed_image (image_group_id, character_id, gallery_id, original_path, selected_file, script_id, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))", [imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId]);
+    run(S.SQL_INSERT_PROCESSED, [imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId]);
   }
-  run("UPDATE image_group SET status='processed' WHERE id=?", [imageGroupId]);
-  return queryOne<ProcessedImage>('SELECT * FROM processed_image WHERE image_group_id = ?', [imageGroupId])!;
+  run(S.SQL_UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
+  return queryOne<ProcessedImage>(S.SQL_SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
 export function getAllProcessedImages(galleryId?: number, characterId?: number): ProcessedImageView[] {
-  let sql = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName FROM processed_image pi JOIN character c ON pi.character_id=c.id JOIN gallery g ON pi.gallery_id=g.id LEFT JOIN process_script ps ON pi.script_id=ps.id WHERE 1=1`;
+  let sql = S.SQL_SELECT_PROCESSED_VIEW_BASE;
   const params: any[] = [];
   if (galleryId) { sql += ' AND pi.gallery_id = ?'; params.push(galleryId); }
   if (characterId) { sql += ' AND pi.character_id = ?'; params.push(characterId); }
@@ -237,10 +232,10 @@ export function getAllProcessedImages(galleryId?: number, characterId?: number):
 }
 
 export function deleteProcessedImage(id: number): void {
-  const r = queryOne<{ image_group_id: number }>('SELECT image_group_id FROM processed_image WHERE id = ?', [id]);
+  const r = queryOne<{ image_group_id: number }>(S.SQL_SELECT_PROCESSED_BY_ID_GROUP, [id]);
   if (!r) return;
-  run('DELETE FROM processed_image WHERE id = ?', [id]);
-  run("UPDATE image_group SET status='pending' WHERE id = ?", [r.image_group_id]);
+  run(S.SQL_DELETE_PROCESSED, [id]);
+  run(S.SQL_UPDATE_GROUP_PENDING, [r.image_group_id]);
 }
 
 /** 关闭数据库并落盘 */
