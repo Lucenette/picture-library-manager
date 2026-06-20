@@ -42,15 +42,25 @@ function save(): void {
 }
 
 // ============================================================
-// 工具函数（抹平 sql.js 与 better-sqlite3 的 API 差异）
+// 工具函数
 // ============================================================
+
+/** 将蛇形键名转为驼峰 */
+function snakeToCamel(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    result[camelKey] = obj[key];
+  }
+  return result;
+}
 
 /** 执行 SELECT 返回多行 */
 function queryAll<T = any>(sql: string, params: any[] = []): T[] {
   const stmt = db!.prepare(sql);
   if (params.length) stmt.bind(params);
   const rows: T[] = [];
-  while (stmt.step()) rows.push(stmt.getAsObject() as unknown as T);
+  while (stmt.step()) rows.push(snakeToCamel(stmt.getAsObject()) as unknown as T);
   stmt.free();
   return rows;
 }
@@ -59,7 +69,7 @@ function queryAll<T = any>(sql: string, params: any[] = []): T[] {
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
   const stmt = db!.prepare(sql);
   if (params.length) stmt.bind(params);
-  const row = stmt.step() ? (stmt.getAsObject() as unknown as T) : undefined;
+  const row = stmt.step() ? (snakeToCamel(stmt.getAsObject()) as unknown as T) : undefined;
   stmt.free();
   return row;
 }
@@ -218,7 +228,7 @@ export function upsertProcessedImage(
 }
 
 export function getAllProcessedImages(galleryId?: number, characterId?: number): ProcessedImageView[] {
-  let sql = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName FROM processed_image pi JOIN character c ON pi.character_id=c.id JOIN gallery g ON pi.gallery_id=g.id LEFT JOIN process_script ps ON pi.script_id=ps.id WHERE 1=1`;
+  let sql = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName FROM processed_image pi JOIN character c ON pi.character_id=c.id JOIN gallery g ON pi.gallery_id=g.id LEFT JOIN process_script ps ON pi.script_id=ps.id WHERE 1=1`;
   const params: any[] = [];
   if (galleryId) { sql += ' AND pi.gallery_id = ?'; params.push(galleryId); }
   if (characterId) { sql += ' AND pi.character_id = ?'; params.push(characterId); }

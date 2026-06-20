@@ -3,7 +3,15 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 140px">
+        <el-select v-model="galleryFilter" placeholder="按图库" clearable style="width: 140px" @change="onGalleryFilterChange">
+          <el-option v-for="g in galleries" :key="g.id" :label="g.name" :value="g.id" />
+        </el-select>
+
+        <el-select v-model="characterFilter" placeholder="按角色" clearable style="width: 160px; margin-left: 8px">
+          <el-option v-for="c in characterNames" :key="c" :label="c" :value="c" />
+        </el-select>
+
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 140px; margin-left: 8px">
           <el-option label="全部" value="" />
           <el-option label="未处理" value="pending" />
           <el-option label="已处理" value="processed" />
@@ -11,12 +19,7 @@
         </el-select>
 
         <el-select v-model="selectedScriptId" placeholder="选择脚本" clearable style="width: 200px; margin-left: 8px">
-          <el-option
-            v-for="s in scripts"
-            :key="s.id"
-            :label="s.name"
-            :value="s.id"
-          />
+          <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
 
         <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId || selectedIds.length === 0" style="margin-left: 8px">
@@ -44,15 +47,17 @@
       :data="filteredGroups"
       style="width: 100%"
       @selection-change="onSelectionChange"
+      @sort-change="onSortChange"
       v-loading="processing"
       row-key="id"
+      :default-sort="{ prop: 'galleryName', order: 'ascending' }"
     >
       <el-table-column type="selection" width="45" />
-      <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip />
-      <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip />
-      <el-table-column prop="dirName" label="图片组" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="fileCount" label="文件数" width="80" align="center" />
-      <el-table-column label="状态" width="100" align="center">
+      <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="dirName" label="图片组" min-width="200" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="fileCount" label="文件数" width="80" align="center" sortable="custom" />
+      <el-table-column label="状态" width="100" align="center" sortable="custom" prop="status">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status)" size="small">
             {{ statusLabel(row.status) }}
@@ -139,28 +144,36 @@ import {
   getImageFilesByGroup,
   upsertProcessedImage,
   getAllScripts,
+  getAllGalleries,
   upsertScript,
   reloadScript as dbReload,
   deleteScript,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
-import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript } from '@/types';
+import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '@/types';
 
 // ============================================================
 // 数据
 // ============================================================
 
 const statusFilter = ref<string>('');
+const galleryFilter = ref<number | undefined>(undefined);
+const characterFilter = ref<string>('');
 const selectedScriptId = ref<number | null>(null);
 const selectedIds = ref<number[]>([]);
 const allGroups = ref<ImageGroupView[]>([]);
 const scripts = ref<ProcessScript[]>([]);
+const galleries = ref<Gallery[]>([]);
 const processing = ref(false);
 const processProgressVisible = ref(false);
 const processPercent = ref(0);
 const processedCount = ref(0);
 const totalCount = ref(0);
 const errorCount = ref(0);
+
+/** 排序 */
+const sortProp = ref<string>('galleryName');
+const sortOrder = ref<'ascending' | 'descending'>('ascending');
 
 /** 文件查看弹窗 */
 const fileDialogVisible = ref(false);
@@ -174,9 +187,35 @@ const showScriptDialog = ref(false);
 // 计算
 // ============================================================
 
+const characterNames = computed(() => {
+  const names = new Set(allGroups.value.map(g => g.characterName));
+  return [...names].sort();
+});
+
 const filteredGroups = computed(() => {
-  if (!statusFilter.value) return allGroups.value;
-  return allGroups.value.filter((g) => g.status === statusFilter.value);
+  let list = allGroups.value;
+
+  if (statusFilter.value) {
+    list = list.filter(g => g.status === statusFilter.value);
+  }
+  if (galleryFilter.value) {
+    list = list.filter(g => g.galleryId === galleryFilter.value);
+  }
+  if (characterFilter.value) {
+    list = list.filter(g => g.characterName === characterFilter.value);
+  }
+
+  // 排序
+  const prop = sortProp.value as keyof ImageGroupView;
+  const dir = sortOrder.value === 'ascending' ? 1 : -1;
+  list = [...list].sort((a, b) => {
+    const va = a[prop] ?? '';
+    const vb = b[prop] ?? '';
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb)) * dir;
+  });
+
+  return list;
 });
 
 // ============================================================
@@ -186,6 +225,17 @@ const filteredGroups = computed(() => {
 async function loadData(): Promise<void> {
   allGroups.value = await getImageGroupsView();
   scripts.value = await getAllScripts();
+  galleries.value = await getAllGalleries();
+}
+
+/** 图库筛选变化时清角色筛选 */
+function onGalleryFilterChange(_gid?: number): void {
+  characterFilter.value = '';
+}
+
+function onSortChange({ prop, order }: { prop: string; order: string | null }): void {
+  sortProp.value = prop || 'galleryName';
+  sortOrder.value = (order as 'ascending' | 'descending') || 'ascending';
 }
 
 function statusTagType(status: ImageGroupStatus): 'info' | 'success' | 'danger' {

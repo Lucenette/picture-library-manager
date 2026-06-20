@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { join } from 'path';
 import * as db from './db';
 
@@ -39,6 +39,14 @@ function registerIpc(): void {
     const fn = (db as any)[method];
     if (typeof fn !== 'function') throw new Error(`Unknown db method: ${method}`);
     return fn(...args);
+  });
+
+  ipcMain.handle('dialog:openDir', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: '选择图库目录',
+    });
+    return result.canceled ? null : result.filePaths[0];
   });
 }
 

@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
+import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
 import { getAllGalleries, addGallery as dbAdd, deleteGallery, updateGalleryScannedAt } from '@/db/database';
 import {
@@ -78,45 +79,25 @@ async function loadGalleries(): Promise<void> {
 }
 
 /**
- * 添加图库
- * 使用 HTML input[webkitdirectory] 选择文件夹，
- * 在 Electron 环境下 File 对象具有 .path 属性可获取完整路径
+ * 添加图库 —— Electron 原生对话框选择文件夹
  */
-function addGallery(): void {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.webkitdirectory = true;
+async function addGallery(): Promise<void> {
+  const result = await ipcRenderer.invoke('dialog:openDir');
+  if (!result) return;
 
-  input.onchange = async () => {
-    const files = input.files;
-    if (!files || files.length === 0) return;
+  const rootPath = result as string;
+  const rootName = rootPath.split('\\').pop() || rootPath;
 
-    // 取第一个文件的路径，向上取到选中的根目录
-    const firstPath = (files[0] as any).path as string;
-    if (!firstPath) {
-      alert('无法获取目录路径，请在 Electron 环境中运行');
-      return;
+  try {
+    await dbAdd(rootName, rootPath);
+    await loadGalleries();
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) {
+      alert('该图库已添加过');
+    } else {
+      alert(`添加失败: ${e.message}`);
     }
-
-    // 从文件路径反推根目录：去掉文件相对路径部分
-    // webkitRelativePath 形如 "图库名/子目录/文件.png"
-    const relative = (files[0] as any).webkitRelativePath as string;
-    const rootName = relative.split('/')[0];
-    const rootPath = firstPath.substring(0, firstPath.indexOf(rootName) + rootName.length);
-
-    try {
-      await dbAdd(rootName, rootPath);
-      await loadGalleries();
-    } catch (e: any) {
-      if (e.message?.includes('UNIQUE')) {
-        alert('该图库已添加过');
-      } else {
-        alert(`添加失败: ${e.message}`);
-      }
-    }
-  };
-
-  input.click();
+  }
 }
 
 /** 扫描图库 */
@@ -152,6 +133,7 @@ async function scanGallery(gallery: Gallery): Promise<void> {
 
       await updateGalleryScannedAt(gallery.id);
       await loadGalleries();
+      progressVisible.value = false;
     } catch (e: any) {
       alert(`扫描出错: ${e.message}`);
     } finally {
