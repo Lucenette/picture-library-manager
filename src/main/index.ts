@@ -61,6 +61,39 @@ function registerIpc(): void {
     });
     return result.canceled ? [] : result.filePaths;
   });
+
+  // 图片查看器数据缓存
+  const viewerStore = new Map<number, any>();
+  let viewerWin: BrowserWindow | null = null;
+
+  ipcMain.handle('viewer:open', async (_event, data: any) => {
+    // 缓存数据，用窗口 webContents.id 做 key
+    viewerStore.set(-1, data); // -1 临时存储
+    if (viewerWin) viewerWin.close();
+    viewerWin = new BrowserWindow({
+      width: 1200, height: 800,
+      backgroundColor: '#0d0d0d',
+      title: '图片查看器',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        webSecurity: false,
+        sandbox: false,
+      },
+    });
+    viewerWin.setMenu(null);
+    viewerStore.set(viewerWin.webContents.id, data);
+    if (process.env.ELECTRON_RENDERER_URL) {
+      viewerWin.loadURL(`${process.env.ELECTRON_RENDERER_URL}#/viewer`);
+    } else {
+      viewerWin.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/viewer' });
+    }
+    viewerWin.on('closed', () => { viewerWin = null; });
+  });
+
+  ipcMain.handle('viewer:getData', (event) => {
+    return viewerStore.get(event.sender.id) ?? viewerStore.get(-1);
+  });
 }
 
 app.whenReady().then(async () => {

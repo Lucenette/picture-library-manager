@@ -156,7 +156,7 @@ export const SQL_INSERT_PROCESSED = "INSERT INTO processed_image (image_group_id
 export const SQL_UPDATE_GROUP_PENDING = "UPDATE image_group SET status='pending' WHERE id = ?";
 
 /** ProcessedImage 带关联查询的基 SQL */
-export const SQL_SELECT_PROCESSED_VIEW_BASE = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName, f.thumbnail AS selectedFileThumbnail
+export const SQL_SELECT_PROCESSED_VIEW_BASE = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName, f.thumbnail AS selectedFileThumbnail, f.width AS selectedFileWidth, f.height AS selectedFileHeight, f.file_size AS selectedFileSize
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
   JOIN gallery g ON pi.gallery_id = g.id

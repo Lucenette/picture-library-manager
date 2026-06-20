@@ -89,6 +89,9 @@ export interface ProcessedImageView extends ProcessedImage {
   scriptName: string | null;
   selectedFileName: string;
   selectedFileThumbnail: string | null;
+  selectedFileWidth: number | null;
+  selectedFileHeight: number | null;
+  selectedFileSize: number | null;
 }
 
 // ============================================================

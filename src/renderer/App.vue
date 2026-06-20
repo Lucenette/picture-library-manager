@@ -1,5 +1,6 @@
 <template>
-  <el-container class="app-container">
+  <router-view v-if="isViewer" />
+  <el-container v-else class="app-container">
     <el-header class="app-header">
       <el-menu
         :default-active="activeMenu"
@@ -34,6 +35,7 @@ import { FolderOpened, Select, PictureFilled } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);
+const isViewer = computed(() => route.path === '/viewer');
 </script>
 
 <style>

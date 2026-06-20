@@ -99,7 +99,7 @@
       <el-table :data="currentFiles" max-height="400">
         <el-table-column label="预览" width="80">
           <template #default="{ row }">
-            <img v-if="row.thumbnail" :src="row.thumbnail" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px" />
+            <img v-if="row.thumbnail" :src="row.thumbnail" @click="openViewer(currentFiles, row)" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer" />
             <span v-else style="font-size:24px">🖼</span>
           </template>
         </el-table-column>
@@ -284,6 +284,21 @@ function statusLabel(status: ImageGroupStatus): string {
 
 function onSelectionChange(rows: ImageGroupView[]): void {
   selectedIds.value = rows.map((r) => r.id);
+}
+
+async function openViewer(fileList: ImageFile[], target: ImageFile): Promise<void> {
+  const { ipcRenderer } = require('electron');
+  const idx = fileList.indexOf(target);
+  const files = fileList.map(f => ({
+    filePath: f.filePath,
+    fileName: f.fileName,
+    relativePath: relPath(f),
+    fileSize: f.fileSize,
+    width: f.width,
+    height: f.height,
+    thumbnail: f.thumbnail,
+  }));
+  await ipcRenderer.invoke('viewer:open', { files, index: idx >= 0 ? idx : 0 });
 }
 
 function relPath(f: ImageFile): string {

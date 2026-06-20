@@ -47,7 +47,8 @@
           <img
             v-if="row.selectedFileThumbnail"
             :src="row.selectedFileThumbnail"
-            style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px"
+            @click="openViewer(row)"
+            style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer"
           />
           <span v-else style="font-size:24px">🖼</span>
         </template>
@@ -155,6 +156,22 @@ const pagedImages = computed(() => {
   const start = (page.value - 1) * pageSize.value;
   return sortedImages.value.slice(start, start + pageSize.value);
 });
+
+async function openViewer(target: ProcessedImageView): Promise<void> {
+  const { ipcRenderer } = require('electron');
+  const list = sortedImages.value;
+  const idx = list.indexOf(target);
+  const files = list.map(pi => ({
+    filePath: pi.selectedFile,
+    fileName: pi.selectedFileName,
+    relativePath: pi.selectedFileName,
+    fileSize: pi.selectedFileSize,
+    width: pi.selectedFileWidth,
+    height: pi.selectedFileHeight,
+    thumbnail: pi.selectedFileThumbnail,
+  }));
+  await ipcRenderer.invoke('viewer:open', { files, index: idx >= 0 ? idx : 0 });
+}
 
 async function loadData(): Promise<void> {
   processedImages.value = await getAllProcessedImages(galleryFilter.value, characterFilter.value);
