@@ -21,23 +21,16 @@
         <el-select v-model="selectedScriptId" placeholder="选择脚本" clearable filterable style="width: 200px; margin-left: 8px">
           <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
-
-        <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId" style="margin-left: 8px">
+      </div>
+      <div class="toolbar-right">
+        <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId">
           批量处理 ({{ selectedIds.length || filteredGroups.length }})
         </el-button>
-
-        <el-button @click="excludeSelected" :disabled="selectedIds.length === 0" style="margin-left: 4px">
+        <el-button @click="excludeSelected" :disabled="selectedIds.length === 0">
           标记排除
         </el-button>
-
-        <el-button @click="unexcludeSelected" :disabled="selectedIds.length === 0" style="margin-left: 4px">
+        <el-button @click="unexcludeSelected" :disabled="selectedIds.length === 0">
           取消排除
-        </el-button>
-      </div>
-
-      <div class="toolbar-right">
-        <el-button @click="showScriptDialog = true">
-          <el-icon><Setting /></el-icon> 脚本管理
         </el-button>
       </div>
     </div>
@@ -54,7 +47,8 @@
       <el-table-column type="selection" width="45" />
       <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip sortable="custom" />
       <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="dirName" label="图片组" min-width="200" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="dirName" label="图片组" min-width="140" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="dirPath" label="路径" min-width="360" show-overflow-tooltip sortable="custom" />
       <el-table-column prop="fileCount" label="文件数" width="90" align="center" sortable="custom" />
       <el-table-column label="状态" width="100" align="center" sortable="custom" prop="status">
         <template #default="{ row }">
@@ -126,30 +120,11 @@
       </el-table>
     </el-dialog>
 
-    <!-- 脚本管理弹窗 -->
-    <el-dialog v-model="showScriptDialog" title="脚本管理" width="600px">
-      <div style="margin-bottom: 12px">
-        <el-button type="primary" size="small" @click="addScript">加载脚本文件</el-button>
-      </div>
-      <el-table :data="scripts" max-height="300">
-        <el-table-column prop="name" label="名称" width="180" show-overflow-tooltip />
-        <el-table-column prop="filePath" label="文件路径" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="loadedAt" label="加载时间" width="160" />
-        <el-table-column label="操作" width="160">
-          <template #default="{ row }">
-            <el-button size="small" text @click="reloadScript(row)">重载</el-button>
-            <el-button size="small" text type="danger" @click="removeScript(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="scripts.length === 0" description="还没有加载脚本" />
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { Setting } from '@element-plus/icons-vue';
 import {
   getImageGroupsView,
   updateImageGroupStatus,
@@ -157,12 +132,9 @@ import {
   upsertProcessedImage,
   getAllScripts,
   getAllGalleries,
-  upsertScript,
-  reloadScript as dbReload,
-  deleteScript,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
-import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '@common/types';
+import type { ImageGroupView, ImageGroupStatus, ImageFile, Gallery } from '@common/types';
 
 // ============================================================
 // 数据
@@ -196,8 +168,6 @@ const fileDialogVisible = ref(false);
 const currentGroup = ref<ImageGroupView | null>(null);
 const currentFiles = ref<ImageFile[]>([]);
 
-/** 脚本管理弹窗 */
-const showScriptDialog = ref(false);
 
 // ============================================================
 // 计算
@@ -386,41 +356,6 @@ async function batchProcess(): Promise<void> {
   setTimeout(next, 50);
 }
 
-/** 添加脚本 —— Electron 原生对话框，支持多选 */
-async function addScript(): Promise<void> {
-  const { ipcRenderer } = require('electron');
-  const paths: string[] = await ipcRenderer.invoke('dialog:openScript');
-  if (!paths || paths.length === 0) return;
-
-  const fs = require('fs');
-  const path = require('path');
-
-  for (const filePath of paths) {
-    const code = fs.readFileSync(filePath, 'utf-8');
-    const name = path.basename(filePath);
-    await upsertScript(name, filePath, code);
-  }
-  scripts.value = await getAllScripts();
-}
-
-/** 重载脚本 */
-async function reloadScript(script: ProcessScript): Promise<void> {
-  const fs = require('fs');
-  try {
-    const code = fs.readFileSync(script.filePath, 'utf-8');
-    await dbReload(script.filePath, code);
-    scripts.value = await getAllScripts();
-  } catch (e: any) { alert(`重载失败: ${e.message}`); }
-}
-
-/** 删除脚本 */
-async function removeScript(script: ProcessScript): Promise<void> {
-  if (!confirm(`确定删除脚本「${script.name}」？`)) return;
-  await deleteScript(script.id);
-  scripts.value = await getAllScripts();
-  if (selectedScriptId.value === script.id) selectedScriptId.value = null;
-}
-
 onMounted(loadData);
 </script>
 
@@ -441,12 +376,8 @@ onMounted(loadData);
   gap: 8px;
   flex-shrink: 0;
 }
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-}
+.toolbar-left { display: flex; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; align-items: center; gap: 4px; }
 
 .file-dialog :deep(.el-dialog__body) {
   padding: 12px 16px;

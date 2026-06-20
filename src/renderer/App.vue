@@ -12,6 +12,10 @@
           <el-icon><FolderOpened /></el-icon>
           <span>图库管理</span>
         </el-menu-item>
+        <el-menu-item index="/scripts">
+          <el-icon><Setting /></el-icon>
+          <span>脚本管理</span>
+        </el-menu-item>
         <el-menu-item index="/process">
           <el-icon><Select /></el-icon>
           <span>处理确认</span>
@@ -31,7 +35,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { FolderOpened, Select, PictureFilled } from '@element-plus/icons-vue';
+import { FolderOpened, Setting, Select, PictureFilled } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);

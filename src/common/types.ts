@@ -54,6 +54,7 @@ export interface ProcessScript {
   name: string;
   filePath: string;
   code: string;
+  brief: string;
   loadedAt: string;
   createdAt: string;
 }

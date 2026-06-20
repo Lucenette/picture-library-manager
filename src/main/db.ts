@@ -188,18 +188,25 @@ export function insertImageFiles(
 // ProcessScript
 // ============================================================
 
+function makeBrief(code: string): string {
+  const brief = code.replace(/\n/g, '\\n').substring(0, 120);
+  return brief.length >= 120 ? brief + '…' : brief;
+}
+
 export function upsertScript(name: string, filePath: string, code: string): ProcessScript {
+  const brief = makeBrief(code);
   const existing = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath]);
   if (existing) {
-    run(S.SQL_UPDATE_SCRIPT, [name, code, filePath]);
+    run(S.SQL_UPDATE_SCRIPT, [name, code, brief, filePath]);
   } else {
-    run(S.SQL_INSERT_SCRIPT, [name, filePath, code]);
+    run(S.SQL_INSERT_SCRIPT, [name, filePath, code, brief]);
   }
   return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
 }
 
 export function reloadScript(filePath: string, code: string): ProcessScript {
-  run(S.SQL_RELOAD_SCRIPT, [code, filePath]);
+  const brief = makeBrief(code);
+  run(S.SQL_RELOAD_SCRIPT, [code, brief, filePath]);
   return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
 }
 
@@ -209,6 +216,10 @@ export function getAllScripts(): ProcessScript[] {
 
 export function getScriptById(id: number): ProcessScript | undefined {
   return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_ID, [id]);
+}
+
+export function renameScript(id: number, name: string): void {
+  run(S.SQL_RENAME_SCRIPT, [name, id]);
 }
 
 export function deleteScript(id: number): void {

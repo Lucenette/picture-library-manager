@@ -51,6 +51,7 @@ export const CREATE_PROCESS_SCRIPT = `CREATE TABLE IF NOT EXISTS process_script 
   name TEXT NOT NULL,
   file_path TEXT NOT NULL UNIQUE,
   code TEXT NOT NULL,
+  brief TEXT NOT NULL DEFAULT '',
   loaded_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 )`;
@@ -140,9 +141,10 @@ export const SQL_SELECT_SCRIPT_BY_PATH = 'SELECT * FROM process_script WHERE fil
 export const SQL_SELECT_SCRIPT_BY_ID = 'SELECT * FROM process_script WHERE id = ?';
 export const SQL_SELECT_SCRIPTS_ALL = 'SELECT * FROM process_script ORDER BY name';
 export const SQL_DELETE_SCRIPT = 'DELETE FROM process_script WHERE id = ?';
-export const SQL_INSERT_SCRIPT = "INSERT INTO process_script (name, file_path, code, loaded_at) VALUES (?, ?, ?, datetime('now','localtime'))";
-export const SQL_UPDATE_SCRIPT = "UPDATE process_script SET name=?, code=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
-export const SQL_RELOAD_SCRIPT = "UPDATE process_script SET code=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
+export const SQL_INSERT_SCRIPT = "INSERT INTO process_script (name, file_path, code, brief, loaded_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))";
+export const SQL_UPDATE_SCRIPT = "UPDATE process_script SET name=?, code=?, brief=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
+export const SQL_RELOAD_SCRIPT = "UPDATE process_script SET code=?, brief=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
+export const SQL_RENAME_SCRIPT = 'UPDATE process_script SET name=? WHERE id=?';
 
 // ============================================================
 // ProcessedImage

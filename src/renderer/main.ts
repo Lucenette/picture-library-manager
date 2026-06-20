@@ -10,6 +10,7 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', name: 'gallery', component: import('@/views/GalleryPage.vue') },
+    { path: '/scripts', name: 'scripts', component: import('@/views/ScriptPage.vue') },
     { path: '/process', name: 'process', component: import('@/views/ProcessPage.vue') },
     { path: '/library', name: 'library', component: import('@/views/LibraryPage.vue') },
     { path: '/viewer', name: 'viewer', component: import('@/views/ImageViewer.vue') },

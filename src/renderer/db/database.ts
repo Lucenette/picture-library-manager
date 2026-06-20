@@ -51,6 +51,7 @@ export async function upsertScript(name: string, filePath: string, code: string)
 export async function reloadScript(filePath: string, code: string): Promise<ProcessScript> { return call('reloadScript', filePath, code); }
 export async function getAllScripts(): Promise<ProcessScript[]> { return call('getAllScripts'); }
 export async function getScriptById(id: number): Promise<ProcessScript | undefined> { return call('getScriptById', id); }
+export async function renameScript(id: number, name: string): Promise<void> { await call('renameScript', id, name); }
 export async function deleteScript(id: number): Promise<void> { await call('deleteScript', id); }
 
 // ProcessedImage
