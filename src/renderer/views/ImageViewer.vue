@@ -12,10 +12,13 @@
       @mousedown="onMouseDown"
       @mousemove="onMouseMove"
       @mouseup="onMouseUp"
-      @mouseleave="onMouseUp"
+      @mouseleave="onMouseUp(); navVisible = false"
       @dblclick="onDblClick"
       @click="onClick"
+      @mouseenter="navVisible = true"
     >
+      <div v-if="navVisible && index > 0" class="viewer-nav-left" @click.stop="prev">‹</div>
+      <div v-if="navVisible && index < files.length - 1" class="viewer-nav-right" @click.stop="next">›</div>
       <img
         v-if="currentFile"
         :src="'file://' + currentFile.filePath"
@@ -26,17 +29,16 @@
         @load="onImgLoad"
       />
     </div>
-    <div class="viewer-thumbs" ref="thumbsRef" :style="{ paddingLeft: thumbPad + 'px' }">
-      <div v-for="(f, i) in visibleThumbs" :key="f.idx" class="thumb-item" :class="{ active: f.idx === index }" @click="index = f.idx">
-        <img v-if="f.file.thumbnail" :src="f.file.thumbnail" />
-        <span v-else>🖼</span>
+    <div class="viewer-thumbs">
+      <div v-for="t in thumbSlots" :key="t.idx" class="thumb-item" :class="{ active: t.active, empty: !t.file }" :style="{ width: thumbSize(t), height: thumbSize(t), '--hover-scale': 68 / parseInt(thumbSize(t)) }" @click="t.file && (index = t.idx)">
+        <img v-if="t.file?.thumbnail" :src="t.file.thumbnail" :alt="t.file.fileName || t.file.relativePath" :title="t.file.fileName || t.file.relativePath" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 const { ipcRenderer } = require('electron');
 
 interface ViewerFile {
@@ -58,6 +60,7 @@ const offsetY = ref(0);
 const dragging = ref(false);
 const dragStartX = ref(0);
 const dragStartY = ref(0);
+const navVisible = ref(false);
 const displayZoom = ref('');
 const imgEl = ref<HTMLImageElement | null>(null);
 const viewerMain = ref<HTMLElement | null>(null);
@@ -84,53 +87,39 @@ function calcFit(): void {
 
 function onImgLoad(): void { calcFit(); cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel(); }
 
-function onResize(): void { calcFit(); calcThumbs(); }
+function onResize(): void { calcFit(); }
 
-const thumbsRef = ref<HTMLElement | null>(null);
-const thumbCount = ref(10);
-const thumbPad = ref(0);
-const thumbW = 54; // 50px宽 + 4px gap
+const HALF = 30;
 
-function calcThumbs(): void {
-  const ct = thumbsRef.value;
-  if (!ct) return;
-  const count = Math.max(1, Math.floor((ct.clientWidth - 32) / thumbW));
-  thumbCount.value = count;
-  // 左填充让活动缩略图居中
-  const half = Math.floor(count / 2);
-  const start = Math.max(0, index.value - half);
-  if (start === 0) {
-    thumbPad.value = (half - index.value) * thumbW;
-  } else if (index.value + half >= files.value.length) {
-    const extra = index.value + half - files.value.length + 1;
-    thumbPad.value = (half + extra) * thumbW;
-  } else {
-    thumbPad.value = 0;
-  }
+function thumbSize(t: { idx: number; active: boolean }): string {
+  if (t.active) return '72px';
+  if (Math.abs(t.idx - index.value) === 1) return '60px';
+  return '50px';
 }
 
-const visibleThumbs = computed(() => {
-  const half = Math.floor(thumbCount.value / 2);
-  const start = Math.max(0, index.value - half);
-  const end = Math.min(files.value.length, start + thumbCount.value);
-  const result: { idx: number; file: ViewerFile }[] = [];
-  for (let i = start; i < end; i++) {
-    if (files.value[i]) result.push({ idx: i, file: files.value[i] });
+const thumbSlots = computed(() => {
+  const slots: { idx: number; file: ViewerFile | null; active: boolean }[] = [];
+  const cur = index.value;
+  const total = files.value.length;
+  // 左30个 + 中间1个 + 右30个
+  for (let i = cur - HALF; i <= cur + HALF; i++) {
+    slots.push({
+      idx: i,
+      file: i >= 0 && i < total ? files.value[i] : null,
+      active: i === cur,
+    });
   }
-  return result;
+  return slots;
 });
 
 watch(index, () => {
   cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel();
-  calcThumbs();
 });
 
 async function init(): Promise<void> {
   const data = await ipcRenderer.invoke('viewer:getData');
   if (data) { files.value = data.files; index.value = data.index; }
   window.addEventListener('resize', onResize);
-  await nextTick();
-  calcThumbs();
 }
 
 function prev(): void { if (index.value > 0) index.value--; }
@@ -189,6 +178,7 @@ function onKey(e: KeyboardEvent): void {
   if (e.key === 'ArrowRight') next();
   if (e.key === 'Escape') close();
   if (e.key === '0') { cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel(); }
+  if (e.key === 'F12') { ipcRenderer.invoke('viewer:devtools'); }
 }
 
 function close(): void { window.close(); }
@@ -220,17 +210,36 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   flex: 1; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
 }
+.viewer-nav-left, .viewer-nav-right {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 56px; color: rgba(255,255,255,0.5); cursor: pointer;
+  user-select: none; z-index: 5; padding: 40px 12px;
+  transition: color 0.15s;
+}
+.viewer-nav-left { left: 8px; }
+.viewer-nav-right { right: 8px; }
+.viewer-nav-left:hover, .viewer-nav-right:hover { color: rgba(255,255,255,0.9); }
 .viewer-img { will-change: transform; transform-origin: center center; }
 .viewer-thumbs {
-  display: flex; gap: 4px; padding: 8px 16px;
-  background: #1a1a1a; overflow-x: auto; flex-shrink: 0;
-  height: 70px; align-items: center;
+  display: flex; gap: 6px; padding: 4px 100px 8px 100px;
+  background: #1a1a1a; overflow: hidden; flex-shrink: 0;
+  align-items: center; justify-content: center;
+  position: relative;
 }
+.viewer-thumbs::before,
+.viewer-thumbs::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 100px; z-index: 2; pointer-events: none;
+}
+.viewer-thumbs::before { left: 0; background: linear-gradient(to right, #1a1a1a, rgba(26,26,26,0)); }
+.viewer-thumbs::after { right: 0; background: linear-gradient(to left, #1a1a1a, rgba(26,26,26,0)); }
 .thumb-item {
-  width: 50px; height: 50px; flex-shrink: 0; border: 2px solid transparent;
+  flex-shrink: 0;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  background: #222; border-radius: 4px; overflow: hidden;
+  border-radius: 4px; overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.thumb-item.active { border-color: #3871e1; }
+.thumb-item.empty { visibility: hidden; }
+.thumb-item.active { box-shadow: 0 2px 12px rgba(0,0,0,0.4); border: 2px solid #3871e1; z-index: 4; position: relative; }
+.thumb-item:not(.active):hover { transform: scale(var(--hover-scale, 1.36)); z-index: 3; box-shadow: 0 4px 20px rgba(0,0,0,0.7); }
 .thumb-item img { width: 100%; height: 100%; object-fit: cover; }
 </style>

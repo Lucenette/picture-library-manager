@@ -15,9 +15,9 @@
         <el-select v-model="characterFilter" placeholder="按角色筛选" clearable filterable style="width: 180px; margin-left: 8px" @change="loadData">
           <el-option
             v-for="c in characters"
-            :key="c.id"
-            :label="c.name"
-            :value="c.id"
+            :key="c"
+            :label="c"
+            :value="c"
           />
         </el-select>
       </div>
@@ -105,14 +105,14 @@ import type { ProcessedImageView, Gallery } from '@common/types';
 const processedImages = ref<ProcessedImageView[]>([]);
 const selectedIds = ref<number[]>([]);
 const galleryFilter = ref<number | undefined>(undefined);
-const characterFilter = ref<number | undefined>(undefined);
+const characterFilter = ref<string>('');
 const galleries = ref<Gallery[]>([]);
 const characters = computed(() => {
   const seen = new Set<string>();
   return processedImages.value
     .filter(pi => seen.has(pi.characterName) ? false : (seen.add(pi.characterName), true))
-    .map(pi => ({ id: pi.characterId, name: pi.characterName, galleryId: pi.galleryId, sourcePath: '', createdAt: '' }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map(pi => pi.characterName)
+    .sort((a, b) => a.localeCompare(b));
 });
 
 /** 导出状态 */

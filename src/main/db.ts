@@ -233,11 +233,11 @@ export function upsertProcessedImage(
   return queryOne<ProcessedImage>(S.SQL_SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
-export function getAllProcessedImages(galleryId?: number, characterId?: number): ProcessedImageView[] {
+export function getAllProcessedImages(galleryId?: number, characterName?: string): ProcessedImageView[] {
   let sql = S.SQL_SELECT_PROCESSED_VIEW_BASE;
   const params: any[] = [];
   if (galleryId) { sql += ' AND pi.gallery_id = ?'; params.push(galleryId); }
-  if (characterId) { sql += ' AND pi.character_id = ?'; params.push(characterId); }
+  if (characterName) { sql += ' AND c.name = ?'; params.push(characterName); }
   sql += ' ORDER BY c.name';
   return queryAll<ProcessedImageView>(sql, params);
 }

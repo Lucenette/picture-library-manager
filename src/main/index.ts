@@ -94,6 +94,10 @@ function registerIpc(): void {
   ipcMain.handle('viewer:getData', (event) => {
     return viewerStore.get(event.sender.id) ?? viewerStore.get(-1);
   });
+
+  ipcMain.handle('viewer:devtools', (event) => {
+    event.sender.openDevTools();
+  });
 }
 
 app.whenReady().then(async () => {

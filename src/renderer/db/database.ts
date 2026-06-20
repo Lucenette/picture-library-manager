@@ -55,5 +55,5 @@ export async function deleteScript(id: number): Promise<void> { await call('dele
 
 // ProcessedImage
 export async function upsertProcessedImage(imageGroupId: number, characterId: number, galleryId: number, originalPath: string, selectedFile: string, scriptId: number | null): Promise<ProcessedImage> { return call('upsertProcessedImage', imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId); }
-export async function getAllProcessedImages(galleryId?: number, characterId?: number): Promise<ProcessedImageView[]> { return call('getAllProcessedImages', galleryId, characterId); }
+export async function getAllProcessedImages(galleryId?: number, characterName?: string): Promise<ProcessedImageView[]> { return call('getAllProcessedImages', galleryId, characterName); }
 export async function deleteProcessedImage(id: number): Promise<void> { await call('deleteProcessedImage', id); }

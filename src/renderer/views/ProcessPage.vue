@@ -22,8 +22,8 @@
           <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
 
-        <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId || selectedIds.length === 0" style="margin-left: 8px">
-          批量处理 ({{ selectedIds.length }})
+        <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId" style="margin-left: 8px">
+          批量处理 ({{ selectedIds.length || filteredGroups.length }})
         </el-button>
 
         <el-button @click="excludeSelected" :disabled="selectedIds.length === 0" style="margin-left: 4px">
@@ -355,8 +355,10 @@ async function unexcludeSelected(): Promise<void> {
 
 /** 批量处理 */
 async function batchProcess(): Promise<void> {
-  if (!selectedScriptId.value || selectedIds.value.length === 0) return;
-  const targets = allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded');
+  if (!selectedScriptId.value) return;
+  const targets = selectedIds.value.length > 0
+    ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
+    : filteredGroups.value.filter(g => g.status !== 'excluded');
   if (targets.length === 0) { alert('选中的图片组都已被排除'); return; }
 
   processing.value = true;
