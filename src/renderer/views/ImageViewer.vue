@@ -26,9 +26,9 @@
         @load="onImgLoad"
       />
     </div>
-    <div class="viewer-thumbs">
-      <div v-for="(f, i) in files" :key="i" class="thumb-item" :class="{ active: i === index }" @click="index = i">
-        <img v-if="f.thumbnail" :src="f.thumbnail" />
+    <div class="viewer-thumbs" ref="thumbsRef" :style="{ paddingLeft: thumbPad + 'px' }">
+      <div v-for="(f, i) in visibleThumbs" :key="f.idx" class="thumb-item" :class="{ active: f.idx === index }" @click="index = f.idx">
+        <img v-if="f.file.thumbnail" :src="f.file.thumbnail" />
         <span v-else>🖼</span>
       </div>
     </div>
@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted, nextTick } from 'vue';
 const { ipcRenderer } = require('electron');
 
 interface ViewerFile {
@@ -84,14 +84,53 @@ function calcFit(): void {
 
 function onImgLoad(): void { calcFit(); cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel(); }
 
-function onResize(): void { calcFit(); }
+function onResize(): void { calcFit(); calcThumbs(); }
 
-watch(index, () => { cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel(); });
+const thumbsRef = ref<HTMLElement | null>(null);
+const thumbCount = ref(10);
+const thumbPad = ref(0);
+const thumbW = 54; // 50px宽 + 4px gap
+
+function calcThumbs(): void {
+  const ct = thumbsRef.value;
+  if (!ct) return;
+  const count = Math.max(1, Math.floor((ct.clientWidth - 32) / thumbW));
+  thumbCount.value = count;
+  // 左填充让活动缩略图居中
+  const half = Math.floor(count / 2);
+  const start = Math.max(0, index.value - half);
+  if (start === 0) {
+    thumbPad.value = (half - index.value) * thumbW;
+  } else if (index.value + half >= files.value.length) {
+    const extra = index.value + half - files.value.length + 1;
+    thumbPad.value = (half + extra) * thumbW;
+  } else {
+    thumbPad.value = 0;
+  }
+}
+
+const visibleThumbs = computed(() => {
+  const half = Math.floor(thumbCount.value / 2);
+  const start = Math.max(0, index.value - half);
+  const end = Math.min(files.value.length, start + thumbCount.value);
+  const result: { idx: number; file: ViewerFile }[] = [];
+  for (let i = start; i < end; i++) {
+    if (files.value[i]) result.push({ idx: i, file: files.value[i] });
+  }
+  return result;
+});
+
+watch(index, () => {
+  cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel();
+  calcThumbs();
+});
 
 async function init(): Promise<void> {
   const data = await ipcRenderer.invoke('viewer:getData');
   if (data) { files.value = data.files; index.value = data.index; }
   window.addEventListener('resize', onResize);
+  await nextTick();
+  calcThumbs();
 }
 
 function prev(): void { if (index.value > 0) index.value--; }
