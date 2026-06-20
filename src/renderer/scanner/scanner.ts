@@ -1,14 +1,15 @@
-import { readdirSync, statSync } from 'fs';
-import { join, extname } from 'path';
-import { imageSize } from 'image-size';
+import {readdirSync, statSync} from 'fs';
+import {extname, join} from 'path';
+import {imageSize} from 'image-size';
+import {IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME} from '@/db/database';
+import type {ScannedCharacter, ScannedFile, ScanProgress} from '@common/types';
+
 const { Jimp } = require('jimp');
 const jpegJs = require('jpeg-js');
 const { PNG: PngJs } = require('pngjs');
 const { GifReader } = require('omggif');
 const bmpTs = require('bmp-ts');
 const utif2 = require('utif2');
-import { IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME } from '@/db/database';
-import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '@common/types';
 
 /**
  * 全格式解码为 { width, height, data: Buffer(RGBA) }
@@ -63,8 +64,7 @@ async function generateThumbnail(filePath: string): Promise<string | null> {
     const y = Math.floor((raw.height - size) / 2);
 
     const img = Jimp.fromBitmap({ width: raw.width, height: raw.height, data: raw.data });
-    const thumb = await img.crop({ x, y, w: size, h: size }).resize({ w: 50, h: 50 }).getBase64('image/png');
-    return thumb;
+    return await img.crop({x, y, w: size, h: size}).resize({w: 50, h: 50}).getBase64('image/png');
   } catch (e: any) {
     console.error(`缩略图失败: ${filePath}`, e.message);
     return null;
@@ -153,6 +153,7 @@ function collectImageFiles(dirPath: string): ScannedFile[] {
           width,
           height,
           extension: extname(entry).toLowerCase().replace('.', ''),
+          thumbnail: null,
         });
       }
     }
@@ -239,6 +240,7 @@ export function scanGallery(
           width,
           height,
           extension: extname(ge).toLowerCase().replace('.', ''),
+          thumbnail: null,
         });
       }
     }
