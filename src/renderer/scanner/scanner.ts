@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
-import { sizeOf } from 'image-size';
+import { imageSize } from 'image-size';
 import { IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME } from '@/db/database';
 import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '@/types';
 
@@ -49,7 +49,7 @@ function collectImageFiles(dirPath: string): ScannedFile[] {
         let width: number | null = null;
         let height: number | null = null;
         try {
-          const dims = sizeOf(fullPath);
+          const dims = imageSize(fullPath);
           width = dims.width ?? null;
           height = dims.height ?? null;
         } catch {
@@ -136,7 +136,7 @@ export function scanGallery(
         let width: number | null = null;
         let height: number | null = null;
         try {
-          const dims = sizeOf(gePath);
+          const dims = imageSize(gePath);
           width = dims.width ?? null;
           height = dims.height ?? null;
         } catch {

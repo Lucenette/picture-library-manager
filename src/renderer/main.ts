@@ -3,16 +3,13 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import ElementPlus from 'element-plus';
 import 'element-plus/dist/index.css';
 import App from '@/App.vue';
-import GalleryPage from '@/views/GalleryPage.vue';
-import ProcessPage from '@/views/ProcessPage.vue';
-import LibraryPage from '@/views/LibraryPage.vue';
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', name: 'gallery', component: GalleryPage },
-    { path: '/process', name: 'process', component: ProcessPage },
-    { path: '/library', name: 'library', component: LibraryPage },
+    { path: '/', name: 'gallery', component: import('@/views/GalleryPage.vue') },
+    { path: '/process', name: 'process', component: import('@/views/ProcessPage.vue') },
+    { path: '/library', name: 'library', component: import('@/views/LibraryPage.vue') },
   ],
 });
 

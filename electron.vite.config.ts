@@ -1,5 +1,6 @@
 import { defineConfig } from 'electron-vite';
 import vue from '@vitejs/plugin-vue';
+import renderer from 'vite-plugin-electron-renderer';
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -11,18 +12,10 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [vue()],
+    plugins: [vue(), renderer()],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src/renderer'),
-      },
-    },
-    optimizeDeps: {
-      exclude: ['electron'],
-    },
-    build: {
-      rollupOptions: {
-        external: ['electron'],
       },
     },
   },

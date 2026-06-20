@@ -5,8 +5,12 @@
     "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
+    "types": ["node"],
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["electron.vite.config.ts", "src/main/**/*.ts"]
+  "include": [
+    "electron.vite.config.ts",
+    "src/main/**/*.ts"
+  ]
 }

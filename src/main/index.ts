@@ -2,11 +2,14 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import * as db from './db';
 
-/**
- * 创建主窗口
- * - nodeIntegration: true —— 渲染进程可直接 require Node 模块
- * - contextIsolation: false —— 不需要 preload，简单直接
- */
+// 关闭所有 Chrome/Electron 安全策略
+app.commandLine.appendSwitch('disable-web-security');
+app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+app.commandLine.appendSwitch('allow-running-insecure-content');
+app.commandLine.appendSwitch('ignore-certificate-errors');
+app.commandLine.appendSwitch('disable-site-isolation-trials');
+app.commandLine.appendSwitch('no-sandbox');
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
@@ -15,6 +18,11 @@ function createWindow(): void {
       nodeIntegration: true,
       contextIsolation: false,
       webSecurity: false,
+      allowRunningInsecureContent: true,
+      nodeIntegrationInWorker: true,
+      nodeIntegrationInSubFrames: true,
+      sandbox: false,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   });
 
@@ -26,13 +34,10 @@ function createWindow(): void {
   }
 }
 
-/** 注册数据库 IPC 通道：渲染进程 invoke('db', method, ...args) */
 function registerIpc(): void {
   ipcMain.handle('db', async (_event, method: string, ...args: any[]) => {
     const fn = (db as any)[method];
-    if (typeof fn !== 'function') {
-      throw new Error(`Unknown db method: ${method}`);
-    }
+    if (typeof fn !== 'function') throw new Error(`Unknown db method: ${method}`);
     return fn(...args);
   });
 }
