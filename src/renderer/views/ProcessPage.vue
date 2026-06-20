@@ -3,22 +3,22 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-select v-model="galleryFilter" placeholder="按图库" clearable style="width: 140px" @change="onGalleryFilterChange">
+        <el-select v-model="galleryFilter" placeholder="按图库" clearable filterable style="width: 140px" @change="onGalleryFilterChange">
           <el-option v-for="g in galleries" :key="g.id" :label="g.name" :value="g.id" />
         </el-select>
 
-        <el-select v-model="characterFilter" placeholder="按角色" clearable style="width: 160px; margin-left: 8px">
+        <el-select v-model="characterFilter" placeholder="按角色" clearable filterable style="width: 160px; margin-left: 8px">
           <el-option v-for="c in characterNames" :key="c" :label="c" :value="c" />
         </el-select>
 
-        <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 140px; margin-left: 8px">
+        <el-select v-model="statusFilter" placeholder="状态筛选" clearable filterable style="width: 140px; margin-left: 8px">
           <el-option label="全部" value="" />
           <el-option label="未处理" value="pending" />
           <el-option label="已处理" value="processed" />
           <el-option label="已排除" value="excluded" />
         </el-select>
 
-        <el-select v-model="selectedScriptId" placeholder="选择脚本" clearable style="width: 200px; margin-left: 8px">
+        <el-select v-model="selectedScriptId" placeholder="选择脚本" clearable filterable style="width: 200px; margin-left: 8px">
           <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
 

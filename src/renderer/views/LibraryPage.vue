@@ -3,7 +3,7 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-select v-model="galleryFilter" placeholder="按图库筛选" clearable style="width: 180px" @change="loadData">
+        <el-select v-model="galleryFilter" placeholder="按图库筛选" clearable filterable style="width: 180px" @change="loadData">
           <el-option
             v-for="g in galleries"
             :key="g.id"
@@ -12,7 +12,7 @@
           />
         </el-select>
 
-        <el-select v-model="characterFilter" placeholder="按角色筛选" clearable style="width: 180px; margin-left: 8px" @change="loadData">
+        <el-select v-model="characterFilter" placeholder="按角色筛选" clearable filterable style="width: 180px; margin-left: 8px" @change="loadData">
           <el-option
             v-for="c in characters"
             :key="c.id"
@@ -95,9 +95,8 @@ import {
   getAllProcessedImages,
   deleteProcessedImage,
   getAllGalleries,
-  getCharactersByGallery,
 } from '@/db/database';
-import type { ProcessedImageView, Gallery, Character } from '@common/types';
+import type { ProcessedImageView, Gallery } from '@common/types';
 
 /** 所有 processed_image 记录 */
 const processedImages = ref<ProcessedImageView[]>([]);
@@ -105,7 +104,13 @@ const selectedIds = ref<number[]>([]);
 const galleryFilter = ref<number | undefined>(undefined);
 const characterFilter = ref<number | undefined>(undefined);
 const galleries = ref<Gallery[]>([]);
-const characters = ref<Character[]>([]);
+const characters = computed(() => {
+  const seen = new Set<string>();
+  return processedImages.value
+    .filter(pi => seen.has(pi.characterName) ? false : (seen.add(pi.characterName), true))
+    .map(pi => ({ id: pi.characterId, name: pi.characterName, galleryId: pi.galleryId, sourcePath: '', createdAt: '' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+});
 
 /** 导出状态 */
 const exporting = ref(false);
@@ -152,11 +157,6 @@ const pagedImages = computed(() => {
 async function loadData(): Promise<void> {
   processedImages.value = await getAllProcessedImages(galleryFilter.value, characterFilter.value);
   galleries.value = await getAllGalleries();
-  if (galleryFilter.value) {
-    characters.value = await getCharactersByGallery(galleryFilter.value);
-  } else {
-    characters.value = [];
-  }
 }
 
 function onSelectionChange(rows: ProcessedImageView[]): void {

@@ -153,6 +153,10 @@ export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number
 
 export function updateImageGroupStatus(id: number, status: ImageGroupStatus): void {
   run(S.SQL_UPDATE_IMAGE_GROUP_STATUS, [status, id]);
+  // 排除时级联删除已处理记录
+  if (status === 'excluded') {
+    run('DELETE FROM processed_image WHERE image_group_id = ?', [id]);
+  }
 }
 
 export function getImageFilesByGroup(groupId: number): ImageFile[] {
@@ -232,10 +236,10 @@ export function getAllProcessedImages(galleryId?: number, characterId?: number):
 }
 
 export function deleteProcessedImage(id: number): void {
-  const r = queryOne<{ image_group_id: number }>(S.SQL_SELECT_PROCESSED_BY_ID_GROUP, [id]);
+  const r = queryOne<{ imageGroupId: number }>(S.SQL_SELECT_PROCESSED_BY_ID_GROUP, [id]);
   if (!r) return;
   run(S.SQL_DELETE_PROCESSED, [id]);
-  run(S.SQL_UPDATE_GROUP_PENDING, [r.image_group_id]);
+  run(S.SQL_UPDATE_GROUP_PENDING, [r.imageGroupId]);
 }
 
 /** 关闭数据库并落盘 */
