@@ -60,6 +60,10 @@ function registerIpc(): void {
   ipcMain.handle('viewer:devtools', (event) => {
     event.sender.openDevTools();
   });
+
+  ipcMain.handle('devtools', (event) => {
+    event.sender.openDevTools({ mode: 'detach' });
+  });
 }
 
 app.whenReady().then(async () => {

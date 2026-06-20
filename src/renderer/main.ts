@@ -5,15 +5,20 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs';
 import 'element-plus/dist/index.css';
 import '@/styles/theme.css';
 import App from '@/App.vue';
+import GalleryPage from '@/views/GalleryPage.vue';
+import ScriptPage from '@/views/ScriptPage.vue';
+import ProcessPage from '@/views/ProcessPage.vue';
+import LibraryPage from '@/views/LibraryPage.vue';
+import ImageViewer from '@/views/ImageViewer.vue';
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', name: 'gallery', component: import('@/views/GalleryPage.vue') },
-    { path: '/scripts', name: 'scripts', component: import('@/views/ScriptPage.vue') },
-    { path: '/process', name: 'process', component: import('@/views/ProcessPage.vue') },
-    { path: '/library', name: 'library', component: import('@/views/LibraryPage.vue') },
-    { path: '/viewer', name: 'viewer', component: import('@/views/ImageViewer.vue') },
+    { path: '/', name: 'gallery', component: GalleryPage },
+    { path: '/scripts', name: 'scripts', component: ScriptPage },
+    { path: '/process', name: 'process', component: ProcessPage },
+    { path: '/library', name: 'library', component: LibraryPage },
+    { path: '/viewer', name: 'viewer', component: ImageViewer },
   ],
 });
 

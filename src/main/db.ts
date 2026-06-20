@@ -1,7 +1,7 @@
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
-import { join } from 'path';
-import { homedir } from 'os';
+import { join, dirname } from 'path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { app } from 'electron';
 import * as S from '@/sql';
 import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView } from '@common/types';
 
@@ -15,12 +15,20 @@ export const VIRTUAL_GROUP_NAME = '(未分类)';
 let db: SqlJsDatabase | null = null;
 let dbPath: string;
 
+/** 数据库目录：打包后在 exe 旁边的 data/ 下，开发时在项目根 data/ 下 */
+function getDataDir(): string {
+  if (app.isPackaged) {
+    return join(dirname(app.getPath('exe')), 'data');
+  }
+  return join(process.cwd(), 'dist', 'data');
+}
+
 // ============================================================
 // 初始化
 // ============================================================
 
 export async function initDatabase(): Promise<void> {
-  const dir = join(homedir(), '.picture-lib');
+  const dir = getDataDir();
   mkdirSync(dir, { recursive: true });
   dbPath = join(dir, 'picture-lib.db');
 

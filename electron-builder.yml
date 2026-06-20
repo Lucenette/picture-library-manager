@@ -1,0 +1,30 @@
+appId: com.lucenette.picture-library-manager
+productName: PLManager
+copyright: MIT
+
+directories:
+  output: dist
+
+files:
+  - out/**/*
+  - package.json
+
+extraFiles:
+  - from: data
+    to: data
+
+npmRebuild: false
+asar: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: null
+  sign: null
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}_Setup_${version}.${ext}
+

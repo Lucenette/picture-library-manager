@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
-import { join } from 'path';
+import { join, resolve } from 'path';
+import { pathToFileURL } from 'url';
 
 /** 窗口工厂配置 */
 interface WindowConfig {
@@ -15,7 +16,8 @@ function getUrl(hash: string): string {
   if (process.env.ELECTRON_RENDERER_URL) {
     return `${process.env.ELECTRON_RENDERER_URL}#${hash}`;
   }
-  return `file://${join(__dirname, '../renderer/index.html')}#${hash}`;
+  const indexPath = resolve(__dirname, '../renderer/index.html');
+  return `${pathToFileURL(indexPath).href}#${hash}`;
 }
 
 const windows = new Map<string, BrowserWindow>();
@@ -25,6 +27,7 @@ const defaultWebPrefs = {
   contextIsolation: false,
   webSecurity: false,
   sandbox: false,
+  allowFileAccessFromFileUrls: true,
 };
 
 /** 创建并注册窗口 */

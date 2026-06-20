@@ -1,6 +1,6 @@
 <template>
   <router-view v-if="isViewer" />
-  <el-container v-else class="app-container">
+  <el-container v-else class="app-container" @keydown="onKey" tabindex="0" ref="appEl">
     <el-header class="app-header">
       <el-menu
         :default-active="activeMenu"
@@ -40,6 +40,12 @@ import { FolderOpened, Setting, Select, PictureFilled } from '@element-plus/icon
 const route = useRoute();
 const activeMenu = computed(() => route.path);
 const isViewer = computed(() => route.path === '/viewer');
+
+function onKey(e: KeyboardEvent): void {
+  if (e.key === 'F12') {
+    require('electron').ipcRenderer.invoke('devtools');
+  }
+}
 </script>
 
 <style>
