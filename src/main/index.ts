@@ -51,6 +51,15 @@ function registerIpc(): void {
     });
     return result.canceled ? [] : result.filePaths;
   });
+
+  ipcMain.handle('dialog:openScript', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'JavaScript', extensions: ['js'] }],
+      title: '选择脚本文件（可多选）',
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
 }
 
 app.whenReady().then(async () => {

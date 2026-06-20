@@ -360,32 +360,21 @@ async function batchProcess(): Promise<void> {
   setTimeout(next, 50);
 }
 
-/** 添加脚本 */
-function addScript(): void {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.js';
+/** 添加脚本 —— Electron 原生对话框，支持多选 */
+async function addScript(): Promise<void> {
+  const { ipcRenderer } = require('electron');
+  const paths: string[] = await ipcRenderer.invoke('dialog:openScript');
+  if (!paths || paths.length === 0) return;
 
-  input.onchange = () => {
-    const file = input.files?.[0];
-    if (!file) return;
+  const fs = require('fs');
+  const path = require('path');
 
-    const filePath = (file as any).path as string;
-    if (!filePath) {
-      alert('无法获取文件路径');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const code = reader.result as string;
-      await upsertScript(file.name, filePath, code);
-      scripts.value = await getAllScripts();
-    };
-    reader.readAsText(file);
-  };
-
-  input.click();
+  for (const filePath of paths) {
+    const code = fs.readFileSync(filePath, 'utf-8');
+    const name = path.basename(filePath);
+    await upsertScript(name, filePath, code);
+  }
+  scripts.value = await getAllScripts();
 }
 
 /** 重载脚本 */
