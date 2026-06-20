@@ -42,9 +42,9 @@
       </div>
     </div>
 
-    <!-- 图片组表格 -->
+    <div class="table-wrap">
     <el-table
-      :data="filteredGroups"
+      :data="pagedGroups"
       style="width: 100%"
       @selection-change="onSelectionChange"
       @sort-change="onSortChange"
@@ -72,8 +72,16 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
-    <el-empty v-if="filteredGroups.length === 0" description="没有匹配的数据" />
+    <el-pagination
+      v-model:current-page="page"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50, 100]"
+      :total="filteredGroups.length"
+      layout="total, sizes, prev, pager, next, jumper"
+      class="pager"
+    />
 
     <!-- 处理进度 -->
     <el-dialog v-model="processProgressVisible" title="处理进度" width="400px" :close-on-click-modal="false">
@@ -170,6 +178,10 @@ const processedCount = ref(0);
 const totalCount = ref(0);
 const errorCount = ref(0);
 
+/** 分页 */
+const page = ref(1);
+const pageSize = ref(20);
+
 /** 排序 */
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
@@ -208,10 +220,12 @@ const filteredGroups = computed(() => {
   const prop = sortProp.value as keyof ImageGroupView | null;
   const order = sortOrder.value;
   if (!prop || !order) {
-    // 默认：先图库名再角色名
+    // 默认：图库名 → 角色名 → 图片组
     list = [...list].sort((a, b) => {
-      const cmp = a.galleryName.localeCompare(b.galleryName);
-      return cmp !== 0 ? cmp : a.characterName.localeCompare(b.characterName);
+      let cmp = a.galleryName.localeCompare(b.galleryName);
+      if (cmp !== 0) return cmp;
+      cmp = a.characterName.localeCompare(b.characterName);
+      return cmp !== 0 ? cmp : a.dirName.localeCompare(b.dirName);
     });
   } else {
     const dir = order === 'ascending' ? 1 : -1;
@@ -224,6 +238,11 @@ const filteredGroups = computed(() => {
   }
 
   return list;
+});
+
+const pagedGroups = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return filteredGroups.value.slice(start, start + pageSize.value);
 });
 
 // ============================================================
@@ -393,20 +412,40 @@ onMounted(loadData);
 <style scoped>
 .process-page {
   padding: 0 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .toolbar-left {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.table-wrap :deep(.el-table) {
+  height: 100%;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 16px 0;
+  flex-shrink: 0;
 }
 </style>

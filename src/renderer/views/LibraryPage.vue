@@ -32,9 +32,9 @@
       </div>
     </div>
 
-    <!-- 图片表格 -->
+    <div class="table-wrap">
     <el-table
-      :data="sortedImages"
+      :data="pagedImages"
       style="width: 100%"
       @selection-change="onSelectionChange"
       @sort-change="onSortChange"
@@ -64,8 +64,16 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
-    <el-empty v-if="processedImages.length === 0" description="准图库为空，先去「处理确认」页面处理图片" />
+    <el-pagination
+      v-model:current-page="page"
+      v-model:page-size="pageSize"
+      :page-sizes="[10, 20, 50, 100]"
+      :total="sortedImages.length"
+      layout="total, sizes, prev, pager, next, jumper"
+      class="pager"
+    />
 
     <!-- 导出进度 -->
     <el-dialog v-model="exportProgressVisible" title="导出进度" width="400px" :close-on-click-modal="false">
@@ -111,6 +119,8 @@ const exportErrorCount = ref(0);
 // 方法
 // ============================================================
 
+const page = ref(1);
+const pageSize = ref(20);
 const libSortProp = ref<string | null>(null);
 const libSortOrder = ref<'ascending' | 'descending' | null>(null);
 
@@ -132,6 +142,11 @@ const sortedImages = computed(() => {
     const vb = (b as any)[prop] ?? '';
     return String(va).localeCompare(String(vb)) * dir;
   });
+});
+
+const pagedImages = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return sortedImages.value.slice(start, start + pageSize.value);
 });
 
 async function loadData(): Promise<void> {
@@ -240,15 +255,19 @@ onMounted(loadData);
 <style scoped>
 .library-page {
   padding: 0 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .toolbar-left {
@@ -260,5 +279,21 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.table-wrap :deep(.el-table) {
+  height: 100%;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 16px 0;
+  flex-shrink: 0;
 }
 </style>

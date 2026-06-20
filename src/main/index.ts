@@ -1,6 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { join } from 'path';
 import * as db from './db';
+
+// 移除顶部菜单栏
+Menu.setApplicationMenu(null);
 
 // 关闭所有 Chrome/Electron 安全策略
 app.commandLine.appendSwitch('disable-web-security');
@@ -43,10 +46,10 @@ function registerIpc(): void {
 
   ipcMain.handle('dialog:openDir', async () => {
     const result = await dialog.showOpenDialog({
-      properties: ['openDirectory'],
-      title: '选择图库目录',
+      properties: ['openDirectory', 'multiSelections'],
+      title: '选择图库目录（可多选）',
     });
-    return result.canceled ? null : result.filePaths[0];
+    return result.canceled ? [] : result.filePaths;
   });
 }
 

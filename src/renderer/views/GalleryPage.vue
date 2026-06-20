@@ -4,34 +4,52 @@
       <el-button type="primary" @click="addGallery">
         <el-icon><Plus /></el-icon> 添加图库
       </el-button>
+      <el-button type="success" @click="batchScan" :disabled="selectedIds.length === 0">
+        批量扫描 ({{ selectedIds.length }})
+      </el-button>
+      <el-button type="danger" @click="batchDelete" :disabled="selectedIds.length === 0">
+        批量删除 ({{ selectedIds.length }})
+      </el-button>
     </div>
 
-    <el-table
-      :data="sortedGalleries"
-      style="width: 100%"
-      v-loading="scanning"
-      @sort-change="onSortChange"
-    >
-      <el-table-column prop="name" label="图库名称" min-width="200" sortable="custom" />
-      <el-table-column prop="rootPath" label="路径" min-width="350" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="scannedAt" label="最近扫描" width="170" sortable="custom">
-        <template #default="{ row }">
-          {{ row.scannedAt || '未扫描' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="260" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="success" @click="scanGallery(row)" :loading="scanning && scanTargetId === row.id">
-            扫描
-          </el-button>
-          <el-button size="small" type="danger" @click="removeGallery(row)">
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-wrap">
+      <el-table
+        :data="pagedGalleries"
+        v-loading="scanning"
+        @sort-change="onSortChange"
+        @selection-change="onSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="45" />
+        <el-table-column prop="name" label="图库名称" min-width="200" sortable="custom" />
+        <el-table-column prop="rootPath" label="路径" min-width="350" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="scannedAt" label="最近扫描" width="170" sortable="custom">
+          <template #default="{ row }">
+            {{ row.scannedAt || '未扫描' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="scanGallery(row)" :loading="scanning && scanTargetId === row.id">
+              扫描
+            </el-button>
+            <el-button size="small" text type="danger" @click="removeGallery(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
-    <el-empty v-if="galleries.length === 0 && !scanning" description="还没有添加图库，点击上方按钮添加" />
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="sortedGalleries.length"
+        layout="total, sizes, prev, pager, next, jumper"
+      />
+    </div>
 
     <!-- 扫描进度 -->
     <el-dialog v-model="progressVisible" title="扫描进度" width="400px" :close-on-click-modal="false">
@@ -67,6 +85,7 @@ import { scanGallery as doScan } from '@/scanner/scanner';
 import type { Gallery, ScanProgress } from '../../common/types';
 
 const galleries = ref<Gallery[]>([]);
+const selectedIds = ref<number[]>([]);
 const scanning = ref(false);
 const scanTargetId = ref<number | null>(null);
 const progressVisible = ref(false);
@@ -78,6 +97,8 @@ const scanProgress = reactive<ScanProgress>({
   currentCharacter: null,
 });
 
+const page = ref(1);
+const pageSize = ref(20);
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
@@ -101,6 +122,13 @@ const sortedGalleries = computed(() => {
   });
 });
 
+const totalPages = computed(() => Math.max(1, Math.ceil(sortedGalleries.value.length / pageSize.value)));
+
+const pagedGalleries = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return sortedGalleries.value.slice(start, start + pageSize.value);
+});
+
 /** 加载图库列表 */
 async function loadGalleries(): Promise<void> {
   galleries.value = await getAllGalleries();
@@ -110,22 +138,20 @@ async function loadGalleries(): Promise<void> {
  * 添加图库 —— Electron 原生对话框选择文件夹
  */
 async function addGallery(): Promise<void> {
-  const result = await ipcRenderer.invoke('dialog:openDir');
-  if (!result) return;
+  const paths: string[] = await ipcRenderer.invoke('dialog:openDir');
+  if (!paths || paths.length === 0) return;
 
-  const rootPath = result as string;
-  const rootName = rootPath.split('\\').pop() || rootPath;
-
-  try {
-    await dbAdd(rootName, rootPath);
-    await loadGalleries();
-  } catch (e: any) {
-    if (e.message?.includes('UNIQUE')) {
-      alert('该图库已添加过');
-    } else {
-      alert(`添加失败: ${e.message}`);
+  for (const rootPath of paths) {
+    const rootName = rootPath.split('\\').pop() || rootPath;
+    try {
+      await dbAdd(rootName, rootPath);
+    } catch (e: any) {
+      if (!e.message?.includes('UNIQUE')) {
+        console.error(`添加失败: ${rootName}`, e.message);
+      }
     }
   }
+  await loadGalleries();
 }
 
 /** 扫描图库 */
@@ -171,6 +197,27 @@ async function scanGallery(gallery: Gallery): Promise<void> {
   }, 100);
 }
 
+function onSelectionChange(rows: Gallery[]): void {
+  selectedIds.value = rows.map(r => r.id);
+}
+
+/** 批量扫描 */
+async function batchScan(): Promise<void> {
+  const targets = galleries.value.filter(g => selectedIds.value.includes(g.id));
+  for (const g of targets) {
+    await scanGallery(g);
+  }
+}
+
+/** 批量删除 */
+async function batchDelete(): Promise<void> {
+  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个图库及其所有扫描数据？\n（不会删除原始文件）`)) return;
+  for (const id of selectedIds.value) {
+    await deleteGallery(id);
+  }
+  await loadGalleries();
+}
+
 /** 删除图库 */
 async function removeGallery(gallery: Gallery): Promise<void> {
   if (!confirm(`确定删除图库「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`)) return;
@@ -184,14 +231,34 @@ onMounted(loadGalleries);
 <style scoped>
 .gallery-page {
   padding: 0 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.table-wrap :deep(.el-table) {
+  height: 100%;
 }
 
 .progress-stats {
   margin-top: 16px;
   line-height: 1.8;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 16px 0;
+  flex-shrink: 0;
 }
 </style>
