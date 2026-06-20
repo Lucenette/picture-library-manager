@@ -95,27 +95,32 @@
     </el-dialog>
 
     <!-- 查看文件弹窗 -->
-    <el-dialog v-model="fileDialogVisible" :title="`图片组文件: ${currentGroup?.dirName}`" width="700px">
+    <el-dialog v-model="fileDialogVisible" :title="`图片组文件: ${currentGroup?.dirName}`" width="800px" class="file-dialog">
       <el-table :data="currentFiles" max-height="400">
         <el-table-column label="预览" width="80">
           <template #default="{ row }">
-            <img :src="'file://' + row.filePath" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px" />
+            <img v-if="row.thumbnail" :src="row.thumbnail" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px" />
+            <span v-else style="font-size:24px">🖼</span>
           </template>
         </el-table-column>
-        <el-table-column prop="fileName" label="文件名" min-width="180" show-overflow-tooltip />
-        <el-table-column label="尺寸" width="120">
+        <el-table-column label="相对路径" min-width="280" show-overflow-tooltip sortable :sort-method="(a,b) => relPath(a).localeCompare(relPath(b))">
+          <template #default="{ row }">
+            {{ relPath(row) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="尺寸" width="120" prop="width" sortable>
           <template #default="{ row }">
             {{ row.width }} × {{ row.height }}
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="90">
+        <el-table-column label="大小" width="100" prop="fileSize" sortable>
           <template #default="{ row }">
             {{ formatSize(row.fileSize) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80">
+        <el-table-column label="操作" width="90">
           <template #default="{ row }">
-            <el-button size="small" type="primary" @click="manualConfirm(row)">选这个</el-button>
+            <el-button size="small" text type="primary" @click="manualConfirm(row)">选这个</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -157,7 +162,7 @@ import {
   deleteScript,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
-import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '../../common/types';
+import type { ImageGroupView, ImageGroupStatus, ImageFile, ProcessScript, Gallery } from '@common/types';
 
 // ============================================================
 // 数据
@@ -279,6 +284,10 @@ function statusLabel(status: ImageGroupStatus): string {
 
 function onSelectionChange(rows: ImageGroupView[]): void {
   selectedIds.value = rows.map((r) => r.id);
+}
+
+function relPath(f: ImageFile): string {
+  return f.filePath.replace(currentGroup.value?.dirPath || '', '').replace(/^[\\/]/, '');
 }
 
 function formatSize(bytes: number | null): string {
@@ -420,6 +429,10 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.file-dialog :deep(.el-dialog__body) {
+  padding: 12px 16px;
 }
 
 .table-wrap {

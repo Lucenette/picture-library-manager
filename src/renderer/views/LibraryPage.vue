@@ -45,9 +45,11 @@
       <el-table-column label="预览" width="90">
         <template #default="{ row }">
           <img
-            :src="'file://' + row.selectedFile"
-            style="width: 70px; height: 70px; object-fit: cover; border-radius: 4px"
+            v-if="row.selectedFileThumbnail"
+            :src="row.selectedFileThumbnail"
+            style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px"
           />
+          <span v-else style="font-size:24px">🖼</span>
         </template>
       </el-table-column>
       <el-table-column prop="characterName" label="角色" width="160" sortable="custom" />

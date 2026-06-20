@@ -29,6 +29,7 @@ export async function addGallery(name: string, rootPath: string): Promise<Galler
 export async function getAllGalleries(): Promise<Gallery[]> { return call('getAllGalleries'); }
 export async function getGalleryById(id: number): Promise<Gallery | undefined> { return call('getGalleryById', id); }
 export async function deleteGallery(id: number): Promise<void> { await call('deleteGallery', id); }
+export async function clearGalleryData(id: number): Promise<void> { await call('clearGalleryData', id); }
 export async function updateGalleryScannedAt(id: number): Promise<void> { await call('updateGalleryScannedAt', id); }
 
 // Character
@@ -43,7 +44,7 @@ export async function updateImageGroupStatus(id: number, status: ImageGroupStatu
 export async function getImageFilesByGroup(groupId: number): Promise<ImageFile[]> { return call('getImageFilesByGroup', groupId); }
 
 // ImageFile
-export async function insertImageFiles(groupId: number, files: Array<{ fileName: string; filePath: string; fileSize: number; width: number | null; height: number | null; extension: string }>): Promise<void> { await call('insertImageFiles', groupId, files); }
+export async function insertImageFiles(groupId: number, files: Array<{ fileName: string; filePath: string; fileSize: number; width: number | null; height: number | null; extension: string; thumbnail: string | null }>): Promise<void> { await call('insertImageFiles', groupId, files); }
 
 // ProcessScript
 export async function upsertScript(name: string, filePath: string, code: string): Promise<ProcessScript> { return call('upsertScript', name, filePath, code); }

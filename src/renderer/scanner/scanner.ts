@@ -1,8 +1,98 @@
 import { readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import { imageSize } from 'image-size';
+const { Jimp } = require('jimp');
+const jpegJs = require('jpeg-js');
+const { PNG: PngJs } = require('pngjs');
+const { GifReader } = require('omggif');
+const bmpTs = require('bmp-ts');
+const utif2 = require('utif2');
 import { IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME } from '@/db/database';
-import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '../../common/types';
+import type { ScannedFile, ScannedGroup, ScannedCharacter, ScanProgress } from '@common/types';
+
+/**
+ * 全格式解码为 { width, height, data: Buffer(RGBA) }
+ * 用各格式原生解码器，不依赖 jimp.read（它有 bug 吞 options）
+ */
+function decodeImage(buf: Buffer, ext: string): { width: number; height: number; data: Buffer } | null {
+  try {
+    if (ext === '.jpg' || ext === '.jpeg') {
+      const img = jpegJs.decode(buf, { maxMemoryUsageInMB: 999999, maxResolutionInMP: 999999 });
+      return { width: img.width, height: img.height, data: Buffer.from(img.data) };
+    }
+    if (ext === '.png') {
+      const img = PngJs.sync.read(buf);
+      return { width: img.width, height: img.height, data: Buffer.from(img.data) };
+    }
+    if (ext === '.gif') {
+      const reader = new GifReader(buf);
+      const { width, height } = reader.frameInfo(0);
+      const data = Buffer.alloc(width * height * 4);
+      reader.decodeAndBlitFrameRGBA(0, data);
+      return { width, height, data };
+    }
+    if (ext === '.bmp') {
+      const img = bmpTs.decode(buf);
+      return { width: img.width, height: img.height, data: Buffer.from(img.data) };
+    }
+    if (ext === '.tiff' || ext === '.tif') {
+      const [ifd] = utif2.decode(buf);
+      if (!ifd) return null;
+      utif2.decodeImage(buf, ifd);
+      const rgba = new Uint8Array(utif2.toRGBA8(ifd));
+      return { width: ifd.width, height: ifd.height, data: Buffer.from(rgba) };
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+/**
+ * 生成缩略图：原图中心最大正方形 → 50x50 → base64
+ * 失败返回 null（文件损坏或格式不支持）
+ */
+async function generateThumbnail(filePath: string): Promise<string | null> {
+  try {
+    const fs = require('fs');
+    const buf = fs.readFileSync(filePath);
+    const ext = extname(filePath).toLowerCase();
+    const raw = decodeImage(buf, ext);
+    if (!raw) return null;
+
+    const size = Math.min(raw.width, raw.height);
+    const x = Math.floor((raw.width - size) / 2);
+    const y = Math.floor((raw.height - size) / 2);
+
+    const img = Jimp.fromBitmap({ width: raw.width, height: raw.height, data: raw.data });
+    const thumb = await img.crop({ x, y, w: size, h: size }).resize({ w: 50, h: 50 }).getBase64('image/png');
+    return thumb;
+  } catch (e: any) {
+    console.error(`缩略图失败: ${filePath}`, e.message);
+    return null;
+  }
+}
+
+/** 缩略图生成进度回调 */
+export interface ThumbnailProgress {
+  current: number;
+  total: number;
+  currentFile: string;
+}
+
+/**
+ * 为一批文件生成缩略图（逐个处理，报告进度）
+ */
+export async function generateThumbnails(
+  files: ScannedFile[],
+  onProgress?: (p: ThumbnailProgress) => void,
+): Promise<ScannedFile[]> {
+  const total = files.length;
+  for (let i = 0; i < total; i++) {
+    const f = files[i];
+    f.thumbnail = await generateThumbnail(f.filePath);
+    if (onProgress) onProgress({ current: i + 1, total, currentFile: f.fileName });
+  }
+  return files;
+}
 
 /**
  * 目录扫描器

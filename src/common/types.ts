@@ -44,6 +44,7 @@ export interface ImageFile {
   width: number | null;
   height: number | null;
   extension: string;
+  thumbnail: string | null;
   createdAt: string;
 }
 
@@ -87,6 +88,7 @@ export interface ProcessedImageView extends ProcessedImage {
   galleryName: string;
   scriptName: string | null;
   selectedFileName: string;
+  selectedFileThumbnail: string | null;
 }
 
 // ============================================================
@@ -101,6 +103,7 @@ export interface ScannedFile {
   width: number | null;
   height: number | null;
   extension: string;
+  thumbnail: string | null;
 }
 
 /** 扫描时收集的图片组信息 */

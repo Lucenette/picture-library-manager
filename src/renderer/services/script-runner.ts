@@ -1,5 +1,5 @@
 import { getScriptById } from '@/db/database';
-import type { ProcessScript } from '../../common/types';
+import type { ProcessScript } from '@common/types';
 
 /**
  * 脚本执行服务

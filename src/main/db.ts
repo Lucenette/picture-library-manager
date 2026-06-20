@@ -104,9 +104,16 @@ export function getGalleryById(id: number): Gallery | undefined {
   return queryOne<Gallery>(S.SQL_SELECT_GALLERY_BY_ID, [id]);
 }
 
-export function deleteGallery(id: number): void {
+/** 清空图库下所有扫描数据（不删图库本身），用于重新扫描 */
+export function clearGalleryData(id: number): void {
   run(S.SQL_DELETE_PROCESSED_BY_GALLERY, [id]);
   run(S.SQL_DELETE_IMAGE_FILES_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_IMAGE_GROUPS_BY_GALLERY, [id]);
+  run(S.SQL_DELETE_CHARACTERS_BY_GALLERY, [id]);
+}
+
+export function deleteGallery(id: number): void {
+  clearGalleryData(id);
   run(S.SQL_DELETE_IMAGE_GROUPS_BY_GALLERY, [id]);
   run(S.SQL_DELETE_CHARACTERS_BY_GALLERY, [id]);
   run(S.SQL_DELETE_GALLERY, [id]);
@@ -169,10 +176,10 @@ export function getImageFilesByGroup(groupId: number): ImageFile[] {
 
 export function insertImageFiles(
   groupId: number,
-  files: Array<{ fileName: string; filePath: string; fileSize: number; width: number | null; height: number | null; extension: string }>,
+  files: Array<{ fileName: string; filePath: string; fileSize: number; width: number | null; height: number | null; extension: string; thumbnail: string | null }>,
 ): void {
   const stmt = db!.prepare(S.SQL_INSERT_IMAGE_FILE);
-  for (const f of files) { stmt.run([groupId, f.fileName, f.filePath, f.fileSize, f.width, f.height, f.extension]); }
+  for (const f of files) { stmt.run([groupId, f.fileName, f.filePath, f.fileSize, f.width, f.height, f.extension, f.thumbnail]); }
   stmt.free();
   save();
 }

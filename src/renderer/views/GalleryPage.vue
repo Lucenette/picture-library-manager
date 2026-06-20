@@ -54,7 +54,7 @@
     <!-- 扫描进度 -->
     <el-dialog v-model="progressVisible" title="扫描进度" width="400px" :close-on-click-modal="false">
       <div class="progress-content">
-        <el-progress :percentage="100" :indeterminate="scanProgress.stage === 'scanning'" />
+        <el-progress :percentage="scanPercent" :indeterminate="scanPhase === 'dir'" />
         <div class="progress-stats">
           <p>角色数：{{ scanProgress.charactersFound }}</p>
           <p>图片组：{{ scanProgress.groupsFound }}</p>
@@ -63,7 +63,7 @@
         </div>
       </div>
       <template #footer>
-        <el-button @click="progressVisible = false" :disabled="scanProgress.stage === 'scanning'">
+        <el-button @click="progressVisible = false" :disabled="scanPhase !== 'done'">
           关闭
         </el-button>
       </template>
@@ -75,14 +75,14 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
-import { getAllGalleries, addGallery as dbAdd, deleteGallery, updateGalleryScannedAt } from '@/db/database';
+import { getAllGalleries, addGallery as dbAdd, deleteGallery, clearGalleryData, updateGalleryScannedAt } from '@/db/database';
 import {
   insertCharacter,
   insertImageGroup,
   insertImageFiles,
 } from '@/db/database';
-import { scanGallery as doScan } from '@/scanner/scanner';
-import type { Gallery, ScanProgress } from '../../common/types';
+import { scanGallery as doScan, generateThumbnails } from '@/scanner/scanner';
+import type { Gallery, ScanProgress } from '@common/types';
 
 const galleries = ref<Gallery[]>([]);
 const selectedIds = ref<number[]>([]);
@@ -95,6 +95,15 @@ const scanProgress = reactive<ScanProgress>({
   groupsFound: 0,
   filesFound: 0,
   currentCharacter: null,
+});
+/** 缩略图阶段进度：条满 10%~100% */
+const thumbCurrent = ref(0);
+const thumbTotal = ref(0);
+const scanPhase = ref<'dir' | 'thumb' | 'done'>('dir');
+const scanPercent = computed(() => {
+  if (scanPhase.value === 'dir') return 10;
+  if (scanPhase.value === 'done') return 100;
+  return thumbTotal.value > 0 ? Math.round(10 + (thumbCurrent.value / thumbTotal.value) * 90) : 10;
 });
 
 const page = ref(1);
@@ -158,33 +167,48 @@ async function addGallery(): Promise<void> {
 async function scanGallery(gallery: Gallery): Promise<void> {
   scanning.value = true;
   scanTargetId.value = gallery.id;
-  scanProgress.stage = 'scanning';
+  scanPhase.value = 'dir';
   scanProgress.charactersFound = 0;
   scanProgress.groupsFound = 0;
   scanProgress.filesFound = 0;
   scanProgress.currentCharacter = null;
+  thumbCurrent.value = 0;
+  thumbTotal.value = 0;
   progressVisible.value = true;
 
-  // 使用 setTimeout 让 UI 先更新
   setTimeout(async () => {
     try {
+      // 先清空旧数据
+      await clearGalleryData(gallery.id);
+      // 阶段1：扫描目录结构
       const characters = doScan(gallery.rootPath, (progress) => {
         Object.assign(scanProgress, progress);
       });
+
+      // 阶段2：生成缩略图
+      scanPhase.value = 'thumb';
+      const totalFiles = scanProgress.filesFound;
+      thumbTotal.value = totalFiles;
+      thumbCurrent.value = 0;
 
       for (const char of characters) {
         const charRecord = await insertCharacter(gallery.id, char.name, char.sourcePath);
         for (const group of char.groups) {
           const groupRecord = await insertImageGroup(charRecord.id, group.dirName, group.dirPath, group.files.length);
           if (group.files.length > 0) {
-            await insertImageFiles(groupRecord.id, group.files.map((f) => ({
+            const filesWithThumb = await generateThumbnails(group.files, (tp) => {
+              thumbCurrent.value += 1;
+              scanProgress.currentCharacter = `${thumbCurrent.value}/${thumbTotal.value} ${tp.currentFile}`;
+            });
+            await insertImageFiles(groupRecord.id, filesWithThumb.map((f) => ({
               fileName: f.fileName, filePath: f.filePath, fileSize: f.fileSize,
-              width: f.width, height: f.height, extension: f.extension,
+              width: f.width, height: f.height, extension: f.extension, thumbnail: f.thumbnail,
             })));
           }
         }
       }
 
+      scanPhase.value = 'done';
       await updateGalleryScannedAt(gallery.id);
       await loadGalleries();
       progressVisible.value = false;

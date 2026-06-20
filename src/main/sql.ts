@@ -42,6 +42,7 @@ export const CREATE_IMAGE_FILE = `CREATE TABLE IF NOT EXISTS image_file (
   width INTEGER,
   height INTEGER,
   extension TEXT NOT NULL,
+  thumbnail TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 )`;
 
@@ -129,7 +130,7 @@ export const SQL_SELECT_IMAGE_GROUPS_VIEW_BASE = `SELECT ig.*, c.name AS charact
 // ImageFile
 // ============================================================
 
-export const SQL_INSERT_IMAGE_FILE = 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension) VALUES (?, ?, ?, ?, ?, ?, ?)';
+export const SQL_INSERT_IMAGE_FILE = 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension, thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
 
 // ============================================================
 // ProcessScript
@@ -155,9 +156,10 @@ export const SQL_INSERT_PROCESSED = "INSERT INTO processed_image (image_group_id
 export const SQL_UPDATE_GROUP_PENDING = "UPDATE image_group SET status='pending' WHERE id = ?";
 
 /** ProcessedImage 带关联查询的基 SQL */
-export const SQL_SELECT_PROCESSED_VIEW_BASE = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName
+export const SQL_SELECT_PROCESSED_VIEW_BASE = `SELECT pi.*, c.name AS characterName, g.name AS galleryName, ps.name AS scriptName, pi.selected_file AS selectedFileName, f.thumbnail AS selectedFileThumbnail
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
   JOIN gallery g ON pi.gallery_id = g.id
   LEFT JOIN process_script ps ON pi.script_id = ps.id
+  LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1=1`;
