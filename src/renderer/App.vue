@@ -63,6 +63,9 @@ body {
 
 .app-main {
   background: #f5f7fa;
+  height: calc(100vh - 60px);
   overflow-y: auto;
+  padding: 16px 0 0 0;
 }
+
 </style>

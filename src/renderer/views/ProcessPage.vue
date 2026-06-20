@@ -50,13 +50,12 @@
       @sort-change="onSortChange"
       v-loading="processing"
       row-key="id"
-      :default-sort="{ prop: 'galleryName', order: 'ascending' }"
     >
       <el-table-column type="selection" width="45" />
       <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip sortable="custom" />
       <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
       <el-table-column prop="dirName" label="图片组" min-width="200" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="fileCount" label="文件数" width="80" align="center" sortable="custom" />
+      <el-table-column prop="fileCount" label="文件数" width="90" align="center" sortable="custom" />
       <el-table-column label="状态" width="100" align="center" sortable="custom" prop="status">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status)" size="small">
@@ -172,8 +171,8 @@ const totalCount = ref(0);
 const errorCount = ref(0);
 
 /** 排序 */
-const sortProp = ref<string>('galleryName');
-const sortOrder = ref<'ascending' | 'descending'>('ascending');
+const sortProp = ref<string | null>(null);
+const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
 /** 文件查看弹窗 */
 const fileDialogVisible = ref(false);
@@ -206,14 +205,23 @@ const filteredGroups = computed(() => {
   }
 
   // 排序
-  const prop = sortProp.value as keyof ImageGroupView;
-  const dir = sortOrder.value === 'ascending' ? 1 : -1;
-  list = [...list].sort((a, b) => {
-    const va = a[prop] ?? '';
-    const vb = b[prop] ?? '';
-    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
-    return String(va).localeCompare(String(vb)) * dir;
-  });
+  const prop = sortProp.value as keyof ImageGroupView | null;
+  const order = sortOrder.value;
+  if (!prop || !order) {
+    // 默认：先图库名再角色名
+    list = [...list].sort((a, b) => {
+      const cmp = a.galleryName.localeCompare(b.galleryName);
+      return cmp !== 0 ? cmp : a.characterName.localeCompare(b.characterName);
+    });
+  } else {
+    const dir = order === 'ascending' ? 1 : -1;
+    list = [...list].sort((a, b) => {
+      const va = a[prop] ?? '';
+      const vb = b[prop] ?? '';
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+  }
 
   return list;
 });
@@ -233,9 +241,9 @@ function onGalleryFilterChange(_gid?: number): void {
   characterFilter.value = '';
 }
 
-function onSortChange({ prop, order }: { prop: string; order: string | null }): void {
-  sortProp.value = prop || 'galleryName';
-  sortOrder.value = (order as 'ascending' | 'descending') || 'ascending';
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
+  sortProp.value = prop;
+  sortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
 function statusTagType(status: ImageGroupStatus): 'info' | 'success' | 'danger' {
@@ -384,8 +392,7 @@ onMounted(loadData);
 
 <style scoped>
 .process-page {
-  max-width: 1200px;
-  margin: 0 auto;
+  padding: 0 24px;
 }
 
 .toolbar {

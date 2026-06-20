@@ -34,9 +34,10 @@
 
     <!-- 图片表格 -->
     <el-table
-      :data="processedImages"
+      :data="sortedImages"
       style="width: 100%"
       @selection-change="onSelectionChange"
+      @sort-change="onSortChange"
       row-key="id"
       v-loading="exporting"
     >
@@ -49,15 +50,14 @@
           />
         </template>
       </el-table-column>
-      <el-table-column prop="characterName" label="角色" width="160" />
-      <el-table-column prop="galleryName" label="图库" width="150" />
-      <el-table-column prop="selectedFileName" label="文件名" min-width="220" show-overflow-tooltip />
-      <el-table-column prop="scriptName" label="处理脚本" width="150">
+      <el-table-column prop="characterName" label="角色" width="160" sortable="custom" />
+      <el-table-column prop="selectedFileName" label="文件名" min-width="220" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="scriptName" label="处理脚本" width="150" sortable="custom">
         <template #default="{ row }">
           {{ row.scriptName || '手动确认' }}
         </template>
       </el-table-column>
-      <el-table-column prop="confirmedAt" label="确认时间" width="170" />
+      <el-table-column prop="confirmedAt" label="确认时间" width="170" sortable="custom" />
       <el-table-column label="操作" width="80" fixed="right">
         <template #default="{ row }">
           <el-button size="small" text type="danger" @click="deleteOne(row)">删除</el-button>
@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { Download } from '@element-plus/icons-vue';
 import {
   getAllProcessedImages,
@@ -110,6 +110,29 @@ const exportErrorCount = ref(0);
 // ============================================================
 // 方法
 // ============================================================
+
+const libSortProp = ref<string | null>(null);
+const libSortOrder = ref<'ascending' | 'descending' | null>(null);
+
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
+  libSortProp.value = prop;
+  libSortOrder.value = order as 'ascending' | 'descending' | null;
+}
+
+const sortedImages = computed(() => {
+  const prop = libSortProp.value;
+  const order = libSortOrder.value;
+  if (!prop || !order) {
+    // 默认：按角色名称升序
+    return [...processedImages.value].sort((a, b) => a.characterName.localeCompare(b.characterName));
+  }
+  const dir = order === 'ascending' ? 1 : -1;
+  return [...processedImages.value].sort((a, b) => {
+    const va = (a as any)[prop] ?? '';
+    const vb = (b as any)[prop] ?? '';
+    return String(va).localeCompare(String(vb)) * dir;
+  });
+});
 
 async function loadData(): Promise<void> {
   processedImages.value = await getAllProcessedImages(galleryFilter.value, characterFilter.value);
@@ -216,8 +239,7 @@ onMounted(loadData);
 
 <style scoped>
 .library-page {
-  max-width: 1200px;
-  margin: 0 auto;
+  padding: 0 24px;
 }
 
 .toolbar {

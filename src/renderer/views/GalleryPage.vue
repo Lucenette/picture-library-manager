@@ -6,10 +6,15 @@
       </el-button>
     </div>
 
-    <el-table :data="galleries" style="width: 100%" v-loading="scanning">
-      <el-table-column prop="name" label="图库名称" min-width="200" />
-      <el-table-column prop="rootPath" label="路径" min-width="350" show-overflow-tooltip />
-      <el-table-column prop="scannedAt" label="最近扫描" width="170">
+    <el-table
+      :data="sortedGalleries"
+      style="width: 100%"
+      v-loading="scanning"
+      @sort-change="onSortChange"
+    >
+      <el-table-column prop="name" label="图库名称" min-width="200" sortable="custom" />
+      <el-table-column prop="rootPath" label="路径" min-width="350" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="scannedAt" label="最近扫描" width="170" sortable="custom">
         <template #default="{ row }">
           {{ row.scannedAt || '未扫描' }}
         </template>
@@ -49,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
 import { getAllGalleries, addGallery as dbAdd, deleteGallery, updateGalleryScannedAt } from '@/db/database';
@@ -71,6 +76,29 @@ const scanProgress = reactive<ScanProgress>({
   groupsFound: 0,
   filesFound: 0,
   currentCharacter: null,
+});
+
+const sortProp = ref<string | null>(null);
+const sortOrder = ref<'ascending' | 'descending' | null>(null);
+
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
+  sortProp.value = prop;
+  sortOrder.value = order as 'ascending' | 'descending' | null;
+}
+
+const sortedGalleries = computed(() => {
+  const prop = sortProp.value;
+  const order = sortOrder.value;
+  if (!prop || !order) {
+    // 默认：按图库名称升序
+    return [...galleries.value].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const dir = order === 'ascending' ? 1 : -1;
+  return [...galleries.value].sort((a, b) => {
+    const va = (a as any)[prop] ?? '';
+    const vb = (b as any)[prop] ?? '';
+    return String(va).localeCompare(String(vb)) * dir;
+  });
 });
 
 /** 加载图库列表 */
@@ -155,8 +183,7 @@ onMounted(loadGalleries);
 
 <style scoped>
 .gallery-page {
-  max-width: 1000px;
-  margin: 0 auto;
+  padding: 0 24px;
 }
 
 .toolbar {
