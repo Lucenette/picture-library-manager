@@ -32,7 +32,7 @@
         <el-table-column prop="loadedAt" label="加载时间" width="170" sortable="custom" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" text @click="startRename(row)">重命名</el-button>
+            <el-button size="small" text @click="openRename(row)">重命名</el-button>
             <el-button size="small" text @click="reloadScript(row)">重载</el-button>
             <el-button size="small" text type="danger" @click="removeScript(row)">删除</el-button>
           </template>
@@ -50,13 +50,6 @@
       />
     </div>
 
-    <el-dialog v-model="renameVisible" title="重命名脚本" width="400px">
-      <el-input v-model="renameName" placeholder="新名称" @keyup.enter="doRename" />
-      <template #footer>
-        <el-button @click="renameVisible = false">取消</el-button>
-        <el-button type="primary" @click="doRename">确定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -107,22 +100,23 @@ const pagedScripts = computed(() => {
 });
 
 // 重命名
-const renameVisible = ref(false);
-const renameId = ref<number | null>(null);
-const renameName = ref('');
+let pendingRenameId: number | null = null;
 
-function startRename(script: ProcessScript): void {
-  renameId.value = script.id;
-  renameName.value = script.name;
-  renameVisible.value = true;
+function openRename(script: ProcessScript): void {
+  pendingRenameId = script.id;
+  require('electron').ipcRenderer.invoke(IPC.PROMPT_OPEN, {
+    title: '重命名脚本', placeholder: '新名称', value: script.name, channel: IPC.SCRIPT_RENAME_CONFIRMED,
+  });
 }
 
-async function doRename(): Promise<void> {
-  if (!renameId.value || !renameName.value.trim()) return;
-  await renameScript(renameId.value, renameName.value.trim());
-  renameVisible.value = false;
-  await loadData();
-}
+onMounted(() => {
+  require('electron').ipcRenderer.on(IPC.SCRIPT_RENAME_CONFIRMED, async (_e: any, data: any) => {
+    if (!pendingRenameId || !data.value) return;
+    await renameScript(pendingRenameId, data.value);
+    pendingRenameId = null;
+    await loadData();
+  });
+});
 
 async function loadData(): Promise<void> {
   scripts.value = await getAllScripts();

@@ -13,6 +13,8 @@ import LibraryPage from '@/views/main/LibraryPage.vue';
 import ImageViewer from '@/views/image/ImageViewer.vue';
 import ScanConfigDialog from '@/views/dialogs/ScanConfigDialog.vue';
 import BatchProcessDialog from '@/views/dialogs/BatchProcessDialog.vue';
+import PromptDialog from '@/views/dialogs/PromptDialog.vue';
+import FileViewerDialog from '@/views/dialogs/FileViewerDialog.vue';
 import Dropdown from '@/views/dialogs/control/Dropdown.vue';
 
 const router = createRouter({
@@ -26,6 +28,8 @@ const router = createRouter({
     { path: '/viewer', name: 'viewer', component: ImageViewer },
     { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },
     { path: '/batch-process', name: 'batchProcess', component: BatchProcessDialog },
+    { path: '/prompt', name: 'prompt', component: PromptDialog },
+    { path: '/file-viewer', name: 'fileViewer', component: FileViewerDialog },
     { path: '/script-list', name: 'scriptList', component: Dropdown },
   ],
 });

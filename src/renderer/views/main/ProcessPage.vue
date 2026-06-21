@@ -71,38 +71,6 @@
       </template>
     </el-dialog>
 
-    <!-- 查看文件弹窗 -->
-    <el-dialog v-model="fileDialogVisible" :title="`图片组文件: ${currentGroup?.dirName}`" width="800px" class="file-dialog">
-      <el-table :data="currentFiles" max-height="400">
-        <el-table-column label="预览" width="80">
-          <template #default="{ row }">
-            <img v-if="row.thumbnail" :src="row.thumbnail" :alt="row.fileName" @click="openViewer(currentFiles, row)" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer" />
-            <span v-else style="font-size:24px">🖼</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="相对路径" min-width="280" show-overflow-tooltip sortable :sort-method="(a: ImageFile,b: ImageFile) => relPath(a).localeCompare(relPath(b))">
-          <template #default="{ row }">
-            {{ relPath(row) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="尺寸" width="120" prop="width" sortable>
-          <template #default="{ row }">
-            {{ row.width }} × {{ row.height }}
-          </template>
-        </el-table-column>
-        <el-table-column label="大小" width="100" prop="fileSize" sortable>
-          <template #default="{ row }">
-            {{ formatSize(row.fileSize) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-button size="small" text type="primary" @click="manualConfirm(row)">选这个</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-
   </div>
 </template>
 
@@ -195,9 +163,6 @@ const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
 /** 文件查看弹窗 */
-const fileDialogVisible = ref(false);
-const currentGroup = ref<ImageGroupView | null>(null);
-const currentFiles = ref<ImageFile[]>([]);
 
 
 // ============================================================
@@ -291,17 +256,13 @@ async function openViewer(fileList: ImageFile[], target: ImageFile): Promise<voi
   const files = fileList.map(f => ({
     filePath: f.filePath,
     fileName: f.fileName,
-    relativePath: relPath(f),
+    relativePath: f.fileName,
     fileSize: f.fileSize,
     width: f.width,
     height: f.height,
     thumbnail: f.thumbnail,
   }));
   await ipcRenderer.invoke(IPC.VIEWER_OPEN, { files, index: idx >= 0 ? idx : 0 });
-}
-
-function relPath(f: ImageFile): string {
-  return f.filePath.replace(currentGroup.value?.dirPath || '', '').replace(/^[\\/]/, '');
 }
 
 function formatSize(bytes: number | null): string {
@@ -311,23 +272,19 @@ function formatSize(bytes: number | null): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-/** 查看图片组下的文件 */
-function viewFiles(group: ImageGroupView): void {
-  currentGroup.value = group;
-  getImageFilesByGroup(group.id).then(files => { currentFiles.value = files; });
-  fileDialogVisible.value = true;
+async function viewFiles(group: ImageGroupView): Promise<void> {
+  const files = await getImageFilesByGroup(group.id);
+  require('electron').ipcRenderer.invoke(IPC.FILE_VIEWER_OPEN, {
+    files, groupName: group.dirName, groupDirPath: group.dirPath,
+  });
 }
 
-/** 手动确认选择文件 */
-async function manualConfirm(file: ImageFile): Promise<void> {
-  if (!currentGroup.value) return;
-  const g = currentGroup.value;
-  try {
-    await upsertProcessedImage(g.id, g.characterId, g.galleryId, g.dirPath, file.filePath, null);
-    await loadData();
-    fileDialogVisible.value = false;
-  } catch (e: any) { alert(`确认失败: ${e.message}`); }
-}
+onMounted(() => {
+  require('electron').ipcRenderer.on(IPC.FILE_VIEWER_SELECTED, (_e: any, filePath: string) => {
+    const g = allGroups.value.find(x => filePath.startsWith(x.dirPath));
+    if (g) upsertProcessedImage(g.id, g.characterId, g.galleryId, g.dirPath, filePath, null).then(() => loadData()).catch((e: any) => alert(`确认失败: ${e.message}`));
+  });
+});
 
 /** 排除/恢复 */
 async function toggleExclude(group: ImageGroupView): Promise<void> {

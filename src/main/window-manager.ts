@@ -182,3 +182,31 @@ export function createBatchProcess(): BrowserWindow {
     maximizable: false,
   });
 }
+
+export function createPrompt(): BrowserWindow {
+  return create('prompt', {
+    width: 400, height: 170,
+    minWidth: 400, minHeight: 170,
+    backgroundColor: '#1e1f22',
+    route: '/prompt',
+    parentId: 'main',
+    modal: true,
+    frame: false,
+    minimizable: false,
+    maximizable: false,
+  });
+}
+
+export function createFileViewer(): BrowserWindow {
+  return create('file-viewer', {
+    width: 820, height: 560,
+    minWidth: 600, minHeight: 400,
+    backgroundColor: '#1e1f22',
+    route: '/file-viewer',
+    parentId: 'main',
+    modal: true,
+    frame: false,
+    minimizable: false,
+    maximizable: false,
+  });
+}

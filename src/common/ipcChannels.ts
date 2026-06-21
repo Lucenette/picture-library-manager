@@ -22,6 +22,18 @@ export const IPC = {
   BATCH_PROCESS_CONFIRM: 'batch-process:confirm',
   BATCH_PROCESS_CONFIRMED: 'batch-process:confirmed',
 
+  PROMPT_OPEN: 'prompt:open',
+  PROMPT_INIT: 'prompt:init',
+  PROMPT_CONFIRM: 'prompt:confirm',
+  BATCH_RENAME_CONFIRMED: 'character:rename-batch-confirmed',
+  SINGLE_RENAME_CONFIRMED: 'character:rename-single-confirmed',
+  SCRIPT_RENAME_CONFIRMED: 'script:rename-confirmed',
+
+  FILE_VIEWER_OPEN: 'file-viewer:open',
+  FILE_VIEWER_INIT: 'file-viewer:init',
+  FILE_VIEWER_SELECT: 'file-viewer:select',
+  FILE_VIEWER_SELECTED: 'file-viewer:selected',
+
   DROPDOWN_OPEN: 'script-list:open',
   DROPDOWN_INIT: 'script-list:init',
   DROPDOWN_SELECT: 'script-list:select',
