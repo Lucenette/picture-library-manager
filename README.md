@@ -23,9 +23,7 @@
 
 ### 🤖 AI 参与率
 
-本项目由 AI 辅助开发，约 **95%** 代码及文档由 AI 生成。
-
-<progress value="95" max="100" style="width:100%;height:10px;border-radius:10px;accent-color:#3871e1"></progress>
+本项目由 AI 辅助开发，约 **95%** 代码及文档由 AI 生成。目前AI共消耗（输入、输出）约 **1,125,759,422 tokens**，产生的花费约为 **52.33 CNY**。
 
 ---
 
