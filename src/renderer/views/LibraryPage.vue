@@ -3,23 +3,7 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-select v-model="galleryFilter" placeholder="按图库筛选" clearable filterable style="width: 180px" @change="loadData">
-          <el-option
-            v-for="g in galleries"
-            :key="g.id"
-            :label="g.name"
-            :value="g.id"
-          />
-        </el-select>
-
-        <el-select v-model="characterFilter" placeholder="按角色筛选" clearable filterable style="width: 180px; margin-left: 8px" @change="loadData">
-          <el-option
-            v-for="c in characters"
-            :key="c"
-            :label="c"
-            :value="c"
-          />
-        </el-select>
+        <CategorySearch :sections="filterCats" :order="filterOrder" />
       </div>
 
       <div class="toolbar-right">
@@ -94,6 +78,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { Download } from '@element-plus/icons-vue';
+import CategorySearch from '@/components/CategorySearch.vue';
+import type { FilterSection } from '@/components/CategorySearch.types';
 import {
   getAllProcessedImages,
   deleteProcessedImage,
@@ -104,16 +90,33 @@ import type { ProcessedImageView, Gallery } from '@common/types';
 /** 所有 processed_image 记录 */
 const processedImages = ref<ProcessedImageView[]>([]);
 const selectedIds = ref<number[]>([]);
+const filterOrder = ref<string[]>([]);
 const galleryFilter = ref<number | undefined>(undefined);
 const characterFilter = ref<string>('');
+const fileNameFilter = ref<string>('');
+const scriptFilter = ref<string>('');
 const galleries = ref<Gallery[]>([]);
-const characters = computed(() => {
+
+const galleryItems = computed(() => galleries.value.map(g => ({ label: g.name, value: String(g.id) })));
+const characterItems = computed(() => {
   const seen = new Set<string>();
   return processedImages.value
     .filter(pi => seen.has(pi.characterName) ? false : (seen.add(pi.characterName), true))
-    .map(pi => pi.characterName)
-    .sort((a, b) => a.localeCompare(b));
+    .map(pi => pi.characterName).sort().map(n => ({ label: n, value: n }));
 });
+const scriptItems = computed(() => {
+  const seen = new Set<string>();
+  return processedImages.value
+    .filter(pi => pi.scriptName && seen.has(pi.scriptName) ? false : (seen.add(pi.scriptName!), true))
+    .map(pi => pi.scriptName!).sort().map(n => ({ label: n, value: n }));
+});
+
+const filterCats = computed<FilterSection[]>(() => [
+  { key: 'gallery', label: '图库', value: galleryFilter.value ? String(galleryFilter.value) : '', display: galleryFilter.value ? galleries.value.find(g => g.id === galleryFilter.value)?.name || '' : '', items: galleryItems.value, onSelect: (v: string) => { galleryFilter.value = Number(v); page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'gallery'), 'gallery']; }, onClear: () => { galleryFilter.value = undefined; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'gallery'); } },
+  { key: 'character', label: '角色', value: characterFilter.value, display: characterFilter.value || '', items: characterItems.value, onSelect: (v: string) => { characterFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'character'), 'character']; }, onClear: () => { characterFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'character'); } },
+  { key: 'filename', label: '文件名', value: fileNameFilter.value, display: fileNameFilter.value || '', items: [], onSelect: (v: string) => { fileNameFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'filename'), 'filename']; }, onClear: () => { fileNameFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'filename'); } },
+  { key: 'script', label: '处理脚本', value: scriptFilter.value, display: scriptFilter.value || '', items: scriptItems.value, onSelect: (v: string) => { scriptFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'script'), 'script']; }, onClear: () => { scriptFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'script'); } },
+]);
 
 /** 导出状态 */
 const exporting = ref(false);
@@ -137,15 +140,22 @@ function onSortChange({ prop, order }: { prop: string | null; order: string | nu
   libSortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
+const filteredImages = computed(() => {
+  let list = processedImages.value;
+  if (galleryFilter.value) list = list.filter(pi => pi.galleryId === galleryFilter.value);
+  if (characterFilter.value) list = list.filter(pi => pi.characterName === characterFilter.value);
+  if (fileNameFilter.value) { const kw = fileNameFilter.value.toLowerCase(); list = list.filter(pi => pi.selectedFileName.toLowerCase().includes(kw)); }
+  if (scriptFilter.value) list = list.filter(pi => (pi.scriptName || '手动确认') === scriptFilter.value);
+  return list;
+});
+
 const sortedImages = computed(() => {
+  const list = filteredImages.value;
   const prop = libSortProp.value;
   const order = libSortOrder.value;
-  if (!prop || !order) {
-    // 默认：按角色名称升序
-    return [...processedImages.value].sort((a, b) => a.characterName.localeCompare(b.characterName));
-  }
+  if (!prop || !order) return [...list].sort((a, b) => a.characterName.localeCompare(b.characterName));
   const dir = order === 'ascending' ? 1 : -1;
-  return [...processedImages.value].sort((a, b) => {
+  return [...list].sort((a, b) => {
     const va = (a as any)[prop] ?? '';
     const vb = (b as any)[prop] ?? '';
     return String(va).localeCompare(String(vb)) * dir;
@@ -174,7 +184,7 @@ async function openViewer(target: ProcessedImageView): Promise<void> {
 }
 
 async function loadData(): Promise<void> {
-  processedImages.value = await getAllProcessedImages(galleryFilter.value, characterFilter.value);
+  processedImages.value = await getAllProcessedImages();
   galleries.value = await getAllGalleries();
 }
 
@@ -295,6 +305,7 @@ onMounted(loadData);
 .toolbar-left {
   display: flex;
   align-items: center;
+  flex: 1;
 }
 
 .toolbar-right {

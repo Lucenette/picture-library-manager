@@ -3,27 +3,10 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-select v-model="galleryFilter" placeholder="按图库" clearable filterable style="width: 140px" @change="onGalleryFilterChange">
-          <el-option v-for="g in galleries" :key="g.id" :label="g.name" :value="g.id" />
-        </el-select>
-
-        <el-select v-model="characterFilter" placeholder="按角色" clearable filterable style="width: 160px; margin-left: 8px">
-          <el-option v-for="c in characterNames" :key="c" :label="c" :value="c" />
-        </el-select>
-
-        <el-select v-model="statusFilter" placeholder="状态筛选" clearable filterable style="width: 140px; margin-left: 8px">
-          <el-option label="全部" value="" />
-          <el-option label="未处理" value="pending" />
-          <el-option label="已处理" value="processed" />
-          <el-option label="已排除" value="excluded" />
-        </el-select>
-
-        <el-select v-model="selectedScriptId" placeholder="选择脚本" clearable filterable style="width: 200px; margin-left: 8px">
-          <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
-        </el-select>
+        <CategorySearch :sections="filterCats" :order="filterOrder" />
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="batchProcess" :disabled="!selectedScriptId">
+        <el-button type="primary" @click="showBatchDialog = true">
           批量处理 ({{ selectedIds.length || filteredGroups.length }})
         </el-button>
         <el-button @click="excludeSelected" :disabled="selectedIds.length === 0">
@@ -77,6 +60,17 @@
       class="pager"
     />
 
+    <!-- 选择脚本弹窗 -->
+    <el-dialog v-model="showBatchDialog" title="批量处理" width="400px">
+      <el-select v-model="selectedScriptId" placeholder="选择脚本" filterable style="width: 100%">
+        <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="showBatchDialog = false">取消</el-button>
+        <el-button type="primary" @click="doBatchProcess" :disabled="!selectedScriptId">开始处理</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 处理进度 -->
     <el-dialog v-model="processProgressVisible" title="处理进度" width="400px" :close-on-click-modal="false">
       <el-progress :percentage="processPercent" />
@@ -93,11 +87,11 @@
       <el-table :data="currentFiles" max-height="400">
         <el-table-column label="预览" width="80">
           <template #default="{ row }">
-            <img v-if="row.thumbnail" :src="row.thumbnail" @click="openViewer(currentFiles, row)" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer" />
+            <img v-if="row.thumbnail" :src="row.thumbnail" :alt="row.fileName" @click="openViewer(currentFiles, row)" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; cursor: pointer" />
             <span v-else style="font-size:24px">🖼</span>
           </template>
         </el-table-column>
-        <el-table-column label="相对路径" min-width="280" show-overflow-tooltip sortable :sort-method="(a,b) => relPath(a).localeCompare(relPath(b))">
+        <el-table-column label="相对路径" min-width="280" show-overflow-tooltip sortable :sort-method="(a: ImageFile,b: ImageFile) => relPath(a).localeCompare(relPath(b))">
           <template #default="{ row }">
             {{ relPath(row) }}
           </template>
@@ -125,6 +119,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import CategorySearch from '@/components/CategorySearch.vue';
+import type { FilterSection } from '@/components/CategorySearch.types';
 import {
   getImageGroupsView,
   updateImageGroupStatus,
@@ -134,16 +130,62 @@ import {
   getAllGalleries,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
-import type { ImageGroupView, ImageGroupStatus, ImageFile, Gallery } from '@common/types';
+import type {ImageGroupView, ImageGroupStatus, ImageFile, Gallery, ProcessScript} from '@common/types';
 
 // ============================================================
 // 数据
 // ============================================================
 
+const filterOrder = ref<string[]>([]); // 记录添加顺序
+const pathFilter = ref<string>('');
 const statusFilter = ref<string>('');
 const galleryFilter = ref<number | undefined>(undefined);
 const characterFilter = ref<string>('');
+
+const galleryItems = computed(() => galleries.value.map(g => ({ label: g.name, value: String(g.id) })));
+const characterItems = computed(() => [...new Set(allGroups.value.map(g => g.characterName))].sort().map(n => ({ label: n, value: n })));
+const statusItems = [
+  { label: '未处理', value: 'pending' },
+  { label: '已处理', value: 'processed' },
+  { label: '已排除', value: 'excluded' },
+];
+
+const filterCats = computed<FilterSection[]>(() => [
+  {
+    key: 'gallery', label: '图库',
+    value: galleryFilter.value ? String(galleryFilter.value) : '',
+    display: galleryFilter.value ? galleries.value.find(g => g.id === galleryFilter.value)?.name || '' : '',
+    items: galleryItems.value,
+    onSelect: (v: string) => { galleryFilter.value = Number(v); onGalleryFilterChange(); page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'gallery'), 'gallery']; },
+    onClear: () => { galleryFilter.value = undefined; onGalleryFilterChange(); page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'gallery'); },
+  },
+  {
+    key: 'character', label: '角色',
+    value: characterFilter.value,
+    display: characterFilter.value || '',
+    items: characterItems.value,
+    onSelect: (v: string) => { characterFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'character'), 'character']; },
+    onClear: () => { characterFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'character'); },
+  },
+  {
+    key: 'path', label: '路径',
+    value: pathFilter.value,
+    display: pathFilter.value || '',
+    items: [],
+    onSelect: (v: string) => { pathFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'path'), 'path']; },
+    onClear: () => { pathFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'path'); },
+  },
+  {
+    key: 'status', label: '状态',
+    value: statusFilter.value,
+    display: statusItems.find(s => s.value === statusFilter.value)?.label || '',
+    items: statusItems,
+    onSelect: (v: string) => { statusFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'status'), 'status']; },
+    onClear: () => { statusFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'status'); },
+  },
+]);
 const selectedScriptId = ref<number | null>(null);
+const showBatchDialog = ref(false);
 const selectedIds = ref<number[]>([]);
 const allGroups = ref<ImageGroupView[]>([]);
 const scripts = ref<ProcessScript[]>([]);
@@ -173,10 +215,6 @@ const currentFiles = ref<ImageFile[]>([]);
 // 计算
 // ============================================================
 
-const characterNames = computed(() => {
-  const names = new Set(allGroups.value.map(g => g.characterName));
-  return [...names].sort();
-});
 
 const filteredGroups = computed(() => {
   let list = allGroups.value;
@@ -189,6 +227,10 @@ const filteredGroups = computed(() => {
   }
   if (characterFilter.value) {
     list = list.filter(g => g.characterName === characterFilter.value);
+  }
+  if (pathFilter.value) {
+    const kw = pathFilter.value.toLowerCase();
+    list = list.filter(g => g.dirPath.toLowerCase().includes(kw));
   }
 
   // 排序
@@ -231,9 +273,7 @@ async function loadData(): Promise<void> {
 }
 
 /** 图库筛选变化时清角色筛选 */
-function onGalleryFilterChange(_gid?: number): void {
-  characterFilter.value = '';
-}
+function onGalleryFilterChange(): void {}
 
 function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
   sortProp.value = prop;
@@ -324,8 +364,9 @@ async function unexcludeSelected(): Promise<void> {
 }
 
 /** 批量处理 */
-async function batchProcess(): Promise<void> {
+async function doBatchProcess(): Promise<void> {
   if (!selectedScriptId.value) return;
+  showBatchDialog.value = false;
   const targets = selectedIds.value.length > 0
     ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
     : filteredGroups.value.filter(g => g.status !== 'excluded');
@@ -376,7 +417,7 @@ onMounted(loadData);
   gap: 8px;
   flex-shrink: 0;
 }
-.toolbar-left { display: flex; align-items: center; flex-wrap: wrap; }
+.toolbar-left { display: flex; align-items: center; flex: 1; }
 .toolbar-right { display: flex; align-items: center; gap: 4px; }
 
 .file-dialog :deep(.el-dialog__body) {
