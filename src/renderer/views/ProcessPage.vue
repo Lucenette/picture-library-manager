@@ -126,7 +126,7 @@ import {
   updateImageGroupStatus,
   getImageFilesByGroup,
   upsertProcessedImage,
-  getAllScripts,
+  getScriptsByType,
   getAllGalleries,
 } from '@/db/database';
 import { runScript } from '@/services/script-runner';
@@ -268,7 +268,7 @@ const pagedGroups = computed(() => {
 
 async function loadData(): Promise<void> {
   allGroups.value = await getImageGroupsView();
-  scripts.value = await getAllScripts();
+  scripts.value = await getScriptsByType('select-image');
   galleries.value = await getAllGalleries();
 }
 

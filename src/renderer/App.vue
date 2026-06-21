@@ -2,29 +2,31 @@
   <router-view v-if="isViewer" />
   <el-container v-else class="app-container" @keydown="onKey" tabindex="0" ref="appEl">
     <el-header class="app-header">
-      <el-menu
-        :default-active="activeMenu"
-        mode="horizontal"
-        router
-        class="app-menu"
-      >
-        <el-menu-item index="/">
-          <el-icon><FolderOpened /></el-icon>
-          <span>图库管理</span>
-        </el-menu-item>
-        <el-menu-item index="/scripts">
+      <div class="header-wrap">
+        <el-menu
+          :default-active="activeMenu"
+          mode="horizontal"
+          router
+          class="app-menu"
+        >
+          <el-menu-item index="/">
+            <el-icon><FolderOpened /></el-icon>
+            <span>图库管理</span>
+          </el-menu-item>
+          <el-menu-item index="/process">
+            <el-icon><Select /></el-icon>
+            <span>处理确认</span>
+          </el-menu-item>
+          <el-menu-item index="/library">
+            <el-icon><PictureFilled /></el-icon>
+            <span>准图库</span>
+          </el-menu-item>
+        </el-menu>
+        <router-link to="/scripts" class="header-scripts-link" :class="{ active: activeMenu === '/scripts' }">
           <el-icon><Setting /></el-icon>
           <span>脚本管理</span>
-        </el-menu-item>
-        <el-menu-item index="/process">
-          <el-icon><Select /></el-icon>
-          <span>处理确认</span>
-        </el-menu-item>
-        <el-menu-item index="/library">
-          <el-icon><PictureFilled /></el-icon>
-          <span>准图库</span>
-        </el-menu-item>
-      </el-menu>
+        </router-link>
+      </div>
     </el-header>
     <el-main class="app-main">
       <router-view />
@@ -69,9 +71,20 @@ body {
   border-bottom: 1px solid #e4e7ed;
 }
 
-.app-menu {
-  border-bottom: none !important;
+.header-wrap {
+  display: flex; align-items: center; height: 100%;
 }
+.app-menu {
+  border-bottom: none !important; flex: 1;
+}
+.header-scripts-link {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 20px; height: 100%; text-decoration: none;
+  color: #a0a3a9; font-size: 14px; border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.header-scripts-link:hover { color: #d8dadd; }
+.header-scripts-link.active { color: #3871e1; border-bottom-color: #3871e1; }
 
 .app-main {
   background: #f5f7fa;

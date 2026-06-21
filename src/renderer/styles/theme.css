@@ -216,7 +216,17 @@ body {
   border-color: #542f32;
   color: #c75458;
 }
+.el-tag--warning {
+  background: #2e2010;
+  border-color: #5c3d16;
+  color: #f0b34b;
+}
 .el-tag--info {
+  background: #2e3034;
+  border-color: #3e4044;
+  color: #b4b6ba;
+}
+.el-tag:not(.el-tag--success):not(.el-tag--warning):not(.el-tag--danger):not(.el-tag--info) {
   background: #2e3034;
   border-color: #3e4044;
   color: #b4b6ba;

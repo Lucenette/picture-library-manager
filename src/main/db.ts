@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { app } from 'electron';
 import * as S from '@/sql';
-import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView } from '@common/types';
+import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView, ScriptType } from '@common/types';
 
 // ============================================================
 // 常量
@@ -201,29 +201,68 @@ function makeBrief(code: string): string {
   return brief.length >= 120 ? brief + '…' : brief;
 }
 
-export function upsertScript(name: string, filePath: string, code: string): ProcessScript {
+const Module = require('module');
+
+/** 从 DB 代码字符串加载模块，自动检测所有匹配的函数类型 */
+export function detectScriptTypes(code: string): ScriptType[] {
+  const ALL_TYPES = ['select-image', 'identify-character', 'identify-structure'] as ScriptType[];
+  try {
+    const m = new Module('');
+    m.paths = Module._nodeModulePaths(process.cwd());
+    m._compile(code, '');
+    return ALL_TYPES.filter(t => typeof m.exports[t] === 'function');
+  } catch { return []; }
+}
+
+function setScriptTypes(scriptId: number, types: ScriptType[]): void {
+  run(S.SQL_DELETE_SCRIPT_TYPES, [scriptId]);
+  for (const t of types) run(S.SQL_INSERT_SCRIPT_TYPE, [scriptId, t]);
+}
+
+function getScriptTypes(scriptId: number): ScriptType[] {
+  return queryAll<{ type: ScriptType }>(S.SQL_SELECT_SCRIPT_TYPES, [scriptId]).map(r => r.type);
+}
+
+function enrichScript<T extends ProcessScript>(s: T): T {
+  (s as any).types = getScriptTypes(s.id);
+  return s;
+}
+
+export function upsertScript(name: string, filePath: string, code: string, types?: ScriptType[]): ProcessScript {
   const brief = makeBrief(code);
   const existing = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath]);
+  const finalTypes = types ?? detectScriptTypes(code);
   if (existing) {
     run(S.SQL_UPDATE_SCRIPT, [name, code, brief, filePath]);
+    setScriptTypes(existing.id, finalTypes);
   } else {
     run(S.SQL_INSERT_SCRIPT, [name, filePath, code, brief]);
+    const created = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
+    setScriptTypes(created.id, finalTypes);
   }
-  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
+  return enrichScript(queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!);
 }
 
 export function reloadScript(filePath: string, code: string): ProcessScript {
   const brief = makeBrief(code);
+  const types = detectScriptTypes(code);
+  const existing = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath]);
   run(S.SQL_RELOAD_SCRIPT, [code, brief, filePath]);
-  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!;
+  if (existing) setScriptTypes(existing.id, types);
+  return enrichScript(queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_PATH, [filePath])!);
 }
 
 export function getAllScripts(): ProcessScript[] {
-  return queryAll<ProcessScript>(S.SQL_SELECT_SCRIPTS_ALL);
+  return queryAll<ProcessScript>(S.SQL_SELECT_SCRIPTS_ALL).map(enrichScript);
 }
 
 export function getScriptById(id: number): ProcessScript | undefined {
-  return queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_ID, [id]);
+  const s = queryOne<ProcessScript>(S.SQL_SELECT_SCRIPT_BY_ID, [id]);
+  return s ? enrichScript(s) : undefined;
+}
+
+export function getScriptsByType(type: ScriptType): ProcessScript[] {
+  return queryAll<ProcessScript>(S.SQL_SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
 }
 
 export function renameScript(id: number, name: string): void {
@@ -231,6 +270,7 @@ export function renameScript(id: number, name: string): void {
 }
 
 export function deleteScript(id: number): void {
+  run(S.SQL_DELETE_SCRIPT_TYPES, [id]);
   run(S.SQL_DELETE_SCRIPT, [id]);
 }
 

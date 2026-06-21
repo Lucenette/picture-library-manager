@@ -20,9 +20,15 @@
         row-key="id"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="name" label="名称" min-width="180" sortable="custom" show-overflow-tooltip />
-        <el-table-column prop="filePath" label="文件路径" min-width="280" sortable="custom" show-overflow-tooltip />
-        <el-table-column prop="brief" label="代码" min-width="300" show-overflow-tooltip />
+        <el-table-column prop="name" label="名称" width="160" sortable="custom" show-overflow-tooltip />
+        <el-table-column prop="filePath" label="文件路径" min-width="250" sortable="custom" show-overflow-tooltip />
+        <el-table-column label="类型" width="180">
+          <template #default="{ row }">
+            <el-tag v-for="t in row.types" :key="t" size="small" :type="tagType(t)" style="margin-right:4px">{{ typeLabel(t) }}</el-tag>
+            <span v-if="!row.types?.length" style="color:#5e6065">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="brief" label="代码" min-width="260" show-overflow-tooltip />
         <el-table-column prop="loadedAt" label="加载时间" width="170" sortable="custom" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
@@ -170,6 +176,15 @@ async function removeScript(script: ProcessScript): Promise<void> {
   if (!confirm(`确定删除脚本「${script.name}」？`)) return;
   await deleteScript(script.id);
   scripts.value = await getAllScripts();
+}
+
+function tagType(t: string): 'success' | 'warning' | 'info' | 'danger' | '' {
+  const map: Record<string, any> = { 'select-image': 'success', 'identify-character': 'warning', 'identify-structure': 'info' };
+  return map[t] || '';
+}
+function typeLabel(t: string): string {
+  const map: Record<string, string> = { 'select-image': '选图', 'identify-character': '识别角色', 'identify-structure': '识别结构' };
+  return map[t] || t;
 }
 
 onMounted(loadData);

@@ -56,6 +56,13 @@ export const CREATE_PROCESS_SCRIPT = `CREATE TABLE IF NOT EXISTS process_script 
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 )`;
 
+export const CREATE_SCRIPT_TYPE = `CREATE TABLE IF NOT EXISTS script_type (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  script_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  UNIQUE(script_id, type)
+)`;
+
 export const CREATE_PROCESSED_IMAGE = `CREATE TABLE IF NOT EXISTS processed_image (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   image_group_id INTEGER NOT NULL UNIQUE,
@@ -80,6 +87,7 @@ export const DDL_ALL = [
   CREATE_IMAGE_FILE,
   CREATE_INDEX_IMAGE_FILE,
   CREATE_PROCESS_SCRIPT,
+  CREATE_SCRIPT_TYPE,
   CREATE_PROCESSED_IMAGE,
   CREATE_INDEX_PROCESSED_CHAR,
   CREATE_INDEX_PROCESSED_GALLERY,
@@ -145,6 +153,10 @@ export const SQL_INSERT_SCRIPT = "INSERT INTO process_script (name, file_path, c
 export const SQL_UPDATE_SCRIPT = "UPDATE process_script SET name=?, code=?, brief=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
 export const SQL_RELOAD_SCRIPT = "UPDATE process_script SET code=?, brief=?, loaded_at=datetime('now','localtime') WHERE file_path=?";
 export const SQL_RENAME_SCRIPT = 'UPDATE process_script SET name=? WHERE id=?';
+export const SQL_DELETE_SCRIPT_TYPES = 'DELETE FROM script_type WHERE script_id=?';
+export const SQL_INSERT_SCRIPT_TYPE = 'INSERT OR IGNORE INTO script_type (script_id, type) VALUES (?, ?)';
+export const SQL_SELECT_SCRIPT_TYPES = 'SELECT type FROM script_type WHERE script_id=?';
+export const SQL_SELECT_SCRIPTS_BY_TYPE = `SELECT DISTINCT ps.* FROM process_script ps JOIN script_type st ON ps.id=st.script_id WHERE st.type=? ORDER BY ps.name`;
 
 // ============================================================
 // ProcessedImage

@@ -48,6 +48,11 @@ export interface ImageFile {
   createdAt: string;
 }
 
+/** 脚本类型 */
+export type ScriptType = 'select-image' | 'identify-character' | 'identify-structure';
+
+export const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
+
 /** 处理脚本记录 */
 export interface ProcessScript {
   id: number;
@@ -55,6 +60,7 @@ export interface ProcessScript {
   filePath: string;
   code: string;
   brief: string;
+  types: ScriptType[];
   loadedAt: string;
   createdAt: string;
 }
