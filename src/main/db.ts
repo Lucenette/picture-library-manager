@@ -4,15 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import {app, ipcMain} from 'electron';
 import * as S from '@/sql';
 import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView, ScriptType } from '@common/types';
-import {IPC} from "@common/ipcChannels";
-
-export const initDbIpc = (): void => {
-  ipcMain.handle(IPC.DB, async (_event, method: string, ...args: any[]) => {
-    const fn = (db as any)[method];
-    if (typeof fn !== 'function') throw new Error(`Unknown db method: ${method}`);
-    return fn(...args);
-  });
-};
+import { IPC } from '@common/ipcChannels';
 
 // ============================================================
 // 常量
@@ -183,7 +175,7 @@ export function updateImageGroupStatus(id: number, status: ImageGroupStatus): vo
   run(S.SQL_UPDATE_IMAGE_GROUP_STATUS, [status, id]);
   // 排除时级联删除已处理记录
   if (status === 'excluded') {
-    run('DELETE FROM processed_image WHERE image_group_id = ?', [id]);
+    run(S.SQL_DELETE_PROCESSED_BY_GROUP, [id]);
   }
 }
 
@@ -328,4 +320,31 @@ export function closeDatabase(): void {
     db.close();
     db = null;
   }
+}
+
+// ============================================================
+// IPC 调度表 —— 解决模块内部自引用问题，同时让 IDE 识别方法被调用
+// ============================================================
+
+const methodTable: Record<string, Function> = {
+  // Gallery
+  addGallery, getAllGalleries, getGalleryById, deleteGallery, clearGalleryData, updateGalleryScannedAt,
+  // Character
+  insertCharacter, getCharactersByGallery, renameCharacter,
+  // ImageGroup
+  insertImageGroup, updateImageGroupFileCount, getImageGroupsView, updateImageGroupStatus, getImageFilesByGroup,
+  // ImageFile
+  insertImageFiles,
+  // ProcessScript
+  upsertScript, reloadScript, getAllScripts, getScriptById, getScriptsByType, renameScript, deleteScript,
+  // ProcessedImage
+  upsertProcessedImage, getAllProcessedImages, deleteProcessedImage,
+};
+
+export function initDbIpc(): void {
+  ipcMain.handle(IPC.DB, async (_event, method: string, ...args: any[]) => {
+    const fn = methodTable[method];
+    if (!fn) throw new Error(`Unknown db method: ${method}`);
+    return fn(...args);
+  });
 }

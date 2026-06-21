@@ -166,6 +166,7 @@ export const SQL_SELECT_SCRIPTS_BY_TYPE = `SELECT DISTINCT ps.* FROM process_scr
 export const SQL_SELECT_PROCESSED_BY_GROUP = 'SELECT * FROM processed_image WHERE image_group_id = ?';
 export const SQL_SELECT_PROCESSED_BY_ID_GROUP = 'SELECT image_group_id FROM processed_image WHERE id = ?';
 export const SQL_DELETE_PROCESSED = 'DELETE FROM processed_image WHERE id = ?';
+export const SQL_DELETE_PROCESSED_BY_GROUP = 'DELETE FROM processed_image WHERE image_group_id = ?';
 export const SQL_UPDATE_PROCESSED = "UPDATE processed_image SET selected_file=?, script_id=?, confirmed_at=datetime('now','localtime') WHERE image_group_id=?";
 export const SQL_INSERT_PROCESSED = "INSERT INTO processed_image (image_group_id, character_id, gallery_id, original_path, selected_file, script_id, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))";
 export const SQL_UPDATE_GROUP_PENDING = "UPDATE image_group SET status='pending' WHERE id = ?";

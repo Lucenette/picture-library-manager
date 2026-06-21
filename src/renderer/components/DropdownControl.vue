@@ -36,11 +36,12 @@ function open(): void {
     scripts: toRaw(props.items).map((i: any) => ({ id: i.id, name: i.name })),
     selectedId: props.modelValue,
     controlRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+    listHeight: Math.max(34, Math.min(300, props.items.length * 34)),
   };
-  ipcRenderer.once(IPC.SCRIPT_LIST_SELECTED, (_e: any, id: number) => {
+  ipcRenderer.once(IPC.DROPDOWN_SELECTED, (_e: any, id: number) => {
     emit('update:modelValue', id);
   });
-  ipcRenderer.invoke(IPC.SCRIPT_LIST_OPEN, data);
+  ipcRenderer.invoke(IPC.DROPDOWN_OPEN, data);
 }
 </script>
 

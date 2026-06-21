@@ -17,8 +17,8 @@ export const IPC = {
   SCAN_CONFIG_CONFIRM: 'scan-config:confirm',
   SCAN_CONFIG_CONFIRMED: 'scan-config:confirmed',
 
-  SCRIPT_LIST_OPEN: 'script-list:open',
-  SCRIPT_LIST_INIT: 'script-list:init',
-  SCRIPT_LIST_SELECT: 'script-list:select',
-  SCRIPT_LIST_SELECTED: 'script-list:selected',
+  DROPDOWN_OPEN: 'script-list:open',
+  DROPDOWN_INIT: 'script-list:init',
+  DROPDOWN_SELECT: 'script-list:select',
+  DROPDOWN_SELECTED: 'script-list:selected',
 } as const;

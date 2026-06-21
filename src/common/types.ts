@@ -81,6 +81,7 @@ export interface ScriptListInitData {
 /** 脚本列表浮窗打开请求 */
 export interface ScriptListOpenData extends ScriptListInitData {
   controlRect: { x: number; y: number; width: number; height: number };
+  listHeight: number;
 }
 
 /** 处理脚本记录 */
