@@ -53,6 +53,25 @@ export type ScriptType = 'select-image' | 'identify-character' | 'identify-struc
 
 export const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
 
+/** 目录树节点 */
+export interface DirNode {
+  name: string;
+  path: string;
+  children: DirNode[] | null; // null = 文件, [] = 空目录, 非空 = 有子节点
+}
+
+/** identify-structure 脚本输入 */
+export interface StructureInput {
+  rootPath: string;
+  tree: DirNode[];
+}
+
+/** identify-structure 脚本输出 */
+export interface StructureOutput {
+  name: string;
+  groups: string[]; // 相对于图库根的图片组路径
+}
+
 /** 处理脚本记录 */
 export interface ProcessScript {
   id: number;

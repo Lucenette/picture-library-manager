@@ -42,6 +42,41 @@ const identifyCharacter = dirName => {
 };
 
 /**
+ * 目录结构识别 - 将图库目录树映射为角色→图片组结构
+ *
+ * 默认行为：第一层子目录是角色，第二层子目录是图片组
+ * 对于编号型图库（第一层是"51雷电将军"），由 identifyCharacter 清洗角色名
+ *
+ * @param {Object}   ctx
+ * @param {string}   ctx.rootPath  图库根路径
+ * @param {Object[]} ctx.tree      目录树（name/path/children）
+ * @returns {Array<{ name: string, groups: string[] }>}
+ */
+const identifyStructure = ({ rootPath, tree }) => {
+    const charMap = new Map();
+
+    for (const node of tree) {
+        if (!node.children) continue;
+        const charName = identifyCharacter(node.name);
+
+        if (!charMap.has(charName)) {
+            charMap.set(charName, []);
+        }
+
+        const subDirs = node.children.filter(c => c.children !== null);
+        if (subDirs.length > 0) {
+            for (const sd of subDirs) {
+                charMap.get(charName).push(node.name + "/" + sd.name);
+            }
+        } else {
+            charMap.get(charName).push(node.name);
+        }
+    }
+
+    return Array.from(charMap.entries()).map(([name, groups]) => ({ name, groups }));
+};
+
+/**
  * 输入的文件信息
  *
  * @typedef {Object} SelectImageFile
@@ -73,5 +108,6 @@ const selectImage = ({ characterName, groupDirPath, files }) => {
 
 module.exports = {
     "identify-character": identifyCharacter,
+    "identify-structure": identifyStructure,
     "select-image": selectImage,
 };

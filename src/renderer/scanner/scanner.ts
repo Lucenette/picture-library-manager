@@ -1,8 +1,8 @@
 import {readdirSync, statSync} from 'fs';
-import {extname, join} from 'path';
+import {extname, join, relative} from 'path';
 import {imageSize} from 'image-size';
 import {IMAGE_EXTENSIONS, VIRTUAL_GROUP_NAME} from '@/db/database';
-import type {ScannedCharacter, ScannedFile, ScanProgress} from '@common/types';
+import type {DirNode, ScannedCharacter, ScannedFile, ScanProgress, StructureOutput} from '@common/types';
 
 const { Jimp } = require('jimp');
 const jpegJs = require('jpeg-js');
@@ -286,6 +286,78 @@ export function scanGallery(
       charactersFound: characters.length,
       groupsFound: characters.reduce((sum, c) => sum + c.groups.length, 0),
       filesFound: characters.reduce((sum, c) => sum + c.groups.reduce((s, g) => s + g.files.length, 0), 0),
+      currentCharacter: null,
+    });
+  }
+
+  return characters;
+}
+
+/**
+ * 构建目录树（仅目录结构和文件名，不读图片元数据）
+ * children=null 表示文件，children=[] 表示空目录
+ */
+export function buildDirTree(rootPath: string): DirNode[] {
+  const result: DirNode[] = [];
+  let entries: string[];
+  try { entries = readdirSync(rootPath); }
+  catch { return result; }
+
+  for (const entry of entries) {
+    if (entry.startsWith('.')) continue;
+    const fullPath = join(rootPath, entry);
+    let stat;
+    try { stat = statSync(fullPath); }
+    catch { continue; }
+
+    if (stat.isDirectory()) {
+      result.push({ name: entry, path: fullPath, children: buildDirTree(fullPath) });
+    } else {
+      result.push({ name: entry, path: fullPath, children: null });
+    }
+  }
+  return result;
+}
+
+/**
+ * 根据结构脚本输出扫描图库（替代旧 scanGallery）
+ * @param structure 脚本返回的 [{ name, groups }]
+ * @param onProgress 进度回调
+ */
+export function scanByStructure(
+  structure: StructureOutput[],
+  galleryRoot: string,
+  onProgress?: (progress: ScanProgress) => void,
+): ScannedCharacter[] {
+  const characters: ScannedCharacter[] = [];
+
+  for (const item of structure) {
+    const character: ScannedCharacter = { name: item.name, sourcePath: galleryRoot, groups: [] };
+
+    for (const groupRel of item.groups) {
+      const groupPath = join(galleryRoot, groupRel);
+      const files = collectImageFiles(groupPath);
+      character.groups.push({ dirName: groupRel, dirPath: groupPath, files });
+    }
+
+    characters.push(character);
+    if (onProgress) {
+      onProgress({
+        stage: 'scanning',
+        charactersFound: characters.length,
+        groupsFound: characters.reduce((s, c) => s + c.groups.length, 0),
+        filesFound: characters.reduce((s, c) => s + c.groups.reduce((a, g) => a + g.files.length, 0), 0),
+        currentCharacter: item.name,
+      });
+    }
+  }
+
+  if (onProgress) {
+    onProgress({
+      stage: 'done',
+      charactersFound: characters.length,
+      groupsFound: characters.reduce((s, c) => s + c.groups.length, 0),
+      filesFound: characters.reduce((s, c) => s + c.groups.reduce((a, g) => a + g.files.length, 0), 0),
       currentCharacter: null,
     });
   }

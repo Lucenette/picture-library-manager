@@ -57,16 +57,14 @@
     <!-- 扫描配置 -->
     <el-dialog v-model="scanConfigVisible" title="扫描配置" width="420px">
       <div class="scan-config">
-        <label>角色名识别脚本</label>
-        <el-select v-model="scanCharScriptId" placeholder="不使用脚本" clearable style="width:100%">
-          <el-option v-for="s in identifyScripts" :key="s.id" :label="s.name" :value="s.id" />
+        <label>目录结构识别脚本</label>
+        <el-select v-model="scanStructScriptId" placeholder="请选择脚本" style="width:100%">
+          <el-option v-for="s in structScripts" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
-        <label style="margin-top:12px">目录结构识别脚本</label>
-        <el-select placeholder="（暂不支持）" disabled style="width:100%" />
       </div>
       <template #footer>
         <el-button @click="scanConfigVisible = false">取消</el-button>
-        <el-button type="primary" @click="doScan">开始扫描</el-button>
+        <el-button type="primary" @click="doScan" :disabled="!scanStructScriptId">开始扫描</el-button>
       </template>
     </el-dialog>
 
@@ -101,15 +99,15 @@ import {
   insertImageFiles,
 } from '@/db/database';
 import { executeScript } from '@/services/script-runner';
-import { scanGallery as scanDir, generateThumbnails } from '@/scanner/scanner';
-import type { Gallery, ScanProgress, ProcessScript } from '@common/types';
+import { buildDirTree, scanByStructure, generateThumbnails } from '@/scanner/scanner';
+import type { Gallery, ScanProgress, ProcessScript, StructureOutput } from '@common/types';
 
 const galleries = ref<Gallery[]>([]);
 const selectedIds = ref<number[]>([]);
-const identifyScripts = ref<ProcessScript[]>([]);
+const structScripts = ref<ProcessScript[]>([]);
 const scanConfigVisible = ref(false);
-const scanCharScriptId = ref<number | null>(null);
-const pendingScanGallery = ref<Gallery | null>(null); // 等待确认的扫描目标
+const scanStructScriptId = ref<number | null>(null);
+const pendingScanGallery = ref<Gallery | null>(null);
 const scanning = ref(false);
 const scanTargetId = ref<number | null>(null);
 const progressVisible = ref(false);
@@ -165,7 +163,7 @@ const pagedGalleries = computed(() => {
 /** 加载图库列表 */
 async function loadGalleries(): Promise<void> {
   galleries.value = await getAllGalleries();
-  identifyScripts.value = await getScriptsByType('identify-character');
+  structScripts.value = await getScriptsByType('identify-structure');
 }
 
 /**
@@ -191,7 +189,7 @@ async function addGallery(): Promise<void> {
 /** 弹出扫描配置弹窗 */
 function scanGallery(gallery: Gallery): void {
   pendingScanGallery.value = gallery;
-  scanCharScriptId.value = null;
+  scanStructScriptId.value = null;
   scanConfigVisible.value = true;
 }
 
@@ -219,19 +217,18 @@ async function doScan(): Promise<void> {
       setTimeout(async () => {
         try {
           await clearGalleryData(gallery.id);
-          const characters = scanDir(gallery.rootPath, (progress) => { Object.assign(scanProgress, progress); });
+          // 构建目录树 + 识别结构
+          const tree = buildDirTree(gallery.rootPath);
+          const structure = await executeScript(scanStructScriptId.value!, 'identify-structure', { rootPath: gallery.rootPath, tree });
+
+          const characters = scanByStructure(structure, gallery.rootPath, (progress) => { Object.assign(scanProgress, progress); });
           scanPhase.value = 'thumb';
           const totalFiles = scanProgress.filesFound;
           thumbTotal.value = totalFiles;
           thumbCurrent.value = 0;
 
           for (const char of characters) {
-            let identifiedName = char.name;
-            if (scanCharScriptId.value) {
-              try { identifiedName = await executeScript(scanCharScriptId.value, 'identify-character', char.name); }
-              catch { /* 脚本失败就用原名 */ }
-            }
-            const charRecord = await insertCharacter(gallery.id, identifiedName, char.sourcePath);
+            const charRecord = await insertCharacter(gallery.id, char.name, char.sourcePath);
             for (const group of char.groups) {
               const groupRecord = await insertImageGroup(charRecord.id, group.dirName, group.dirPath, group.files.length);
               if (group.files.length > 0) {
@@ -270,7 +267,7 @@ function onSelectionChange(rows: Gallery[]): void {
 /** 批量扫描 */
 function batchScan(): void {
   // 弹出配置弹窗，确认后逐个扫描选中图库
-  scanCharScriptId.value = null;
+  scanStructScriptId.value = null;
   scanConfigVisible.value = true;
   pendingScanGallery.value = null; // null 表示批量模式
 }

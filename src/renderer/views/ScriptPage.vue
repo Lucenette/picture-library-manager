@@ -179,11 +179,11 @@ async function removeScript(script: ProcessScript): Promise<void> {
 }
 
 function tagType(t: string): 'success' | 'warning' | 'info' | 'danger' | '' {
-  const map: Record<string, any> = { 'select-image': 'success', 'identify-character': 'warning', 'identify-structure': 'info' };
+  const map: Record<string, any> = { 'select-image': 'success', 'identify-character': 'warning', 'identify-structure': 'danger' };
   return map[t] || '';
 }
 function typeLabel(t: string): string {
-  const map: Record<string, string> = { 'select-image': '选图', 'identify-character': '识别角色', 'identify-structure': '识别结构' };
+  const map: Record<string, string> = { 'select-image': '图片', 'identify-character': '角色', 'identify-structure': '结构' };
   return map[t] || t;
 }
 

@@ -328,6 +328,7 @@ body {
 }
 .el-dialog__footer {
   padding: 0 24px 20px;
+  display: flex; justify-content: flex-end; gap: 10px;
 }
 
 /* ======== 复选框 ======== */
