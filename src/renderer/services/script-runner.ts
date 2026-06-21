@@ -1,48 +1,6 @@
-import { getScriptById, getImageFilesByGroup, getScriptsByType } from '@/db/database';
-import type { ImageFile } from '@common/types';
+import { getScriptById } from '@/db/database';
 
 const Module = require('module');
-const crypto = require('crypto');
-
-export interface ScriptResult {
-  success: boolean;
-  selectedFile?: string;
-  error?: string;
-}
-
-export interface ScriptFileInfo {
-  uuid: string;
-  fileName: string;
-  filePath: string;
-  width: number | null;
-  height: number | null;
-  fileSize: number;
-  ext: string;
-}
-
-/**
- * 运行角色识别脚本，指定 ID 或自动取第一个
- */
-export async function runIdentifyCharacter(dirName: string, scriptId?: number): Promise<string> {
-  let script;
-  if (scriptId) {
-    script = await getScriptById(scriptId);
-  } else {
-    const scripts = await getScriptsByType('identify-character');
-    script = scripts[0];
-  }
-  if (!script) return dirName;
-
-  let mod: any;
-  try { mod = loadModule(script.code); }
-  catch { return dirName; }
-
-  const fn = mod['identify-character'];
-  if (typeof fn !== 'function') return dirName;
-
-  try { return fn(dirName); }
-  catch { return dirName; }
-}
 
 function loadModule(code: string): any {
   const m = new Module('');
@@ -52,62 +10,23 @@ function loadModule(code: string): any {
 }
 
 /**
- * 执行选图脚本
- * 先查 DB 获取文件列表，生成临时 UUID，脚本基于元数据选图，返回目标 UUID
+ * 通用脚本执行器
+ *
+ * @param scriptId 脚本 ID
+ * @param method   要调用的导出方法名（如 'select-image'）
+ * @param args     传给方法的参数
+ * @returns 方法返回值，失败抛错
  */
-export async function runScript(
-  scriptId: number,
-  characterName: string,
-  groupDirPath: string,
-  imageGroupId: number,
-): Promise<ScriptResult> {
+export async function executeScript(scriptId: number, method: string, ...args: any[]): Promise<any> {
   const script = await getScriptById(scriptId);
-  if (!script) return { success: false, error: `脚本不存在 (id=${scriptId})` };
-
-  const files: ImageFile[] = await getImageFilesByGroup(imageGroupId);
-  const uuidMap = new Map<string, string>();
-
-  const scriptFiles: ScriptFileInfo[] = files.map(f => {
-    const uuid = crypto.randomUUID();
-    uuidMap.set(uuid, f.filePath);
-    return {
-      uuid,
-      fileName: f.fileName,
-      filePath: f.filePath,
-      width: f.width,
-      height: f.height,
-      fileSize: f.fileSize || 0,
-      ext: f.extension,
-    };
-  });
+  if (!script) throw new Error(`脚本不存在 (id=${scriptId})`);
 
   let mod: any;
   try { mod = loadModule(script.code); }
-  catch (e: any) { return { success: false, error: `脚本加载失败: ${e.message}` }; }
+  catch (e: any) { throw new Error(`脚本加载失败: ${e.message}`); }
 
-  const fn = mod['select-image'];
-  if (typeof fn !== 'function') {
-    return { success: false, error: '脚本未导出 select-image 函数' };
-  }
+  const fn = mod[method];
+  if (typeof fn !== 'function') throw new Error(`脚本未导出方法: ${method}`);
 
-  try {
-    const resultUuid = fn({
-      characterName,
-      groupDirPath,
-      files: scriptFiles,
-    });
-
-    if (!resultUuid || typeof resultUuid !== 'string') {
-      return { success: false, error: '脚本返回值无效 (期望 uuid 字符串)' };
-    }
-
-    const selectedFile = uuidMap.get(resultUuid);
-    if (!selectedFile) {
-      return { success: false, error: `脚本返回了未知 uuid: ${resultUuid}` };
-    }
-
-    return { success: true, selectedFile };
-  } catch (e: any) {
-    return { success: false, error: `脚本执行异常: ${e.message}` };
-  }
+  return fn(...args);
 }

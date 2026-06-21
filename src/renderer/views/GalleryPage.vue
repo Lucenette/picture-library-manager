@@ -100,7 +100,7 @@ import {
   insertImageGroup,
   insertImageFiles,
 } from '@/db/database';
-import { runIdentifyCharacter } from '@/services/script-runner';
+import { executeScript } from '@/services/script-runner';
 import { scanGallery as scanDir, generateThumbnails } from '@/scanner/scanner';
 import type { Gallery, ScanProgress, ProcessScript } from '@common/types';
 
@@ -226,9 +226,11 @@ async function doScan(): Promise<void> {
           thumbCurrent.value = 0;
 
           for (const char of characters) {
-            const identifiedName = scanCharScriptId.value
-              ? await runIdentifyCharacter(char.name, scanCharScriptId.value)
-              : char.name;
+            let identifiedName = char.name;
+            if (scanCharScriptId.value) {
+              try { identifiedName = await executeScript(scanCharScriptId.value, 'identify-character', char.name); }
+              catch { /* 脚本失败就用原名 */ }
+            }
             const charRecord = await insertCharacter(gallery.id, identifiedName, char.sourcePath);
             for (const group of char.groups) {
               const groupRecord = await insertImageGroup(charRecord.id, group.dirName, group.dirPath, group.files.length);

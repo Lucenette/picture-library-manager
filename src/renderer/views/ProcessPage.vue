@@ -129,7 +129,7 @@ import {
   getScriptsByType,
   getAllGalleries,
 } from '@/db/database';
-import { runScript } from '@/services/script-runner';
+import { executeScript } from '@/services/script-runner';
 import type {ImageGroupView, ImageGroupStatus, ImageFile, Gallery, ProcessScript} from '@common/types';
 
 // ============================================================
@@ -383,12 +383,21 @@ async function doBatchProcess(): Promise<void> {
   async function next(): Promise<void> {
     if (i >= targets.length) { processing.value = false; await loadData(); return; }
     const group = targets[i]; i++;
-    const result = await runScript(selectedScriptId.value!, group.characterName, group.dirPath, group.id);
-
-    if (result.success && result.selectedFile) {
-      try { await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, result.selectedFile, selectedScriptId.value); }
-      catch { errorCount.value++; }
-    } else { errorCount.value++; console.error(`[${group.dirName}] ${result.error}`); }
+    try {
+      const files = await getImageFilesByGroup(group.id);
+      const uuidMap = new Map<string, string>();
+      const crypto = require('crypto');
+      const scriptFiles = files.map(f => {
+        const uuid = crypto.randomUUID();
+        uuidMap.set(uuid, f.filePath);
+        return { uuid, fileName: f.fileName, filePath: f.filePath, width: f.width, height: f.height, fileSize: f.fileSize || 0, ext: f.extension };
+      });
+      const resultUuid = await executeScript(selectedScriptId.value!, 'select-image', { characterName: group.characterName, groupDirPath: group.dirPath, files: scriptFiles });
+      const selectedFile = uuidMap.get(resultUuid);
+      if (selectedFile) {
+        await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, selectedFile, selectedScriptId.value);
+      } else { errorCount.value++; }
+    } catch { errorCount.value++; }
 
     processedCount.value = i;
     processPercent.value = Math.round((i / targets.length) * 100);
