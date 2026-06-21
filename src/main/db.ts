@@ -144,6 +144,10 @@ export function getCharactersByGallery(galleryId: number): Character[] {
   return queryAll<Character>(S.SQL_SELECT_CHARACTERS_BY_GALLERY, [galleryId]);
 }
 
+export function renameCharacter(id: number, name: string): void {
+  run(S.SQL_RENAME_CHARACTER, [name, id]);
+}
+
 // ============================================================
 // ImageGroup
 // ============================================================

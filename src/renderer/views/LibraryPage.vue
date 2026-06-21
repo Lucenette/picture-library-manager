@@ -298,7 +298,7 @@ onMounted(loadData);
   align-items: center;
   margin-bottom: 12px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -311,7 +311,7 @@ onMounted(loadData);
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .table-wrap {

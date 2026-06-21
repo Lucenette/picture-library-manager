@@ -35,6 +35,7 @@ export async function updateGalleryScannedAt(id: number): Promise<void> { await 
 // Character
 export async function insertCharacter(galleryId: number, name: string, sourcePath: string): Promise<Character> { return call('insertCharacter', galleryId, name, sourcePath); }
 export async function getCharactersByGallery(galleryId: number): Promise<Character[]> { return call('getCharactersByGallery', galleryId); }
+export async function renameCharacter(id: number, name: string): Promise<void> { await call('renameCharacter', id, name); }
 
 // ImageGroup
 export async function insertImageGroup(characterId: number, dirName: string, dirPath: string, fileCount: number): Promise<ImageGroup> { return call('insertImageGroup', characterId, dirName, dirPath, fileCount); }

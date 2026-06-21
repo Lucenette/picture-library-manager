@@ -383,7 +383,7 @@ async function doBatchProcess(): Promise<void> {
   async function next(): Promise<void> {
     if (i >= targets.length) { processing.value = false; await loadData(); return; }
     const group = targets[i]; i++;
-    const result = await runScript(selectedScriptId.value!, group.dirPath);
+    const result = await runScript(selectedScriptId.value!, group.characterName, group.dirPath, group.id);
 
     if (result.success && result.selectedFile) {
       try { await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, result.selectedFile, selectedScriptId.value); }
@@ -414,11 +414,11 @@ onMounted(loadData);
   align-items: center;
   margin-bottom: 12px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 .toolbar-left { display: flex; align-items: center; flex: 1; }
-.toolbar-right { display: flex; align-items: center; gap: 4px; }
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
 
 .file-dialog :deep(.el-dialog__body) {
   padding: 12px 16px;

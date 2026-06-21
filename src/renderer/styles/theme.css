@@ -18,32 +18,32 @@
   --el-color-primary-dark-2: #2c59b1;
 
   /* ======== 成功 ======== */
-  --el-color-success: #4ab86a;
-  --el-color-success-light-1: #5cbf79;
-  --el-color-success-light-2: #6ec688;
-  --el-color-success-light-3: #80cd97;
-  --el-color-success-light-4: #92d4a6;
-  --el-color-success-light-5: #a4dbb5;
-  --el-color-success-light-6: #b6e2c4;
-  --el-color-success-light-7: #c8e9d3;
-  --el-color-success-light-8: #daf0e2;
-  --el-color-success-light-9: #edf7f1;
-  --el-color-success-dark-1: #42a45f;
-  --el-color-success-dark-2: #3a9054;
+  --el-color-success: #388555;
+  --el-color-success-light-1: #4c9163;
+  --el-color-success-light-2: #609d71;
+  --el-color-success-light-3: #74a97f;
+  --el-color-success-light-4: #88b58d;
+  --el-color-success-light-5: #9cc19b;
+  --el-color-success-light-6: #b0cda9;
+  --el-color-success-light-7: #c4d9b7;
+  --el-color-success-light-8: #d8e5c5;
+  --el-color-success-light-9: #ecf1d3;
+  --el-color-success-dark-1: #32774b;
+  --el-color-success-dark-2: #2c6941;
 
   /* ======== 警告 ======== */
-  --el-color-warning: #e2a53c;
-  --el-color-warning-light-1: #e5ae50;
-  --el-color-warning-light-2: #e8b763;
-  --el-color-warning-light-3: #ecc077;
-  --el-color-warning-light-4: #efc98a;
-  --el-color-warning-light-5: #f2d29e;
-  --el-color-warning-light-6: #f5dbb1;
-  --el-color-warning-light-7: #f8e4c5;
-  --el-color-warning-light-8: #fbedd8;
-  --el-color-warning-light-9: #fef7ed;
-  --el-color-warning-dark-1: #cb9235;
-  --el-color-warning-dark-2: #b4802f;
+  --el-color-warning: #f2c55c;
+  --el-color-warning-light-1: #f4cb6d;
+  --el-color-warning-light-2: #f5d17e;
+  --el-color-warning-light-3: #f7d78f;
+  --el-color-warning-light-4: #f8dda0;
+  --el-color-warning-light-5: #fae3b1;
+  --el-color-warning-light-6: #fbe9c2;
+  --el-color-warning-light-7: #fcefd3;
+  --el-color-warning-light-8: #fef5e4;
+  --el-color-warning-light-9: #fefaf5;
+  --el-color-warning-dark-1: #dab050;
+  --el-color-warning-dark-2: #c29b48;
 
   /* ======== 危险 ======== */
   --el-color-danger: #c75458;
@@ -142,6 +142,10 @@ body {
 /* ======== 按钮 ======== */
 .el-button {
   font-weight: 500;
+  margin-left: 0;
+}
+.el-button + .el-button {
+  margin-left: 0;
 }
 /* 实心按钮（非 text） */
 .el-button--primary:not(.is-text) {
@@ -181,6 +185,7 @@ body {
   border-color: #4a4c50;
   color: #eceef1;
 }
+
 /* 文字按钮 */
 .el-button.is-text {
   background: transparent !important;
@@ -217,9 +222,9 @@ body {
   color: #c75458;
 }
 .el-tag--warning {
-  background: #2e2010;
-  border-color: #5c3d16;
-  color: #f0b34b;
+  background: #3e340e;
+  border-color: #6e590b;
+  color: #f2c55c;
 }
 .el-tag--info {
   background: #2e3034;

@@ -116,6 +116,7 @@ export const SQL_UPDATE_GALLERY_SCAN = "UPDATE gallery SET scanned_at = datetime
 export const SQL_INSERT_CHARACTER = 'INSERT OR IGNORE INTO character (gallery_id, name, source_path) VALUES (?, ?, ?)';
 export const SQL_SELECT_CHARACTER_BY_GALLERY_NAME = 'SELECT * FROM character WHERE gallery_id = ? AND name = ?';
 export const SQL_SELECT_CHARACTERS_BY_GALLERY = 'SELECT * FROM character WHERE gallery_id = ? ORDER BY name';
+export const SQL_RENAME_CHARACTER = 'UPDATE character SET name=? WHERE id=?';
 
 // ============================================================
 // ImageGroup

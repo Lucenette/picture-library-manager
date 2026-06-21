@@ -13,13 +13,18 @@
             <el-icon><FolderOpened /></el-icon>
             <span>图库管理</span>
           </el-menu-item>
-          <el-menu-item index="/process">
-            <el-icon><Select /></el-icon>
-            <span>处理确认</span>
+          <el-menu-item index="/characters"
+          >
+          <el-icon><User /></el-icon>
+          <span>角色确认</span>
+        </el-menu-item>
+        <el-menu-item index="/process">
+            <el-icon><Grid /></el-icon>
+            <span>图组确认</span>
           </el-menu-item>
           <el-menu-item index="/library">
             <el-icon><PictureFilled /></el-icon>
-            <span>准图库</span>
+            <span>图库导出</span>
           </el-menu-item>
         </el-menu>
         <router-link to="/scripts" class="header-scripts-link" :class="{ active: activeMenu === '/scripts' }">
@@ -37,7 +42,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { FolderOpened, Setting, Select, PictureFilled } from '@element-plus/icons-vue';
+import { FolderOpened, Setting, Grid, PictureFilled, User } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);
