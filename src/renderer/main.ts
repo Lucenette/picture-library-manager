@@ -12,6 +12,7 @@ import ProcessPage from '@/views/main/ProcessPage.vue';
 import LibraryPage from '@/views/main/LibraryPage.vue';
 import ImageViewer from '@/views/image/ImageViewer.vue';
 import ScanConfigDialog from '@/views/dialogs/ScanConfigDialog.vue';
+import BatchProcessDialog from '@/views/dialogs/BatchProcessDialog.vue';
 import Dropdown from '@/views/dialogs/control/Dropdown.vue';
 
 const router = createRouter({
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/library', name: 'library', component: LibraryPage },
     { path: '/viewer', name: 'viewer', component: ImageViewer },
     { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },
+    { path: '/batch-process', name: 'batchProcess', component: BatchProcessDialog },
     { path: '/script-list', name: 'scriptList', component: Dropdown },
   ],
 });

@@ -6,7 +6,7 @@
         <CategorySearch :sections="filterCats" :order="filterOrder" />
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="showBatchDialog = true">
+        <el-button type="primary" @click="openBatchDialog">
           批量处理 ({{ selectedIds.length || filteredGroups.length }})
         </el-button>
         <el-button @click="excludeSelected" :disabled="selectedIds.length === 0">
@@ -59,17 +59,6 @@
       layout="total, sizes, prev, pager, next, jumper"
       class="pager"
     />
-
-    <!-- 选择脚本弹窗 -->
-    <el-dialog v-model="showBatchDialog" title="批量处理" width="400px">
-      <el-select v-model="selectedScriptId" placeholder="选择脚本" filterable style="width: 100%">
-        <el-option v-for="s in scripts" :key="s.id" :label="s.name" :value="s.id" />
-      </el-select>
-      <template #footer>
-        <el-button @click="showBatchDialog = false">取消</el-button>
-        <el-button type="primary" @click="doBatchProcess" :disabled="!selectedScriptId">开始处理</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 处理进度 -->
     <el-dialog v-model="processProgressVisible" title="处理进度" width="400px" :close-on-click-modal="false">
@@ -186,7 +175,6 @@ const filterCats = computed<FilterSection[]>(() => [
   },
 ]);
 const selectedScriptId = ref<number | null>(null);
-const showBatchDialog = ref(false);
 const selectedIds = ref<number[]>([]);
 const allGroups = ref<ImageGroupView[]>([]);
 const scripts = ref<ProcessScript[]>([]);
@@ -365,9 +353,20 @@ async function unexcludeSelected(): Promise<void> {
 }
 
 /** 批量处理 */
+function openBatchDialog(): void {
+  const { ipcRenderer } = require('electron');
+  const targets = selectedIds.value.length > 0
+    ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
+    : filteredGroups.value.filter(g => g.status !== 'excluded');
+  if (targets.length === 0) { alert('选中的图片组都被排除'); return; }
+  ipcRenderer.invoke(IPC.BATCH_PROCESS_OPEN, {
+    scripts: scripts.value.map((s: any) => ({ id: s.id, name: s.name })),
+    count: targets.length,
+  });
+}
+
 async function doBatchProcess(): Promise<void> {
   if (!selectedScriptId.value) return;
-  showBatchDialog.value = false;
   const targets = selectedIds.value.length > 0
     ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
     : filteredGroups.value.filter(g => g.status !== 'excluded');
@@ -407,7 +406,13 @@ async function doBatchProcess(): Promise<void> {
   setTimeout(next, 50);
 }
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+  require('electron').ipcRenderer.on(IPC.BATCH_PROCESS_CONFIRMED, (_e: any, scriptId: number) => {
+    selectedScriptId.value = scriptId;
+    doBatchProcess();
+  });
+});
 </script>
 
 <style scoped>

@@ -89,6 +89,16 @@ export function get(id: string): BrowserWindow | undefined {
   return win && !win.isDestroyed() ? win : undefined;
 }
 
+/** 获取窗口Id */
+export function getId(window: BrowserWindow): string | undefined {
+  for (const [name, currentWindow] of windows) {
+    if (currentWindow.id === window.id) {
+      return name;
+    }
+  }
+  return undefined; // 未找到
+}
+
 /** 关闭并注销 */
 export function close(id: string): void {
   const win = windows.get(id);
@@ -125,13 +135,13 @@ export function createViewer(): BrowserWindow {
   });
 }
 
-/** 创建脚本列表浮窗（自适应高度、不可调整大小、定位在指定坐标） */
-export function createScriptList(parentId: string, x: number, y: number, w: number, h: number): BrowserWindow {
+/** 创建脚本列表浮窗（直接指定父窗口对象） */
+export function createDropdown(parent: BrowserWindow, x: number, y: number, w: number, h: number): BrowserWindow {
   const win = create('script-list', {
     width: w, height: h,
     backgroundColor: '#2b2d30',
     route: '/script-list',
-    parentId,
+    parentId: getId(parent) || 'main',
     modal: false,
     frame: false,
     minimizable: false,
@@ -150,6 +160,21 @@ export function createScanConfig(): BrowserWindow {
     minWidth: 420, minHeight: 210,
     backgroundColor: '#1e1f22',
     route: '/scan-config',
+    parentId: 'main',
+    modal: true,
+    frame: false,
+    minimizable: false,
+    maximizable: false,
+  });
+}
+
+/** 创建批量处理脚本选择窗口 */
+export function createBatchProcess(): BrowserWindow {
+  return create('batch-process', {
+    width: 420, height: 210,
+    minWidth: 420, minHeight: 210,
+    backgroundColor: '#1e1f22',
+    route: '/batch-process',
     parentId: 'main',
     modal: true,
     frame: false,

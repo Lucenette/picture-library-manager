@@ -14,7 +14,7 @@ export const initDropdown = (): void => {
         let y = bounds.y + cr.y + cr.height + margin;
         const screenH = require('electron').screen.getPrimaryDisplay().workAreaSize.height;
         if (y + data.listHeight > screenH - 20) y = bounds.y + cr.y - data.listHeight - margin;
-        const listWin = wm.createScriptList('scan-config', x, y, cr.width, data.listHeight);
+        const listWin = wm.createDropdown(parentWin, x, y, cr.width, data.listHeight);
         listWin.webContents.once('did-finish-load', () => {
             listWin.webContents.send(IPC.DROPDOWN_INIT, data);
         });

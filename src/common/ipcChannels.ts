@@ -17,6 +17,11 @@ export const IPC = {
   SCAN_CONFIG_CONFIRM: 'scan-config:confirm',
   SCAN_CONFIG_CONFIRMED: 'scan-config:confirmed',
 
+  BATCH_PROCESS_OPEN: 'batch-process:open',
+  BATCH_PROCESS_INIT: 'batch-process:init',
+  BATCH_PROCESS_CONFIRM: 'batch-process:confirm',
+  BATCH_PROCESS_CONFIRMED: 'batch-process:confirmed',
+
   DROPDOWN_OPEN: 'script-list:open',
   DROPDOWN_INIT: 'script-list:init',
   DROPDOWN_SELECT: 'script-list:select',

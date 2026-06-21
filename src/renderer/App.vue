@@ -47,7 +47,7 @@ import { IPC } from '@common/ipcChannels';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);
-const isPopup = computed(() => ['/viewer', '/scan-config', '/script-list'].includes(route.path));
+const isPopup = computed(() => ['/viewer', '/scan-config', '/batch-process', '/script-list'].includes(route.path));
 </script>
 
 <style>
