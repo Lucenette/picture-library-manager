@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+import { IPC } from '@common/ipcChannels';
 import type {
   Gallery,
   Character,
@@ -13,7 +14,7 @@ import type {
 
 /** 调用主进程数据库方法 */
 async function call<T>(method: string, ...args: any[]): Promise<T> {
-  return ipcRenderer.invoke('db', method, ...args);
+  return ipcRenderer.invoke(IPC.DB, method, ...args);
 }
 
 /** 图片扩展名白名单 */

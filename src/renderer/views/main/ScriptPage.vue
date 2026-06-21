@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { IPC } from '@common/ipcChannels';
 import { ref, onMounted, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import {
@@ -129,7 +130,7 @@ async function loadData(): Promise<void> {
 
 async function addScript(): Promise<void> {
   const { ipcRenderer } = require('electron');
-  const paths: string[] = await ipcRenderer.invoke('dialog:openScript');
+  const paths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_SCRIPT);
   if (!paths || paths.length === 0) return;
   const fs = require('fs');
   const path = require('path');

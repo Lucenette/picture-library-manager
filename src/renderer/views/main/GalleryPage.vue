@@ -54,20 +54,6 @@
       />
     </div>
 
-    <!-- 扫描配置 -->
-    <el-dialog v-model="scanConfigVisible" title="扫描配置" width="420px">
-      <div class="scan-config">
-        <label>目录结构识别脚本</label>
-        <el-select v-model="scanStructScriptId" placeholder="请选择脚本" style="width:100%">
-          <el-option v-for="s in structScripts" :key="s.id" :label="s.name" :value="s.id" />
-        </el-select>
-      </div>
-      <template #footer>
-        <el-button @click="scanConfigVisible = false">取消</el-button>
-        <el-button type="primary" @click="doScan" :disabled="!scanStructScriptId">开始扫描</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 扫描进度 -->
     <el-dialog v-model="progressVisible" title="扫描进度" width="400px" :close-on-click-modal="false">
       <div class="progress-content">
@@ -89,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { IPC } from '@common/ipcChannels';
 import { ref, reactive, onMounted, computed } from 'vue';
 import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
@@ -105,9 +92,6 @@ import type { Gallery, ScanProgress, ProcessScript, StructureOutput } from '@com
 const galleries = ref<Gallery[]>([]);
 const selectedIds = ref<number[]>([]);
 const structScripts = ref<ProcessScript[]>([]);
-const scanConfigVisible = ref(false);
-const scanStructScriptId = ref<number | null>(null);
-const pendingScanGallery = ref<Gallery | null>(null);
 const scanning = ref(false);
 const scanTargetId = ref<number | null>(null);
 const progressVisible = ref(false);
@@ -170,7 +154,7 @@ async function loadGalleries(): Promise<void> {
  * 添加图库 —— Electron 原生对话框选择文件夹
  */
 async function addGallery(): Promise<void> {
-  const paths: string[] = await ipcRenderer.invoke('dialog:openDir');
+  const paths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR);
   if (!paths || paths.length === 0) return;
 
   for (const rootPath of paths) {
@@ -186,45 +170,58 @@ async function addGallery(): Promise<void> {
   await loadGalleries();
 }
 
-/** 弹出扫描配置弹窗 */
+/** 弹出原生扫描配置窗口 */
 function scanGallery(gallery: Gallery): void {
-  pendingScanGallery.value = gallery;
-  scanStructScriptId.value = null;
-  scanConfigVisible.value = true;
+  const { ipcRenderer } = require('electron');
+  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, {
+    scripts: structScripts.value.map(s => ({ id: s.id, name: s.name })),
+    galleryIds: [gallery.id],
+    galleryName: gallery.name,
+    galleryCount: 1,
+  });
 }
 
-/** 确认扫描（支持单个和批量） */
-async function doScan(): Promise<void> {
-  const targets = pendingScanGallery.value
-    ? [pendingScanGallery.value]
-    : galleries.value.filter(g => selectedIds.value.includes(g.id));
-  if (targets.length === 0) return;
-  scanConfigVisible.value = false;
+function batchScan(): void {
+  const { ipcRenderer } = require('electron');
+  const targets = galleries.value.filter(g => selectedIds.value.includes(g.id));
+  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, {
+    scripts: structScripts.value.map(s => ({ id: s.id, name: s.name })),
+    galleryIds: targets.map(g => g.id),
+    galleryName: targets.length === 1 ? targets[0].name : '',
+    galleryCount: targets.length,
+  });
+}
 
-  for (const gallery of targets) {
+/** 扫描配置确认回调 */
+onMounted(() => {
+  const { ipcRenderer } = require('electron');
+  ipcRenderer.on(IPC.SCAN_CONFIG_CONFIRMED, (_event: any, data: any) => {
+    doScan(data.galleryIds, data.scriptId);
+  });
+});
+
+/** 执行扫描 */
+async function doScan(galleryIds: number[], scriptId: number): Promise<void> {
+  for (const id of galleryIds) {
+    const gallery = galleries.value.find(g => g.id === id);
+    if (!gallery) continue;
     scanning.value = true;
     scanTargetId.value = gallery.id;
     scanPhase.value = 'dir';
-    scanProgress.charactersFound = 0;
-    scanProgress.groupsFound = 0;
-    scanProgress.filesFound = 0;
+    scanProgress.charactersFound = 0; scanProgress.groupsFound = 0; scanProgress.filesFound = 0;
     scanProgress.currentCharacter = null;
-    thumbCurrent.value = 0;
-    thumbTotal.value = 0;
+    thumbCurrent.value = 0; thumbTotal.value = 0;
     progressVisible.value = true;
 
     await new Promise<void>(resolve => {
       setTimeout(async () => {
         try {
           await clearGalleryData(gallery.id);
-          // 构建目录树 + 识别结构
           const tree = buildDirTree(gallery.rootPath);
-          const structure = await executeScript(scanStructScriptId.value!, 'identify-structure', { rootPath: gallery.rootPath, tree });
-
+          const structure = await executeScript(scriptId, 'identify-structure', { rootPath: gallery.rootPath, tree });
           const characters = scanByStructure(structure, gallery.rootPath, (progress) => { Object.assign(scanProgress, progress); });
           scanPhase.value = 'thumb';
-          const totalFiles = scanProgress.filesFound;
-          thumbTotal.value = totalFiles;
+          thumbTotal.value = scanProgress.filesFound;
           thumbCurrent.value = 0;
 
           for (const char of characters) {
@@ -232,29 +229,17 @@ async function doScan(): Promise<void> {
             for (const group of char.groups) {
               const groupRecord = await insertImageGroup(charRecord.id, group.dirName, group.dirPath, group.files.length);
               if (group.files.length > 0) {
-                const filesWithThumb = await generateThumbnails(group.files, (tp) => {
-                  thumbCurrent.value += 1;
-                  scanProgress.currentCharacter = `${thumbCurrent.value}/${thumbTotal.value} ${tp.currentFile}`;
-                });
-                await insertImageFiles(groupRecord.id, filesWithThumb.map((f) => ({
-                  fileName: f.fileName, filePath: f.filePath, fileSize: f.fileSize,
-                  width: f.width, height: f.height, extension: f.extension, thumbnail: f.thumbnail,
-                })));
+                const filesWithThumb = await generateThumbnails(group.files, (tp) => { thumbCurrent.value += 1; scanProgress.currentCharacter = `${thumbCurrent.value}/${thumbTotal.value} ${tp.currentFile}`; });
+                await insertImageFiles(groupRecord.id, filesWithThumb.map((f) => ({ fileName: f.fileName, filePath: f.filePath, fileSize: f.fileSize, width: f.width, height: f.height, extension: f.extension, thumbnail: f.thumbnail })));
               }
             }
           }
-
           scanPhase.value = 'done';
           await updateGalleryScannedAt(gallery.id);
           await loadGalleries();
           progressVisible.value = false;
-        } catch (e: any) {
-          alert(`扫描出错: ${e.message}`);
-        } finally {
-          scanning.value = false;
-          scanTargetId.value = null;
-          resolve();
-        }
+        } catch (e: any) { alert(`扫描出错: ${e.message}`); }
+        finally { scanning.value = false; scanTargetId.value = null; resolve(); }
       }, 100);
     });
   }
@@ -262,14 +247,6 @@ async function doScan(): Promise<void> {
 
 function onSelectionChange(rows: Gallery[]): void {
   selectedIds.value = rows.map(r => r.id);
-}
-
-/** 批量扫描 */
-function batchScan(): void {
-  // 弹出配置弹窗，确认后逐个扫描选中图库
-  scanStructScriptId.value = null;
-  scanConfigVisible.value = true;
-  pendingScanGallery.value = null; // null 表示批量模式
 }
 
 /** 批量删除 */
@@ -321,9 +298,6 @@ onMounted(loadGalleries);
   height: 100%;
 }
 
-.scan-config label {
-  display: block; margin-bottom: 4px; font-size: 13px; color: #b4b6ba;
-}
 .progress-stats {
   margin-top: 16px;
   line-height: 1.8;

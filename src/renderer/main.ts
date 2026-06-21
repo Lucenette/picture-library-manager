@@ -5,12 +5,14 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs';
 import 'element-plus/dist/index.css';
 import '@/styles/theme.css';
 import App from '@/App.vue';
-import GalleryPage from '@/views/GalleryPage.vue';
-import ScriptPage from '@/views/ScriptPage.vue';
-import CharacterPage from '@/views/CharacterPage.vue';
-import ProcessPage from '@/views/ProcessPage.vue';
-import LibraryPage from '@/views/LibraryPage.vue';
-import ImageViewer from '@/views/ImageViewer.vue';
+import GalleryPage from '@/views/main/GalleryPage.vue';
+import ScriptPage from '@/views/main/ScriptPage.vue';
+import CharacterPage from '@/views/main/CharacterPage.vue';
+import ProcessPage from '@/views/main/ProcessPage.vue';
+import LibraryPage from '@/views/main/LibraryPage.vue';
+import ImageViewer from '@/views/image/ImageViewer.vue';
+import ScanConfigDialog from '@/views/dialogs/ScanConfigDialog.vue';
+import Dropdown from '@/views/dialogs/control/Dropdown.vue';
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -21,6 +23,8 @@ const router = createRouter({
     { path: '/process', name: 'process', component: ProcessPage },
     { path: '/library', name: 'library', component: LibraryPage },
     { path: '/viewer', name: 'viewer', component: ImageViewer },
+    { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },
+    { path: '/script-list', name: 'scriptList', component: Dropdown },
   ],
 });
 

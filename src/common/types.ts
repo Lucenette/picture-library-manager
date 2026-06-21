@@ -72,6 +72,17 @@ export interface StructureOutput {
   groups: string[]; // 相对于图库根的图片组路径
 }
 
+/** 脚本列表浮窗初始化数据 */
+export interface ScriptListInitData {
+  scripts: Array<{ id: number; name: string }>;
+  selectedId: number | null;
+}
+
+/** 脚本列表浮窗打开请求 */
+export interface ScriptListOpenData extends ScriptListInitData {
+  controlRect: { x: number; y: number; width: number; height: number };
+}
+
 /** 处理脚本记录 */
 export interface ProcessScript {
   id: number;

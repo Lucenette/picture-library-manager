@@ -118,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import { IPC } from '@common/ipcChannels';
 import { ref, computed, onMounted } from 'vue';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterSection } from '@/components/CategorySearch.types';
@@ -308,7 +309,7 @@ async function openViewer(fileList: ImageFile[], target: ImageFile): Promise<voi
     height: f.height,
     thumbnail: f.thumbnail,
   }));
-  await ipcRenderer.invoke('viewer:open', { files, index: idx >= 0 ? idx : 0 });
+  await ipcRenderer.invoke(IPC.VIEWER_OPEN, { files, index: idx >= 0 ? idx : 0 });
 }
 
 function relPath(f: ImageFile): string {

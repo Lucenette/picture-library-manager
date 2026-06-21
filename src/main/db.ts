@@ -1,9 +1,18 @@
 import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
 import { join, dirname } from 'path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { app } from 'electron';
+import {app, ipcMain} from 'electron';
 import * as S from '@/sql';
 import type { Gallery, Character, ImageGroup, ImageGroupStatus, ImageFile, ProcessScript, ProcessedImage, ImageGroupView, ProcessedImageView, ScriptType } from '@common/types';
+import {IPC} from "@common/ipcChannels";
+
+export const initDbIpc = (): void => {
+  ipcMain.handle(IPC.DB, async (_event, method: string, ...args: any[]) => {
+    const fn = (db as any)[method];
+    if (typeof fn !== 'function') throw new Error(`Unknown db method: ${method}`);
+    return fn(...args);
+  });
+};
 
 // ============================================================
 // 常量

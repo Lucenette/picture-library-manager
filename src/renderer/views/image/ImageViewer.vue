@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { IPC } from '@common/ipcChannels';
 import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 const { ipcRenderer } = require('electron');
 
@@ -117,7 +118,7 @@ watch(index, () => {
 });
 
 async function init(): Promise<void> {
-  const data = await ipcRenderer.invoke('viewer:getData');
+  const data = await ipcRenderer.invoke(IPC.VIEWER_GET_DATA);
   if (data) { files.value = data.files; index.value = data.index; }
   window.addEventListener('resize', onResize);
 }
@@ -178,7 +179,6 @@ function onKey(e: KeyboardEvent): void {
   if (e.key === 'ArrowRight') next();
   if (e.key === 'Escape') close();
   if (e.key === '0') { cssScale.value = 0; offsetX.value = 0; offsetY.value = 0; displayZoom.value = scaleLabel(); }
-  if (e.key === 'F12') { ipcRenderer.invoke('viewer:devtools'); }
 }
 
 function close(): void { window.close(); }

@@ -76,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import { IPC } from '@common/ipcChannels';
 import { ref, onMounted, computed } from 'vue';
 import { Download } from '@element-plus/icons-vue';
 import CategorySearch from '@/components/CategorySearch.vue';
@@ -180,7 +181,7 @@ async function openViewer(target: ProcessedImageView): Promise<void> {
     height: pi.selectedFileHeight,
     thumbnail: pi.selectedFileThumbnail,
   }));
-  await ipcRenderer.invoke('viewer:open', { files, index: idx >= 0 ? idx : 0 });
+  await ipcRenderer.invoke(IPC.VIEWER_OPEN, { files, index: idx >= 0 ? idx : 0 });
 }
 
 async function loadData(): Promise<void> {
@@ -214,7 +215,7 @@ async function batchDelete(): Promise<void> {
  */
 async function exportImages(): Promise<void> {
   const { ipcRenderer } = require('electron');
-  const targetDir = await ipcRenderer.invoke('dialog:exportDir');
+  const targetDir = await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR);
   if (!targetDir) return;
 
   const fs = require('fs');

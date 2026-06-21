@@ -1,6 +1,6 @@
 <template>
-  <router-view v-if="isViewer" />
-  <el-container v-else class="app-container" @keydown="onKey" tabindex="0" ref="appEl">
+  <router-view v-if="isPopup" />
+  <el-container v-else class="app-container" tabindex="0" ref="appEl">
     <el-header class="app-header">
       <div class="header-wrap">
         <el-menu
@@ -43,16 +43,11 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { FolderOpened, Setting, Grid, PictureFilled, User } from '@element-plus/icons-vue';
+import { IPC } from '@common/ipcChannels';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);
-const isViewer = computed(() => route.path === '/viewer');
-
-function onKey(e: KeyboardEvent): void {
-  if (e.key === 'F12') {
-    require('electron').ipcRenderer.invoke('devtools');
-  }
-}
+const isPopup = computed(() => ['/viewer', '/scan-config', '/script-list'].includes(route.path));
 </script>
 
 <style>
