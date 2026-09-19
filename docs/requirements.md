@@ -1,6 +1,10 @@
 # 二次元壁纸图库管理器 - 需求文档
 
-> **状态：已确认，待开工**
+> **状态：最初的需求规格，部分细节已被实现取代。**
+>
+> 当前行为请以 [README](../README.md)、[ARCHITECTURE](./ARCHITECTURE.md) 与 [SCRIPTING](./SCRIPTING.md) 为准。
+> 其中最典型的一处演进是脚本接口：本文描述的 `module.exports = function(groupDirPath)`
+> 已被「导出多个具名函数」的形式取代，详见 [SCRIPTING](./SCRIPTING.md)。
 
 ## 项目概述
 
