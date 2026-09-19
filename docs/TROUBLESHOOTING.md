@@ -144,7 +144,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 ### 库文件变得很大
 
-缩略图以 Base64 存放在 `image_file.thumbnail`，实测占库体积约九成。这是「预览零开销」的代价，属于已知取舍（见 [ARCHITECTURE](./ARCHITECTURE.md) 的关键取舍一节）。
+缩略图以 WebP 字节存放在 `image_file.thumbnail`（BLOB），是库体积里最大的一块。这是「预览零开销」的代价，属于已知取舍（见 [ARCHITECTURE](./ARCHITECTURE.md) 的关键取舍一节）。
 
 ---
 

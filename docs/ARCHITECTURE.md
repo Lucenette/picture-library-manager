@@ -155,7 +155,7 @@ pending ──开始──▶ running ──┬──▶ done
    ②  executeScript('identify-structure')   结构脚本把目录树映射成 角色→图片组
    ③  collectImageFiles()       收集文件清单（只读名字/大小/扩展名）
    ④  ThumbnailPool.analyze()   每批 pool.concurrency 张，派给工作线程
-                                线程内：imageSize 读尺寸 + 解码 + 裁剪缩放 → base64
+                                线程内：sharp 解码 + 缩放到 100×100 + 出 WebP 字节
    ⑤  beginBatch()
           clearGalleryData()    到这里才允许动数据库
           insertCharacter / insertImageGroup / insertImageFiles
@@ -186,7 +186,7 @@ pending ──开始──▶ running ──┬──▶ done
 | 取舍 | 选择 | 代价 |
 |---|---|---|
 | 数据库 | sql.js（内存 + 整库落盘） | 写放大明显，靠批量提交缓解；换来零原生依赖、绿色便携 |
-| 缩略图 | Base64 存进数据库 | 库体积大（实测约九成是缩略图），但预览零开销；超过万级图片需要改成落盘缓存 |
+| 缩略图 | 100×100 WebP 字节存进数据库 | 比 PNG+Base64 小三分之二左右，预览零开销；超过万级图片需要改成落盘缓存 |
 | 任务并发 | 恒为 1 | 简单、中间态可推理；换来任务之间互相等待 |
 | 扫描写库 | 全部算完再一次性入库 | 单个图库的缩略图要占内存；换来取消不留脏数据 |
 | 脚本执行 | 主进程、无沙箱、导入即执行 | 有安全边界要求的使用者需谨慎；换来脚本能自由访问文件系统 |
