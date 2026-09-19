@@ -135,7 +135,16 @@ function upsertScript(...) {}
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
 - 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts`），在 `src/main/index.ts` 里与 `initDbIpc()` 并列注册。
 
-### 5. 共享层的准入
+### 5. 弹窗一律用原生窗口
+
+不要用浏览器的 `confirm()` / `alert()`，也不要用 Element Plus 的 `ElMessageBox`——它们渲染在
+主窗口内部，跟项目其它弹窗不一致。统一走 `@/services/dialog-service` 的 `confirmDialog()` /
+`alertDialog()`，对应的原生窗口是 `main/dialogs/confirm.ts` + `views/dialogs/ConfirmDialog.vue`。
+
+新增弹窗时照 `prompt.ts` / `confirm.ts` 的模式：主进程建一个无边框子窗口，渲染进程出对应的
+`.vue` 页面，结果由主进程转交给发起方。
+
+### 6. 共享层的准入
 
 只有**两个进程都在用**的东西才能进 `src/common/`。曾经出现过 `common/script.ts`、`common/image.ts` 只被主进程使用的错误，已被移回。
 

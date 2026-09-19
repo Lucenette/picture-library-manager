@@ -61,8 +61,10 @@
 - 查看图片组文件详情，缩略图预览
 
 ### 缩略图系统
-- 扫描时自动生成 50×50 中心裁剪缩略图
+- 扫描时自动生成 50×50 中心裁剪缩略图，**任何尺寸的图片都会生成**
 - 解码与缩放运行在独立工作线程，扫描期间主进程保持响应
+- 解码按内存预算分批调度：普通图并发，上亿像素的大图独占一批
+- 可选安装 [sharp](https://sharp.pixelplumbing.com/) 切换到 libvips 缩放解码，内存与耗时降一个数量级
 - Base64 存储于数据库，预览零开销
 - 缩略图解码支持 JPEG / PNG / GIF / BMP / TIFF；WEBP / AVIF / SVG / ICO 仅收录元数据
 
@@ -118,6 +120,25 @@ yarn dev        # 启动开发环境
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
 
+### 可选：安装 sharp 加速缩略图
+
+缩略图默认由内置的纯 JS 解码器生成（jpeg-js / pngjs / …），零原生依赖、开箱即用。
+但纯 JS 解码必须先把整图铺成 RGBA 位图：一张 15360×8640 的 JPEG 就要 500 MB 以上。
+
+装上 [sharp](https://sharp.pixelplumbing.com/) 后会自动切换到 libvips：
+
+```bash
+yarn add sharp
+```
+
+- **按需缩放解码**：对大图做 shrink-on-load（1/2、1/4、1/8），不铺开整图，内存降一个数量级
+- **跨平台**：官方提供 Windows / macOS / Linux（x64 与 arm64）预编译包，且是 N-API 模块，
+  在 Electron 里不需要 electron-rebuild
+- 顺带支持 EXIF 方向校正、WebP / AVIF / TIFF
+
+未安装或加载失败时自动回落到内置解码器，功能不受影响。**任务结果里会显示本次实际使用的
+解码引擎**（`解码 sharp` 或 `解码 内置`）。
+
 ### 打包
 
 ```bash
@@ -141,10 +162,12 @@ picture-library-manager/
 │   │   ├── sql.ts               #   SQL 常量
 │   │   ├── window-manager.ts    #   窗口管理器（创建/获取/关闭）
 │   │   ├── image/               #   图片处理流水线（目录遍历 + 解码）
-│   │   │   ├── walk.ts          #     目录遍历（异步分片，不读图片内容）
-│   │   │   ├── thumbnail-pool.ts    #  解码线程池
+│   │   │   ├── walk.ts          #     目录遍历 + 读图片头拿宽高
+│   │   │   ├── thumbnail-pool.ts    #  解码线程池（按内存预算调度）
 │   │   │   ├── thumbnail-worker.ts  #  线程入口
-│   │   │   └── thumbnail-decode.ts  #  读尺寸 + 解码 + 缩放
+│   │   │   ├── thumbnail-engine.ts  #  选择解码引擎（sharp / 内置）
+│   │   │   ├── thumbnail-sharp.ts   #  sharp 实现（可选，未装则跳过）
+│   │   │   └── thumbnail-decode.ts  #  内置纯 JS 解码 + 缩放
 │   │   ├── script/              #   处理脚本
 │   │   │   ├── compile.ts       #     源码编译成模块
 │   │   │   └── script-service.ts    #  按 id 调用脚本方法
@@ -163,6 +186,7 @@ picture-library-manager/
 │   │       ├── scan-config.ts   #     扫描配置
 │   │       ├── batch-process.ts #     批量处理
 │   │       ├── prompt.ts        #     通用输入弹窗
+│   │       ├── confirm.ts       #     原生确认 / 提示弹窗
 │   │       ├── file-viewer.ts   #     文件查看器
 │   │       └── control/         #     原生控件
 │   │           └── dropdown.ts  #        下拉列表浮窗
@@ -194,6 +218,7 @@ picture-library-manager/
 │   │   │       ├── ScanConfigDialog.vue
 │   │   │       ├── BatchProcessDialog.vue
 │   │   │       ├── PromptDialog.vue
+│   │   │       ├── ConfirmDialog.vue
 │   │   │       ├── FileViewerDialog.vue
 │   │   │       └── control/Dropdown.vue
 │   │   └── styles/theme.css     #   暗色主题
