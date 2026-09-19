@@ -54,7 +54,7 @@
 ### 缩略图系统
 - 扫描时自动生成 50×50 中心裁剪缩略图
 - Base64 存储于数据库，预览零开销
-- 支持 JPEG / PNG / GIF / BMP / TIFF 全格式
+- 缩略图解码支持 JPEG / PNG / GIF / BMP / TIFF；WEBP / AVIF / SVG / ICO 仅收录元数据
 
 ### 图片查看器
 - 独立窗口浏览原图，支持缩放拖拽
@@ -102,7 +102,8 @@
 git clone https://github.com/Lucenette/picture-library-manager.git
 cd picture-library-manager
 yarn install
-yarn dev
+yarn dev        # 启动开发环境
+yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
 
 ### 打包
@@ -124,13 +125,13 @@ picture-library-manager/
 ├── src/
 │   ├── main/                    # Electron 主进程
 │   │   ├── index.ts             #   入口：初始化 DB、注册 IPC、创建窗口
-│   │   ├── db.ts                #   数据库层（SQLite CRUD + IPC 调度）
+│   │   ├── db.ts                #   数据库层（SQLite CRUD + 批量落盘 + IPC 调度）
 │   │   ├── sql.ts               #   SQL 常量
 │   │   ├── window-manager.ts    #   窗口管理器（创建/获取/关闭）
 │   │   └── dialogs/             #   IPC 模块
 │   │       ├── index.ts         #     统一注册入口
 │   │       ├── system.ts        #     系统对话框/DevTools
-│   │       ├── viewer.ts        #     图片查看器
+│   │       ├── image-viewer.ts  #     图片查看器
 │   │       ├── scan-config.ts   #     扫描配置
 │   │       ├── batch-process.ts #     批量处理
 │   │       ├── prompt.ts        #     通用输入弹窗
@@ -144,6 +145,9 @@ picture-library-manager/
 │   │   ├── scanner/scanner.ts   #   目录扫描器 + 缩略图生成
 │   │   ├── services/            #   业务服务
 │   │   │   └── script-runner.ts #     脚本执行器
+│   │   ├── composables/         #   组合式函数
+│   │   │   ├── useIpcListener.ts    #  IPC 订阅（组件卸载时自动注销）
+│   │   │   └── useFilterOrder.ts    #  筛选标签的顺序管理
 │   │   ├── components/          #   可复用组件
 │   │   │   ├── CategorySearch.vue   #  分类筛选器
 │   │   │   └── DropdownControl.vue  #  下拉选择控件
@@ -165,7 +169,9 @@ picture-library-manager/
 │   │   └── styles/theme.css     #   暗色主题
 │   └── common/                  # 共享
 │       ├── types.ts             #   类型定义
-│       └── ipcChannels.ts       #   IPC 通道常量
+│       ├── ipcChannels.ts       #   IPC 通道常量
+│       ├── script.ts            #   处理脚本的编译入口
+│       └── image.ts             #   图片扩展名白名单
 ├── electron-builder.yml         # 打包配置
 ├── electron.vite.config.ts      # Vite 配置
 └── package.json

@@ -5,18 +5,22 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs';
 import 'element-plus/dist/index.css';
 import '@/styles/theme.css';
 import App from '@/App.vue';
-import GalleryPage from '@/views/main/GalleryPage.vue';
-import ScriptPage from '@/views/main/ScriptPage.vue';
-import CharacterPage from '@/views/main/CharacterPage.vue';
-import ProcessPage from '@/views/main/ProcessPage.vue';
-import LibraryPage from '@/views/main/LibraryPage.vue';
-import ImageViewer from '@/views/image/ImageViewer.vue';
-import ScanConfigDialog from '@/views/dialogs/ScanConfigDialog.vue';
 import BatchProcessDialog from '@/views/dialogs/BatchProcessDialog.vue';
-import PromptDialog from '@/views/dialogs/PromptDialog.vue';
-import FileViewerDialog from '@/views/dialogs/FileViewerDialog.vue';
 import Dropdown from '@/views/dialogs/control/Dropdown.vue';
+import FileViewerDialog from '@/views/dialogs/FileViewerDialog.vue';
+import PromptDialog from '@/views/dialogs/PromptDialog.vue';
+import ScanConfigDialog from '@/views/dialogs/ScanConfigDialog.vue';
+import ImageViewer from '@/views/image/ImageViewer.vue';
+import CharacterPage from '@/views/main/CharacterPage.vue';
+import GalleryPage from '@/views/main/GalleryPage.vue';
+import LibraryPage from '@/views/main/LibraryPage.vue';
+import ProcessPage from '@/views/main/ProcessPage.vue';
+import ScriptPage from '@/views/main/ScriptPage.vue';
 
+/**
+ * 全部窗口共用同一份渲染进程入口，通过 hash 路由区分：
+ * 无 hash 的是主窗口页面，其余都是独立的原生子窗口。
+ */
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
@@ -25,6 +29,7 @@ const router = createRouter({
     { path: '/characters', name: 'characters', component: CharacterPage },
     { path: '/process', name: 'process', component: ProcessPage },
     { path: '/library', name: 'library', component: LibraryPage },
+
     { path: '/viewer', name: 'viewer', component: ImageViewer },
     { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },
     { path: '/batch-process', name: 'batchProcess', component: BatchProcessDialog },

@@ -4,10 +4,10 @@
       <el-button type="primary" @click="addScript">
         <el-icon><Plus /></el-icon> 加载脚本文件
       </el-button>
-      <el-button @click="batchReload" :disabled="selectedIds.length === 0">
+      <el-button :disabled="selectedIds.length === 0" @click="batchReload">
         批量重载 ({{ selectedIds.length }})
       </el-button>
-      <el-button type="danger" @click="batchDelete" :disabled="selectedIds.length === 0">
+      <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
         批量删除 ({{ selectedIds.length }})
       </el-button>
     </div>
@@ -15,17 +15,25 @@
     <div class="table-wrap">
       <el-table
         :data="pagedScripts"
+        row-key="id"
         @sort-change="onSortChange"
         @selection-change="onSelectionChange"
-        row-key="id"
       >
         <el-table-column type="selection" width="45" />
         <el-table-column prop="name" label="名称" width="160" sortable="custom" show-overflow-tooltip />
         <el-table-column prop="filePath" label="文件路径" min-width="250" sortable="custom" show-overflow-tooltip />
         <el-table-column label="类型" width="180">
           <template #default="{ row }">
-            <el-tag v-for="t in row.types" :key="t" size="small" :type="tagType(t)" style="margin-right:4px">{{ typeLabel(t) }}</el-tag>
-            <span v-if="!row.types?.length" style="color:#5e6065">-</span>
+            <el-tag
+              v-for="type in row.types"
+              :key="type"
+              size="small"
+              :type="tagType(type)"
+              style="margin-right: 4px"
+            >
+              {{ typeLabel(type) }}
+            </el-tag>
+            <span v-if="!row.types?.length" style="color: #5e6065">-</span>
           </template>
         </el-table-column>
         <el-table-column prop="brief" label="代码" min-width="260" show-overflow-tooltip />
@@ -33,7 +41,7 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text @click="openRename(row)">重命名</el-button>
-            <el-button size="small" text @click="reloadScript(row)">重载</el-button>
+            <el-button size="small" text @click="reloadScriptFile(row)">重载</el-button>
             <el-button size="small" text type="danger" @click="removeScript(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -49,36 +57,57 @@
         layout="total, sizes, prev, pager, next, jumper"
       />
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { IPC } from '@common/ipcChannels';
-import { ref, onMounted, computed } from 'vue';
+import { readFileSync } from 'fs';
+import { basename } from 'path';
+import { computed, onMounted, ref } from 'vue';
+import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
+import { IPC } from '@common/ipcChannels';
+import type { ProcessScript, PromptInitData, PromptResult, ScriptType } from '@common/types';
+import { useIpcListener } from '@/composables/useIpcListener';
 import {
-  getAllScripts,
-  upsertScript,
-  reloadScript as dbReload,
   deleteScript,
-  renameScript,
+  getAllScripts,
+  reloadScript as dbReloadScript,
+  renameScript as dbRenameScript,
+  upsertScript,
 } from '@/db/database';
-import type { ProcessScript } from '@common/types';
+
+/** 脚本类型对应的标签配色 */
+const TAG_TYPES: Record<ScriptType, 'success' | 'warning' | 'danger'> = {
+  'select-image': 'success',
+  'identify-character': 'warning',
+  'identify-structure': 'danger',
+};
+
+/** 脚本类型的中文名 */
+const TYPE_LABELS: Record<ScriptType, string> = {
+  'select-image': '图片',
+  'identify-character': '角色',
+  'identify-structure': '结构',
+};
+
+// ------------------------------------------------------------
+// 状态
+// ------------------------------------------------------------
 
 const scripts = ref<ProcessScript[]>([]);
 const selectedIds = ref<number[]>([]);
 const page = ref(1);
 const pageSize = ref(20);
-
-// 排序
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
-function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
-  sortProp.value = prop;
-  sortOrder.value = order as 'ascending' | 'descending' | null;
-}
+/** 等待输入窗口返回的重命名目标 */
+const pendingRenameId = ref<number | null>(null);
+
+// ------------------------------------------------------------
+// 计算属性
+// ------------------------------------------------------------
 
 const sortedScripts = computed(() => {
   const prop = sortProp.value;
@@ -86,11 +115,12 @@ const sortedScripts = computed(() => {
   if (!prop || !order) {
     return [...scripts.value].sort((a, b) => a.name.localeCompare(b.name));
   }
-  const dir = order === 'ascending' ? 1 : -1;
+
+  const direction = order === 'ascending' ? 1 : -1;
   return [...scripts.value].sort((a, b) => {
-    const va = (a as any)[prop] ?? '';
-    const vb = (b as any)[prop] ?? '';
-    return String(va).localeCompare(String(vb)) * dir;
+    const left = String((a as Record<string, unknown>)[prop] ?? '');
+    const right = String((b as Record<string, unknown>)[prop] ?? '');
+    return left.localeCompare(right) * direction;
   });
 });
 
@@ -99,88 +129,106 @@ const pagedScripts = computed(() => {
   return sortedScripts.value.slice(start, start + pageSize.value);
 });
 
-// 重命名
-let pendingRenameId: number | null = null;
-
-function openRename(script: ProcessScript): void {
-  pendingRenameId = script.id;
-  require('electron').ipcRenderer.invoke(IPC.PROMPT_OPEN, {
-    title: '重命名脚本', placeholder: '新名称', value: script.name, channel: IPC.SCRIPT_RENAME_CONFIRMED,
-  });
+function tagType(type: ScriptType): 'success' | 'warning' | 'danger' {
+  return TAG_TYPES[type];
 }
 
-onMounted(() => {
-  require('electron').ipcRenderer.on(IPC.SCRIPT_RENAME_CONFIRMED, async (_e: any, data: any) => {
-    if (!pendingRenameId || !data.value) return;
-    await renameScript(pendingRenameId, data.value);
-    pendingRenameId = null;
-    await loadData();
-  });
-});
+function typeLabel(type: ScriptType): string {
+  return TYPE_LABELS[type];
+}
+
+// ------------------------------------------------------------
+// 列表操作
+// ------------------------------------------------------------
 
 async function loadData(): Promise<void> {
   scripts.value = await getAllScripts();
 }
 
-async function addScript(): Promise<void> {
-  const { ipcRenderer } = require('electron');
-  const paths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_SCRIPT);
-  if (!paths || paths.length === 0) return;
-  const fs = require('fs');
-  const path = require('path');
-  for (const filePath of paths) {
-    const code = fs.readFileSync(filePath, 'utf-8');
-    const name = path.basename(filePath);
-    await upsertScript(name, filePath, code);
-  }
-  scripts.value = await getAllScripts();
-}
-
-async function reloadScript(script: ProcessScript): Promise<void> {
-  const fs = require('fs');
-  try {
-    const code = fs.readFileSync(script.filePath, 'utf-8');
-    await dbReload(script.filePath, code);
-    scripts.value = await getAllScripts();
-  } catch (e: any) { alert(`重载失败: ${e.message}`); }
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
+  sortProp.value = prop;
+  sortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
 function onSelectionChange(rows: ProcessScript[]): void {
-  selectedIds.value = rows.map(r => r.id);
+  selectedIds.value = rows.map((row) => row.id);
+}
+
+/** 从磁盘加载脚本文件：源码同时写入数据库，文件丢失后仍可执行 */
+async function addScript(): Promise<void> {
+  const filePaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_SCRIPT);
+  if (!filePaths?.length) {
+    return;
+  }
+
+  for (const filePath of filePaths) {
+    await upsertScript(basename(filePath), filePath, readFileSync(filePath, 'utf-8'));
+  }
+  await loadData();
+}
+
+async function reloadScriptFile(script: ProcessScript): Promise<void> {
+  try {
+    await dbReloadScript(script.filePath, readFileSync(script.filePath, 'utf-8'));
+    await loadData();
+  } catch (error) {
+    alert(`重载失败：${(error as Error).message}`);
+  }
 }
 
 async function batchReload(): Promise<void> {
-  const fs = require('fs');
-  const targets = scripts.value.filter(s => selectedIds.value.includes(s.id));
-  for (const s of targets) {
+  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id));
+  for (const script of targets) {
     try {
-      const code = fs.readFileSync(s.filePath, 'utf-8');
-      await dbReload(s.filePath, code);
-    } catch (e: any) { console.error(`重载失败 [${s.name}]:`, e.message); }
+      await dbReloadScript(script.filePath, readFileSync(script.filePath, 'utf-8'));
+    } catch (error) {
+      console.error(`重载失败 [${script.name}]：`, error);
+    }
   }
-  scripts.value = await getAllScripts();
-}
-
-async function batchDelete(): Promise<void> {
-  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个脚本？`)) return;
-  for (const id of selectedIds.value) { await deleteScript(id); }
-  scripts.value = await getAllScripts();
+  await loadData();
 }
 
 async function removeScript(script: ProcessScript): Promise<void> {
-  if (!confirm(`确定删除脚本「${script.name}」？`)) return;
+  if (!confirm(`确定删除脚本「${script.name}」？`)) {
+    return;
+  }
   await deleteScript(script.id);
-  scripts.value = await getAllScripts();
+  await loadData();
 }
 
-function tagType(t: string): 'success' | 'warning' | 'info' | 'danger' | '' {
-  const map: Record<string, any> = { 'select-image': 'success', 'identify-character': 'warning', 'identify-structure': 'danger' };
-  return map[t] || '';
+async function batchDelete(): Promise<void> {
+  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个脚本？`)) {
+    return;
+  }
+  for (const id of selectedIds.value) {
+    await deleteScript(id);
+  }
+  await loadData();
 }
-function typeLabel(t: string): string {
-  const map: Record<string, string> = { 'select-image': '图片', 'identify-character': '角色', 'identify-structure': '结构' };
-  return map[t] || t;
+
+// ------------------------------------------------------------
+// 重命名
+// ------------------------------------------------------------
+
+function openRename(script: ProcessScript): void {
+  pendingRenameId.value = script.id;
+  const payload: PromptInitData = {
+    title: '重命名脚本',
+    placeholder: '新名称',
+    value: script.name,
+    channel: IPC.SCRIPT_RENAME_CONFIRMED,
+  };
+  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
 }
+
+useIpcListener(IPC.SCRIPT_RENAME_CONFIRMED, async (result: PromptResult) => {
+  if (pendingRenameId.value === null || !result.value) {
+    return;
+  }
+  await dbRenameScript(pendingRenameId.value, result.value);
+  pendingRenameId.value = null;
+  await loadData();
+});
 
 onMounted(loadData);
 </script>
@@ -192,13 +240,25 @@ onMounted(loadData);
   display: flex;
   flex-direction: column;
 }
-.toolbar { margin-bottom: 12px; flex-shrink: 0; }
-.table-wrap { flex: 1; overflow: hidden; }
-.table-wrap :deep(.el-table) { height: 100%; }
-.code-line {
-  display: inline-block; max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 12px; color: #a0a3a9;
+
+.toolbar {
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
-.pager { display: flex; justify-content: flex-end; padding: 12px 0 16px 0; flex-shrink: 0; }
+
+.table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.table-wrap :deep(.el-table) {
+  height: 100%;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 16px 0;
+  flex-shrink: 0;
+}
 </style>

@@ -1,19 +1,19 @@
-import {BrowserWindow, ipcMain} from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import * as wm from '@/window-manager';
+import type { ScanConfigInitData, ScanConfigResult } from '@common/types';
+import { createScanConfig } from '@/window-manager';
 
-export const initScanConfig = (): void => {
-  ipcMain.handle(IPC.SCAN_CONFIG_OPEN, async (_event, data: any) => {
-    const win = wm.createScanConfig();
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send(IPC.SCAN_CONFIG_INIT, data);
+/** 注册扫描配置窗口 */
+export function initScanConfig(): void {
+  ipcMain.handle(IPC.SCAN_CONFIG_OPEN, (_event, data: ScanConfigInitData) => {
+    const window = createScanConfig();
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(IPC.SCAN_CONFIG_INIT, data);
     });
   });
 
-  ipcMain.handle(IPC.SCAN_CONFIG_CONFIRM, (_event, payload: any) => {
-    const parent = BrowserWindow.fromWebContents(_event.sender)?.getParentWindow();
-    if (parent) {
-      parent.webContents.send(IPC.SCAN_CONFIG_CONFIRMED, payload);
-    }
+  ipcMain.handle(IPC.SCAN_CONFIG_CONFIRM, (event, result: ScanConfigResult) => {
+    const parent = BrowserWindow.fromWebContents(event.sender)?.getParentWindow();
+    parent?.webContents.send(IPC.SCAN_CONFIG_CONFIRMED, result);
   });
-};
+}

@@ -56,7 +56,9 @@ const identifyStructure = ({ rootPath, tree }) => {
     const charMap = new Map();
 
     for (const node of tree) {
-        if (!node.children) continue;
+        if (!node.children) {
+            continue;
+        }
         const charName = identifyCharacter(node.name);
 
         if (!charMap.has(charName)) {

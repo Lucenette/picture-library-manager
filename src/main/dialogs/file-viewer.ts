@@ -1,17 +1,21 @@
 import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import * as wm from '@/window-manager';
+import type { FileViewerInitData } from '@common/types';
+import { createFileViewer, get } from '@/window-manager';
 
-export const initFileViewer = (): void => {
-  ipcMain.handle(IPC.FILE_VIEWER_OPEN, async (_event, data: any) => {
-    const win = wm.createFileViewer();
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send(IPC.FILE_VIEWER_INIT, data);
+/** 注册图片组文件查看窗口 */
+export function initFileViewer(): void {
+  ipcMain.handle(IPC.FILE_VIEWER_OPEN, (_event, data: FileViewerInitData) => {
+    const window = createFileViewer();
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(IPC.FILE_VIEWER_INIT, data);
     });
   });
 
   ipcMain.handle(IPC.FILE_VIEWER_SELECT, (_event, filePath: string) => {
-    const mainWin = wm.get('main');
-    if (mainWin) mainWin.webContents.send(IPC.FILE_VIEWER_SELECTED, filePath);
+    const mainWindow = get('main');
+    if (mainWindow) {
+      mainWindow.webContents.send(IPC.FILE_VIEWER_SELECTED, filePath);
+    }
   });
-};
+}

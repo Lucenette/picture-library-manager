@@ -1,17 +1,21 @@
 import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import * as wm from '@/window-manager';
+import type { BatchProcessInitData } from '@common/types';
+import { createBatchProcess, get } from '@/window-manager';
 
-export const initBatchProcess = (): void => {
-  ipcMain.handle(IPC.BATCH_PROCESS_OPEN, async (_event, data: any) => {
-    const win = wm.createBatchProcess();
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send(IPC.BATCH_PROCESS_INIT, data);
+/** 注册批量处理窗口 */
+export function initBatchProcess(): void {
+  ipcMain.handle(IPC.BATCH_PROCESS_OPEN, (_event, data: BatchProcessInitData) => {
+    const window = createBatchProcess();
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(IPC.BATCH_PROCESS_INIT, data);
     });
   });
 
   ipcMain.handle(IPC.BATCH_PROCESS_CONFIRM, (_event, scriptId: number) => {
-    const mainWin = wm.get('main');
-    if (mainWin) mainWin.webContents.send(IPC.BATCH_PROCESS_CONFIRMED, scriptId);
+    const mainWindow = get('main');
+    if (mainWindow) {
+      mainWindow.webContents.send(IPC.BATCH_PROCESS_CONFIRMED, scriptId);
+    }
   });
-};
+}
