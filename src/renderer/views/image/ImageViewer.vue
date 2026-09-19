@@ -3,7 +3,7 @@
     <div class="viewer-toolbar">
       <span class="viewer-info">{{ index + 1 }} / {{ files.length }}</span>
       <span class="viewer-name">{{ currentFile?.relativePath }}</span>
-      <span v-if="currentFile?.width" class="viewer-res">{{ currentFile?.width }} × {{ currentFile?.height }}</span>
+      <span class="viewer-res">{{ currentFile?.width ?? 0 }} × {{ currentFile?.height ?? 0 }}</span>
       <span class="viewer-size">{{ formatSize(currentFile?.fileSize ?? null) }}</span>
       <span class="viewer-zoom">{{ displayZoom }}</span>
     </div>

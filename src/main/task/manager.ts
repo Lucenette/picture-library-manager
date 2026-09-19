@@ -279,6 +279,12 @@ class TaskManager {
       return;
     }
 
+    // 成功结束一律记 100%：runner 的最后一格可能停在 95（收尾阶段不再上报），
+    // 或者根本没有待处理项而一次都没上报过，进度条不该因此差一截
+    if (status === 'done') {
+      task.row.progress = 100;
+    }
+
     finishTask(task.row.id, status, task.row.progress, message, result, error);
     task.row = getTaskRow(task.row.id) ?? task.row;
     this.notifyChanged(task.row.id);

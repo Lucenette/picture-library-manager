@@ -19,7 +19,7 @@
           <template #default="{ row }">{{ relativePath(row) }}</template>
         </el-table-column>
         <el-table-column prop="width" label="尺寸" width="120" sortable>
-          <template #default="{ row }">{{ row.width }} × {{ row.height }}</template>
+          <template #default="{ row }">{{ row.width ?? 0 }} × {{ row.height ?? 0 }}</template>
         </el-table-column>
         <el-table-column prop="fileSize" label="大小" width="100" sortable>
           <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
