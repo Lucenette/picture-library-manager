@@ -53,6 +53,7 @@ import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
+import { alertDialog } from '@/services/dialog-service';
 import { getAllGalleries, getCharactersByGallery, renameCharacter } from '@/db/database';
 
 /** 列表行：角色实体 + 所属图库名 */
@@ -226,7 +227,7 @@ useIpcListener(IPC.SINGLE_RENAME_CONFIRMED, async (result: PromptResult) => {
     await renameCharacter(result.rowId, result.value);
     await loadData();
   } catch (error) {
-    alert(`重命名失败：${(error as Error).message}`);
+    await alertDialog({ title: '重命名失败', message: (error as Error).message, danger: true });
   }
 });
 
@@ -240,7 +241,7 @@ useIpcListener(IPC.BATCH_RENAME_CONFIRMED, async (result: PromptResult) => {
     try {
       await renameCharacter(id, result.value);
     } catch (error) {
-      alert(`重命名失败：${(error as Error).message}`);
+      await alertDialog({ title: '重命名失败', message: (error as Error).message, danger: true });
       break;
     }
   }

@@ -61,6 +61,7 @@ import { useTasks } from '@/composables/useTasks';
 import {
   addGallery as dbAddGallery, clearGalleryData, deleteGallery, getAllGalleries, getScriptsByType,
 } from '@/db/database';
+import { confirmDialog } from '@/services/dialog-service';
 
 // ------------------------------------------------------------
 // 状态
@@ -140,7 +141,13 @@ async function addGallery(): Promise<void> {
 }
 
 async function clearData(gallery: Gallery): Promise<void> {
-  if (!confirm(`确定清理图库「${gallery.name}」的所有扫描数据？（不会删除原始文件）`)) {
+  const confirmed = await confirmDialog({
+    title: '清理图库数据',
+    message: `确定清理图库「${gallery.name}」的所有扫描数据？\n（不会删除原始文件）`,
+    confirmText: '清理',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   await clearGalleryData(gallery.id);
@@ -148,7 +155,13 @@ async function clearData(gallery: Gallery): Promise<void> {
 }
 
 async function removeGallery(gallery: Gallery): Promise<void> {
-  if (!confirm(`确定删除图库「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`)) {
+  const confirmed = await confirmDialog({
+    title: '删除图库',
+    message: `确定删除图库「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   await deleteGallery(gallery.id);
@@ -156,7 +169,13 @@ async function removeGallery(gallery: Gallery): Promise<void> {
 }
 
 async function batchDelete(): Promise<void> {
-  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个图库及其所有扫描数据？\n（不会删除原始文件）`)) {
+  const confirmed = await confirmDialog({
+    title: '批量删除图库',
+    message: `确定删除选中的 ${selectedIds.value.length} 个图库及其所有扫描数据？\n（不会删除原始文件）`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   for (const id of selectedIds.value) {

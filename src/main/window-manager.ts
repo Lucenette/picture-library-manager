@@ -207,6 +207,23 @@ export function createBatchProcess(): BrowserWindow {
   });
 }
 
+/** 原生确认 / 提示窗口 */
+export function createConfirm(): BrowserWindow {
+  return create('confirm', {
+    width: 440,
+    height: 208,
+    minWidth: 380,
+    minHeight: 190,
+    backgroundColor: '#1e1f22',
+    route: '/confirm',
+    parentId: 'main',
+    modal: true,
+    frame: false,
+    minimizable: false,
+    maximizable: false,
+  });
+}
+
 /** 通用输入窗口 */
 export function createPrompt(): BrowserWindow {
   return create('prompt', {

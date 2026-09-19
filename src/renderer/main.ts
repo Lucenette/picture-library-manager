@@ -6,6 +6,7 @@ import 'element-plus/dist/index.css';
 import '@/styles/theme.css';
 import App from '@/App.vue';
 import BatchProcessDialog from '@/views/dialogs/BatchProcessDialog.vue';
+import ConfirmDialog from '@/views/dialogs/ConfirmDialog.vue';
 import Dropdown from '@/views/dialogs/control/Dropdown.vue';
 import FileViewerDialog from '@/views/dialogs/FileViewerDialog.vue';
 import PromptDialog from '@/views/dialogs/PromptDialog.vue';
@@ -35,6 +36,7 @@ const router = createRouter({
     { path: '/viewer', name: 'viewer', component: ImageViewer },
     { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },
     { path: '/batch-process', name: 'batchProcess', component: BatchProcessDialog },
+    { path: '/confirm', name: 'confirm', component: ConfirmDialog },
     { path: '/prompt', name: 'prompt', component: PromptDialog },
     { path: '/file-viewer', name: 'fileViewer', component: FileViewerDialog },
     { path: '/script-list', name: 'scriptList', component: Dropdown },

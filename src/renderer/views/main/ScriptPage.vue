@@ -67,6 +67,7 @@ import { Plus } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
 import type { ProcessScript, PromptInitData, PromptResult, ScriptType } from '@common/types';
 import { useIpcListener } from '@/composables/useIpcListener';
+import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import {
   deleteScript,
   getAllScripts,
@@ -170,7 +171,7 @@ async function reloadScriptFile(script: ProcessScript): Promise<void> {
     await reloadScriptFromFile(script.filePath);
     await loadData();
   } catch (error) {
-    alert(`重载失败：${(error as Error).message}`);
+    await alertDialog({ title: '重载失败', message: (error as Error).message, danger: true });
   }
 }
 
@@ -187,7 +188,13 @@ async function batchReload(): Promise<void> {
 }
 
 async function removeScript(script: ProcessScript): Promise<void> {
-  if (!confirm(`确定删除脚本「${script.name}」？`)) {
+  const confirmed = await confirmDialog({
+    title: '删除脚本',
+    message: `确定删除脚本「${script.name}」？`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   await deleteScript(script.id);
@@ -195,7 +202,13 @@ async function removeScript(script: ProcessScript): Promise<void> {
 }
 
 async function batchDelete(): Promise<void> {
-  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个脚本？`)) {
+  const confirmed = await confirmDialog({
+    title: '批量删除脚本',
+    message: `确定删除选中的 ${selectedIds.value.length} 个脚本？`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   for (const id of selectedIds.value) {

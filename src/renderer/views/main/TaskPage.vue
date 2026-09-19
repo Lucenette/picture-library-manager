@@ -30,7 +30,9 @@
               :percentage="row.progress"
               :status="row.status === 'failed' ? 'exception' : row.status === 'done' ? 'success' : ''"
             />
-            <div class="progress-message">{{ row.status === 'failed' ? row.error : row.message }}</div>
+            <div class="progress-message" :class="{ 'progress-message--warn': hasFailure(row) }">
+              {{ statusMessage(row) }}
+            </div>
           </template>
         </el-table-column>
 
@@ -77,9 +79,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { ElMessageBox } from 'element-plus';
-import type { TaskStatus, TaskType, TaskView } from '@common/types';
+import type {
+  ExportTaskResult, ProcessTaskResult, ScanTaskResult, TaskStatus, TaskType, TaskView,
+} from '@common/types';
 import { useTasks } from '@/composables/useTasks';
+import { confirmDialog } from '@/services/dialog-service';
 
 /** 运行中任务的耗时每秒刷新一次 */
 const REFRESH_INTERVAL_MS = 1000;
@@ -155,6 +159,56 @@ function typeTag(type: TaskType): 'primary' | 'success' | 'warning' {
   return TYPE_TAGS[type];
 }
 
+/** 终态优先展示结果摘要或错误原因，执行中展示阶段描述 */
+function statusMessage(row: TaskView): string {
+  if (row.status === 'failed') {
+    return row.error;
+  }
+  if (row.status === 'done') {
+    return resultSummary(row) || row.message;
+  }
+  return row.message;
+}
+
+/** 把任务结果拼成一行摘要；失败张数一并显示，避免"看起来成功了其实有跳过" */
+function resultSummary(row: TaskView): string {
+  const result = row.result;
+  if (!result) {
+    return '';
+  }
+
+  if (row.type === 'scan') {
+    const scan = result as ScanTaskResult;
+    const failures = scan.thumbnailFailures > 0 ? ` · 缩略图失败 ${scan.thumbnailFailures}` : '';
+    const engine = scan.thumbnailEngine === 'none' ? '' : ` · 解码 ${scan.thumbnailEngine === 'sharp' ? 'sharp' : '内置'}`;
+    return `角色 ${scan.characters} · 图片组 ${scan.groups} · 文件 ${scan.files} · 缩略图 ${scan.thumbnails}${failures}${engine}`;
+  }
+
+  if (row.type === 'process') {
+    const process = result as ProcessTaskResult;
+    return `成功 ${process.processed} · 失败 ${process.failed}`;
+  }
+
+  const exported = result as ExportTaskResult;
+  return `已复制 ${exported.copied} · 失败 ${exported.failed}`;
+}
+
+/** 结果里是否含失败项，用于把摘要标成警示色 */
+function hasFailure(row: TaskView): boolean {
+  const result = row.result;
+  if (!result) {
+    return false;
+  }
+
+  if (row.type === 'scan') {
+    return (result as ScanTaskResult).thumbnailFailures > 0;
+  }
+  if (row.type === 'process') {
+    return (result as ProcessTaskResult).failed > 0;
+  }
+  return (result as ExportTaskResult).failed > 0;
+}
+
 /** 主进程写入的是 'YYYY-MM-DD HH:mm:ss'，换成带 T 的形式再解析 */
 function parseTime(value: string | null): number | null {
   if (!value) {
@@ -188,15 +242,16 @@ async function clearFinished(): Promise<void> {
   page.value = 1;
 }
 
-/** 强制结束不可回退，做一次二次确认 */
+/** 强制结束不可回退，走原生确认窗口做二次确认 */
 async function confirmForceStop(row: TaskView): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `任务「${row.title}」将立即结束，已处理的部分会保留。确定继续吗？`,
-      '强制结束任务',
-      { type: 'warning', confirmButtonText: '强制结束', cancelButtonText: '再想想' },
-    );
-  } catch {
+  const confirmed = await confirmDialog({
+    title: '强制结束任务',
+    message: `任务「${row.title}」将立即结束，已处理的部分会保留。`,
+    confirmText: '强制结束',
+    cancelText: '再想想',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   await actions.forceStop(row.id);
@@ -262,6 +317,10 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.progress-message--warn {
+  color: #f2c55c;
 }
 
 .pager {

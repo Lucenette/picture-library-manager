@@ -67,6 +67,7 @@ import type { FilterItem, FilterSection } from '@/components/CategorySearch.type
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
+import { alertDialog } from '@/services/dialog-service';
 import {
   getAllGalleries, getImageFilesByGroup, getImageGroupIdByFilePath, getImageGroupsView,
   getScriptsByType, updateImageGroupStatus, upsertProcessedImage,
@@ -310,7 +311,7 @@ async function confirmSelectedFile(filePath: string): Promise<void> {
     await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, filePath, null);
     await loadData();
   } catch (error) {
-    alert(`确认失败：${(error as Error).message}`);
+    await alertDialog({ title: '确认失败', message: (error as Error).message, danger: true });
   }
 }
 

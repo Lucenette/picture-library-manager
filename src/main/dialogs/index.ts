@@ -1,4 +1,5 @@
 import { initBatchProcess } from '@/dialogs/batch-process';
+import { initConfirm } from '@/dialogs/confirm';
 import { initDropdown } from '@/dialogs/control/dropdown';
 import { initFileViewer } from '@/dialogs/file-viewer';
 import { initImageViewer } from '@/dialogs/image-viewer';
@@ -9,6 +10,7 @@ import { initSystem } from '@/dialogs/system';
 /** 注册系统原生对话框与全部辅助窗口 */
 export function initDialogs(): void {
   initSystem();
+  initConfirm();
   initImageViewer();
   initScanConfig();
   initBatchProcess();

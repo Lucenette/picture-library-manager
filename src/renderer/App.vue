@@ -57,7 +57,9 @@ import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element
 import { useTasks } from '@/composables/useTasks';
 
 /** 这些路由属于独立的原生子窗口，不套主窗口的导航骨架 */
-const POPUP_ROUTES = ['/viewer', '/scan-config', '/batch-process', '/prompt', '/file-viewer', '/script-list'];
+const POPUP_ROUTES = [
+  '/viewer', '/scan-config', '/batch-process', '/confirm', '/prompt', '/file-viewer', '/script-list',
+];
 
 const route = useRoute();
 const isPopup = computed(() => POPUP_ROUTES.includes(route.path));

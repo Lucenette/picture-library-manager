@@ -262,7 +262,13 @@ async function openViewer(target: ProcessedImageView): Promise<void> {
 }
 
 async function deleteOne(row: ProcessedImageView): Promise<void> {
-  if (!confirm(`确定删除「${row.characterName} - ${row.selectedFileName}」？\n（不会删除原始文件）`)) {
+  const confirmed = await confirmDialog({
+    title: '删除记录',
+    message: `确定删除「${row.characterName} - ${row.selectedFileName}」？\n（不会删除原始文件）`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
   await deleteProcessedImage(row.id);
@@ -273,7 +279,13 @@ async function batchDelete(): Promise<void> {
   if (selectedIds.value.length === 0) {
     return;
   }
-  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 条记录？\n（不会删除原始文件）`)) {
+  const confirmed = await confirmDialog({
+    title: '批量删除记录',
+    message: `确定删除选中的 ${selectedIds.value.length} 条记录？\n（不会删除原始文件）`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
     return;
   }
 
