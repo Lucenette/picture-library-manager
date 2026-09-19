@@ -11,8 +11,8 @@ import { THUMBNAIL_SIZE } from '@/image/thumbnail-decode';
  * 2. **跨平台**——官方为 win32 / darwin / linux 的 x64 与 arm64 提供预编译包，
  *    而且是 N-API 模块，在 Electron 里不需要 electron-rebuild。
  *
- * sharp 是原生模块，未安装或加载失败时整个缩略图流程自动回落到纯 JS 解码，
- * 因此它是「可选加速」而不是硬依赖。
+ * sharp 是原生模块，也是缩略图解码的**唯一**实现：加载不了就没有可用的解码路径，
+ * 此时直接报错，而不是退回内置的纯 JS 解码器（后者处理大图会慢到被超时打断）。
  */
 
 interface SharpFactory {
@@ -30,20 +30,18 @@ let sharpFactory: SharpFactory | null = null;
 let loadError = '';
 
 try {
-  // 用 require 而不是 import：模块按需加载，缺失时可捕获并回落
+  // 用 require 而不是 import：加载失败要能被捕获成一条能读的错误
   sharpFactory = require('sharp') as SharpFactory;
 } catch (error) {
   loadError = (error as Error).message;
 }
 
-/** sharp 是否可用；不可用时调用方应回落到内置解码器 */
-export function isSharpAvailable(): boolean {
-  return sharpFactory !== null;
-}
-
-/** sharp 加载失败的原因，供任务结果与日志展示 */
-export function getSharpLoadError(): string {
-  return loadError;
+/** 取 sharp 实例；没装或加载失败时抛出带修复方式的错误 */
+function requireSharp(): SharpFactory {
+  if (!sharpFactory) {
+    throw new Error(`sharp 不可用（${loadError}），缩略图解码依赖它，请先安装：yarn add sharp`);
+  }
+  return sharpFactory;
 }
 
 /**
@@ -55,12 +53,8 @@ export function getSharpLoadError(): string {
  * @returns base64 Data URL；格式不支持或文件损坏时返回 null
  */
 export async function generateThumbnailWithSharp(filePath: string): Promise<string | null> {
-  if (!sharpFactory) {
-    return null;
-  }
-
   try {
-    const buffer = await sharpFactory(filePath, { failOn: 'none' })
+    const buffer = await requireSharp()(filePath, { failOn: 'none' })
       .rotate()
       .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover', position: 'centre' })
       .png()
