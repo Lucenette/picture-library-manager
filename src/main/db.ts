@@ -56,15 +56,40 @@ function snakeToCamel(row: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
+/**
+ * 缩略图在库里是 BLOB（WebP 原始字节）。
+ *
+ * 界面需要的是能直接塞进 `<img src>` 的 data URL，转换只在这一处做，
+ * 调用方拿到的永远是字符串——库里存字节、出口是字符串。
+ */
+function thumbnailToDataUrl(value: unknown): unknown {
+  if (!(value instanceof Uint8Array)) {
+    return value;
+  }
+  return `data:image/webp;base64,${Buffer.from(value).toString('base64')}`;
+}
+
+/** 读出来的行统一整形：缩略图字节转成 data URL */
+function shapeRow<T>(row: Record<string, unknown>): T {
+  const shaped = snakeToCamel(row);
+  if ('thumbnail' in shaped) {
+    shaped.thumbnail = thumbnailToDataUrl(shaped.thumbnail);
+  }
+  if ('selectedFileThumbnail' in shaped) {
+    shaped.selectedFileThumbnail = thumbnailToDataUrl(shaped.selectedFileThumbnail);
+  }
+  return shaped as unknown as T;
+}
+
 /** 执行 SELECT 并返回全部行 */
 function queryAll<T>(sql: string, params: SqlValue[] = []): T[] {
-  return db!.prepare(sql).all(...params).map((row) => snakeToCamel(row as Record<string, unknown>) as unknown as T);
+  return db!.prepare(sql).all(...params).map((row) => shapeRow<T>(row as Record<string, unknown>));
 }
 
 /** 执行 SELECT 并返回首行，无结果时返回 undefined */
 function queryOne<T>(sql: string, params: SqlValue[] = []): T | undefined {
   const row = db!.prepare(sql).get(...params);
-  return row ? (snakeToCamel(row as Record<string, unknown>) as unknown as T) : undefined;
+  return row ? shapeRow<T>(row as Record<string, unknown>) : undefined;
 }
 
 /** 执行一条写语句（INSERT / UPDATE / DELETE） */
@@ -343,7 +368,7 @@ export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
   for (const file of files) {
     run(SQL.INSERT_IMAGE_FILE, [
       groupId, file.fileName, file.filePath, file.fileSize,
-      file.width ?? 0, file.height ?? 0, file.extension, file.thumbnail,
+      file.width ?? 0, file.height ?? 0, file.extension, file.thumbnail, file.phash,
     ]);
   }
 }

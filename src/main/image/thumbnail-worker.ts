@@ -15,8 +15,10 @@ export interface ThumbnailRequest {
 /** 工作线程的回复 */
 export interface ThumbnailResponse {
   id: number;
-  /** base64 Data URL；生成不出来时为 null */
-  thumbnail?: string | null;
+  /** WebP 原始字节；生成不出来时为 null */
+  thumbnail?: Uint8Array | null;
+  /** 64 位感知哈希；生成不出来时为 null */
+  phash?: Uint8Array | null;
   /** 原图宽高，读不出来时为 0 */
   width?: number;
   height?: number;
@@ -45,6 +47,7 @@ async function handle(request: ThumbnailRequest): Promise<void> {
     parentPort?.postMessage({
       id: request.id,
       thumbnail: outcome.thumbnail,
+      phash: outcome.phash,
       width: outcome.width,
       height: outcome.height,
       engine: 'sharp',

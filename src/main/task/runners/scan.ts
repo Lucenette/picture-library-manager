@@ -165,6 +165,7 @@ async function generateThumbnails(
     try {
       const outcome = await pool.analyze(file.filePath);
       file.thumbnail = outcome.thumbnail;
+      file.phash = outcome.phash;
       // sharp 读到的宽高优先；它读不出就用遍历阶段 image-size 的结果
       if (outcome.width > 0) {
         file.width = outcome.width;

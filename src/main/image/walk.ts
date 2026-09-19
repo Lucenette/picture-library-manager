@@ -126,7 +126,9 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
         fileSize: stat.size,
         ...readImageDimensions(fullPath),
         extension: extname(entry).toLowerCase().replace('.', ''),
+        // 缩略图与感知哈希由工作线程解码时补齐
         thumbnail: null,
+        phash: null,
       });
     }
     await step();

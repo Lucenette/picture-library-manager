@@ -49,7 +49,7 @@ export interface ImageFile {
   width: number | null;
   height: number | null;
   extension: string;
-  /** 50×50 中心裁剪缩略图的 base64 Data URL；生成失败为 null */
+  /** 100×100 中心裁剪缩略图的 base64 Data URL；生成失败为 null */
   thumbnail: string | null;
   createdAt: string;
 }
@@ -139,7 +139,10 @@ export interface ScannedFile {
   width: number | null;
   height: number | null;
   extension: string;
-  thumbnail: string | null;
+  /** WebP 原始字节；生成失败为 null */
+  thumbnail: Uint8Array | null;
+  /** 64 位感知哈希；生成失败为 null */
+  phash: Uint8Array | null;
 }
 
 /** 扫描阶段收集到的图片组 */

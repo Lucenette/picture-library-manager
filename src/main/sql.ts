@@ -49,7 +49,8 @@ export const SQL = {
   width INTEGER,
   height INTEGER,
   extension TEXT NOT NULL,
-  thumbnail TEXT,
+  thumbnail BLOB,
+  phash BLOB,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 )`,
 
@@ -136,7 +137,7 @@ export const SQL = {
   // ImageFile
   // ----------------------------------------------------------
 
-  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension, thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension, thumbnail, phash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   SELECT_IMAGE_FILES_BY_GROUP: 'SELECT * FROM image_file WHERE image_group_id = ? ORDER BY file_name',
   SELECT_GROUP_ID_BY_FILE_PATH: 'SELECT image_group_id FROM image_file WHERE file_path = ?',
 

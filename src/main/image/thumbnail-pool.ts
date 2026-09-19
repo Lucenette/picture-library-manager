@@ -28,7 +28,8 @@ const MAX_REPLACEMENTS = 8;
 
 /** 一次缩略图生成的结果：缩略图本体 + 原图宽高（读不出来时为 0） */
 interface ThumbnailOutcome {
-  thumbnail: string | null;
+  thumbnail: Uint8Array | null;
+  phash: Uint8Array | null;
   width: number;
   height: number;
   engine: ThumbnailEngineName;
@@ -251,7 +252,7 @@ export class ThumbnailPool {
         if (error) {
           reject(error);
         } else {
-          resolve(outcome ?? { thumbnail: null, width: 0, height: 0, engine: 'sharp' });
+          resolve(outcome ?? { thumbnail: null, phash: null, width: 0, height: 0, engine: 'sharp' });
         }
       };
 
@@ -269,6 +270,7 @@ export class ThumbnailPool {
         } else {
           finish(null, {
             thumbnail: response.thumbnail ?? null,
+            phash: response.phash ?? null,
             width: response.width ?? 0,
             height: response.height ?? 0,
             engine: response.engine ?? 'sharp',
