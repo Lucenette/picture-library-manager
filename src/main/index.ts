@@ -35,7 +35,7 @@ function configureCommandLine(): void {
 
 /** 初始化数据库、IPC 与主窗口，并把任务进度通知挂到主窗口上 */
 async function bootstrap(): Promise<void> {
-  await initDatabase();
+  initDatabase();
   initDbIpc();
   initTaskIpc();
   initDialogs();

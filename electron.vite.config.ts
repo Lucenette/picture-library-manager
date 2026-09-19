@@ -16,12 +16,6 @@ export default defineConfig({
         '@': resolve(__dirname, 'src/main'),
       },
     },
-    build: {
-      rollupOptions: {
-        // sql.js 自带 wasm 资源，交给运行时按 Node 模块加载
-        external: ['sql.js'],
-      },
-    },
   },
   renderer: {
     // 渲染进程需要直接使用 fs/crypto 等 Node 能力

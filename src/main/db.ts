@@ -1,9 +1,7 @@
-import {
-  closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync,
-} from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
+import { DatabaseSync } from 'node:sqlite';
 import { basename, dirname, join } from 'path';
 import { app, ipcMain } from 'electron';
-import initSqlJs, { type Database as SqlJsDatabase, type SqlValue } from 'sql.js';
 import { IPC } from '@common/ipcChannels';
 import { compileScriptModule } from '@/script/compile';
 import type {
@@ -23,14 +21,11 @@ const DB_FILE_NAME = 'picture-lib.db';
 /** 脚本类型全集，用于检测脚本导出了哪些方法 */
 const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
 
-/** 落盘防抖窗口：窗口内的连续写入合并为一次落盘 */
-const SAVE_DEBOUNCE_MS = 300;
-
-/** 落盘最大延迟：写入再密集也不会超过该间隔不落盘 */
-const SAVE_MAX_DELAY_MS = 3000;
-
-/** 备份最小间隔：避免每次落盘都复制整个数据库 */
+/** 备份最小间隔：避免每次写入都复制整个数据库文件 */
 const BACKUP_INTERVAL_MS = 30_000;
+
+/** 可以绑定到语句上的值 */
+type SqlValue = null | number | bigint | string | Uint8Array;
 
 /** 脚本摘要长度 */
 const BRIEF_MAX_LENGTH = 120;
@@ -39,17 +34,11 @@ const BRIEF_MAX_LENGTH = 120;
 // 状态
 // ------------------------------------------------------------
 
-let db: SqlJsDatabase | null = null;
+let db: DatabaseSync | null = null;
 let dbPath = '';
 
-/** 内存中是否有尚未落盘的改动 */
-let dirty = false;
-
-/** 批量提交的嵌套深度，大于 0 时改动只累积、不落盘 */
+/** 事务嵌套深度，大于 0 表示正处于一次事务中 */
 let batchDepth = 0;
-
-let debounceTimer: NodeJS.Timeout | null = null;
-let maxDelayTimer: NodeJS.Timeout | null = null;
 
 /** 上次写入备份的时间戳 */
 let lastBackupAt = 0;
@@ -69,127 +58,54 @@ function snakeToCamel(row: Record<string, unknown>): Record<string, unknown> {
 
 /** 执行 SELECT 并返回全部行 */
 function queryAll<T>(sql: string, params: SqlValue[] = []): T[] {
-  const statement = db!.prepare(sql);
-  if (params.length) {
-    statement.bind(params);
-  }
-  const rows: T[] = [];
-  while (statement.step()) {
-    rows.push(snakeToCamel(statement.getAsObject()) as unknown as T);
-  }
-  statement.free();
-  return rows;
+  return db!.prepare(sql).all(...params).map((row) => snakeToCamel(row as Record<string, unknown>) as unknown as T);
 }
 
 /** 执行 SELECT 并返回首行，无结果时返回 undefined */
 function queryOne<T>(sql: string, params: SqlValue[] = []): T | undefined {
-  const statement = db!.prepare(sql);
-  if (params.length) {
-    statement.bind(params);
-  }
-  const row = statement.step() ? (snakeToCamel(statement.getAsObject()) as unknown as T) : undefined;
-  statement.free();
-  return row;
+  const row = db!.prepare(sql).get(...params);
+  return row ? (snakeToCamel(row as Record<string, unknown>) as unknown as T) : undefined;
 }
 
-/** 执行一条写语句（INSERT / UPDATE / DELETE）并标记改动 */
+/** 执行一条写语句（INSERT / UPDATE / DELETE） */
 function run(sql: string, params: SqlValue[] = []): void {
-  db!.run(sql, params);
-  markDirty();
+  db!.prepare(sql).run(...params);
+  backupDatabase();
 }
 
 /** 执行一条 INSERT 并返回新行的 rowid */
 function insert(sql: string, params: SqlValue[] = []): number {
-  run(sql, params);
-  return Number(db!.exec('SELECT last_insert_rowid()')[0]?.values[0]?.[0] ?? 0);
+  const result = db!.prepare(sql).run(...params);
+  backupDatabase();
+  return Number(result.lastInsertRowid);
 }
 
 // ------------------------------------------------------------
-// 底层：持久化
+// 底层：备份
 // ------------------------------------------------------------
 
 /**
- * 标记存在未落盘的改动。
+ * 按 {@link BACKUP_INTERVAL_MS} 复制一份数据库文件，供误操作兜底。
  *
- * 防抖窗口内的多次写入会合并为一次落盘，同时用最大延迟兜底，
- * 保证持续写入时也不会长时间不落盘；批量提交期间全部挂起，
- * 由 {@link endBatch} 一次性写入。
+ * 复制前先做一次 FULL checkpoint，把 WAL 里的改动落回主文件，
+ * 否则复制出来的可能缺最近几次事务。
  */
-function markDirty(): void {
-  dirty = true;
-  if (batchDepth > 0) {
-    return;
-  }
-
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-  }
-  debounceTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
-  maxDelayTimer ??= setTimeout(flushSave, SAVE_MAX_DELAY_MS);
-}
-
-/** 取消尚未触发的落盘定时器 */
-function clearSaveTimers(): void {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  if (maxDelayTimer) {
-    clearTimeout(maxDelayTimer);
-    maxDelayTimer = null;
-  }
-}
-
-/** 定时器回调：把累积的改动落盘，失败只记录日志（此时已无调用方可通知） */
-function flushSave(): void {
-  clearSaveTimers();
-  try {
-    persist();
-  } catch (error) {
-    console.error('[db] 数据库落盘失败：', error);
-  }
-}
-
-/** 把内存数据库整体写回磁盘 */
-function persist(): void {
-  if (!db || !dirty) {
-    return;
-  }
-  const snapshot = Buffer.from(db.export());
-  backupDatabase();
-  writeFileAtomic(dbPath, snapshot);
-  dirty = false;
-}
-
-/** 按 {@link BACKUP_INTERVAL_MS} 保留一份上一版数据库，供误操作兜底 */
 function backupDatabase(): void {
-  if (!existsSync(dbPath)) {
+  if (!db || !existsSync(dbPath)) {
     return;
   }
   const now = Date.now();
   if (now - lastBackupAt < BACKUP_INTERVAL_MS) {
     return;
   }
-  copyFileSync(dbPath, `${dbPath}.bak`);
-  lastBackupAt = now;
-}
 
-/**
- * 先写临时文件并 fsync，再原子替换目标文件。
- *
- * 直接覆盖写一旦中途失败会留下半截数据库，先落地临时文件再替换
- * 可以保证目标文件要么是旧版本、要么是新版本。
- */
-function writeFileAtomic(targetPath: string, data: Buffer): void {
-  const tempPath = `${targetPath}.tmp`;
-  const handle = openSync(tempPath, 'w');
   try {
-    writeSync(handle, data);
-    fsyncSync(handle);
-  } finally {
-    closeSync(handle);
+    db.exec('PRAGMA wal_checkpoint(FULL)');
+    copyFileSync(dbPath, `${dbPath}.bak`);
+    lastBackupAt = now;
+  } catch (error) {
+    console.error('[db] 备份失败：', error);
   }
-  renameSync(tempPath, targetPath);
 }
 
 // ------------------------------------------------------------
@@ -203,22 +119,25 @@ function getDataDir(): string {
     : join(process.cwd(), 'dist', 'data');
 }
 
-/** 打开（必要时创建）数据库并确保表结构就绪 */
-export async function initDatabase(): Promise<void> {
+/**
+ * 打开（必要时创建）数据库并确保表结构就绪。
+ *
+ * 用 Node 内置的 SQLite：库是真实文件，单条 INSERT 只追加 WAL，
+ * 不再需要「整库导出 + 整文件重写」那套落盘逻辑。
+ */
+export function initDatabase(): void {
   const dataDir = getDataDir();
   mkdirSync(dataDir, { recursive: true });
   dbPath = join(dataDir, DB_FILE_NAME);
 
-  const sqlJs = await initSqlJs();
-  db = existsSync(dbPath) ? new sqlJs.Database(readFileSync(dbPath)) : new sqlJs.Database();
+  db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA synchronous = NORMAL');
 
   for (const ddl of DDL_ALL) {
-    db.run(ddl);
+    db.exec(ddl);
   }
   ensureTaskTable();
-
-  dirty = true;
-  persist();
 }
 
 /**
@@ -230,26 +149,24 @@ export async function initDatabase(): Promise<void> {
 function ensureTaskTable(): void {
   const columns = queryAll<{ name: string }>('PRAGMA table_info(task)').map((column) => column.name);
   if (columns.length > 0 && !columns.includes('queue_order')) {
-    db!.run('DROP TABLE task');
+    db!.exec('DROP TABLE task');
   }
 
-  db!.run(SQL.CREATE_TASK);
-  db!.run(SQL.CREATE_INDEX_TASK_STATUS);
-  db!.run(SQL.CREATE_INDEX_TASK_ORDER);
+  db!.exec(SQL.CREATE_TASK);
+  db!.exec(SQL.CREATE_INDEX_TASK_STATUS);
+  db!.exec(SQL.CREATE_INDEX_TASK_ORDER);
 }
 
-/** 落盘并关闭数据库，供退出前调用 */
+/** 关闭数据库，供退出前调用；WAL 会在关闭时合并回主文件 */
 export function closeDatabase(): void {
   if (!db) {
     return;
   }
-  clearSaveTimers();
   try {
-    persist();
+    db.close();
   } catch (error) {
-    console.error('[db] 退出前落盘失败：', error);
+    console.error('[db] 关闭数据库失败：', error);
   }
-  db.close();
   db = null;
 }
 
@@ -257,12 +174,15 @@ export function closeDatabase(): void {
 // 批量提交
 // ------------------------------------------------------------
 
-/** 开始一次批量写入：期间的改动只留在内存 */
+/** 开始一次事务：期间的多条写入合并成一次提交 */
 export function beginBatch(): void {
   batchDepth += 1;
+  if (batchDepth === 1) {
+    db!.exec('BEGIN');
+  }
 }
 
-/** 结束一次批量写入：嵌套归零时立即落盘 */
+/** 结束一次事务：嵌套归零时提交 */
 export function endBatch(): void {
   if (batchDepth === 0) {
     return;
@@ -271,8 +191,14 @@ export function endBatch(): void {
   if (batchDepth > 0) {
     return;
   }
-  clearSaveTimers();
-  persist();
+
+  try {
+    db!.exec('COMMIT');
+  } catch (error) {
+    db!.exec('ROLLBACK');
+    throw error;
+  }
+  backupDatabase();
 }
 
 // ------------------------------------------------------------
@@ -412,17 +338,14 @@ export function getImageGroupIdByFilePath(filePath: string): number | null {
 // ImageFile
 // ------------------------------------------------------------
 
-/** 批量写入图片组内的图片文件 */
+/** 写入图片组内的图片文件；同路径的行会被忽略 */
 export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
-  const statement = db!.prepare(SQL.INSERT_IMAGE_FILE);
   for (const file of files) {
-    statement.run([
+    run(SQL.INSERT_IMAGE_FILE, [
       groupId, file.fileName, file.filePath, file.fileSize,
-      file.width, file.height, file.extension, file.thumbnail,
+      file.width ?? 0, file.height ?? 0, file.extension, file.thumbnail,
     ]);
   }
-  statement.free();
-  markDirty();
 }
 
 // ------------------------------------------------------------
