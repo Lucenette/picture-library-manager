@@ -140,12 +140,13 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
  * 放在遍历阶段而不是解码线程里，是因为扫描器要根据「宽 × 高 × 4」估算解码
  * 需要多少内存，才能决定这张图能不能和别的图一起并发解码。
  */
-function readImageDimensions(filePath: string): { width: number | null; height: number | null } {
+function readImageDimensions(filePath: string): { width: number; height: number } {
   try {
     const dimensions = imageSize(filePath);
-    return { width: dimensions.width ?? null, height: dimensions.height ?? null };
+    return { width: dimensions.width ?? 0, height: dimensions.height ?? 0 };
   } catch {
-    return { width: null, height: null };
+    // 读不出来就是 0，不要 null：界面直接显示 0 × 0
+    return { width: 0, height: 0 };
   }
 }
 

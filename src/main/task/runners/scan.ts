@@ -1,6 +1,6 @@
 import { join } from 'path';
 import type {
-  ScannedCharacter, ScannedFile, ScannedGroup, ScanTaskPayload, ScanTaskResult,
+  Character, ScannedCharacter, ScannedFile, ScannedGroup, ScanTaskPayload, ScanTaskResult,
   StructureInput, StructureOutput, ThumbnailEngineName,
 } from '@common/types';
 import {
@@ -12,46 +12,48 @@ import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
 import { ThumbnailPool } from '@/image/thumbnail-pool';
 
-/**
- * 同时解码的内存预算。
- *
- * 解码一张图要按「宽 × 高 × 4」分配 RGBA 缓冲区，外加解码器的内部缓冲；
- * 几张一亿像素级的图并发就足以吃穿内存、让系统开始换页，单张解码从十秒
- * 恶化到几分钟。按内存预算分批后：普通图照旧并发，超大图独占一批。
- *
- * 注意不能用文件体积来判断——实测 7.6 MB 的 JPEG 就要 380 MB 内存。
- */
-const DECODE_MEMORY_BUDGET_BYTES = 768 * 1024 * 1024;
+/** 已入库的图片组：带上 group 行 id，逐张插图时要用 */
+interface StoredGroup extends ScannedGroup {
+  groupId: number;
+}
 
-/**
- * 每个像素的估算字节数。
- *
- * RGBA 本身是 4 字节，再留一倍余量覆盖解码器的内部缓冲与内存碎片——
- * 实测解码期间的 RSS 约为 RGBA 缓冲区的 1.9 倍。
- */
-const DECODE_BYTES_PER_PIXEL = 8;
-
-/**
- * 读不出尺寸时的估算值。
- *
- * 取整批预算，于是「尺寸未知」的图必然独占一批。原来取 64MB，等于允许十几张
- * 未知尺寸的大图凑满一整批并发解码，内存预算形同虚设。
- */
-const UNKNOWN_SIZE_BYTES = DECODE_MEMORY_BUDGET_BYTES;
+/** 扫描中的角色：组已经写进数据库，文件留到下一步逐张处理 */
+type StoredCharacter = Omit<ScannedCharacter, 'groups'> & { groups: StoredGroup[] };
 
 /**
  * 扫描一个图库。
  *
- * 分三段：识别结构 → 在内存里收集文件与缩略图 → 一次性入库。
- * 目录遍历在主进程但会周期性让出事件循环，图片解码全部交给工作线程，
- * 因此扫描期间主进程仍然能正常响应窗口消息；写库是最后一步且同步完成，
- * 脚本报错、暂停、取消或强制结束都不会在图库里留下半成品。
+ * 顺序是既定的：**先清除该图库的既有数据，再把扫描结果写回去**。
+ * 清除本身立刻提交，之后**每张图各自一条 INSERT**——写完一张就落一张，
+ * 扫描中途出错或被取消，已经解出来并写进去的图都留在库里。
+ * 目录遍历在主进程但会周期性让出事件循环，图片解码交给工作线程。
  */
 export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   const { galleryId, scriptId } = ctx.payload as ScanTaskPayload;
   const gallery = getGalleryById(galleryId);
   if (!gallery) {
     throw new Error(`图库不存在（id=${galleryId}）`);
+  }
+
+  const characters: StoredCharacter[] = [];
+  let collectedGroups = 0;
+  let totalFiles = 0;
+  let failedWrites = 0;
+  let thumbnailFailures = 0;
+  let thumbnailEngine: ThumbnailEngineName | 'none' = 'none';
+
+  /** 记下写入失败但继续扫描：一个目录写不进去不该拖垮整轮 */
+  const recordWriteFailure = (what: string, error: unknown): void => {
+    failedWrites += 1;
+    console.error(`写入失败：${what}`, (error as Error).message);
+  };
+
+  // 先清除本图库的旧数据，清除立刻提交
+  beginBatch();
+  try {
+    clearGalleryData(galleryId);
+  } finally {
+    endBatch();
   }
 
   // ---- 1. 结构识别 ----
@@ -65,18 +67,32 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   } satisfies StructureInput);
   await ctx.checkpoint();
 
-  // ---- 2. 收集图片文件 ----
+  // ---- 2. 逐角色逐组建好结构：角色与组各自一条 INSERT，写不进去就跳过继续 ----
   const totalGroups = structure.reduce((sum, item) => sum + item.groups.length, 0);
-  const characters: ScannedCharacter[] = [];
-  let collectedGroups = 0;
 
   for (const item of structure) {
-    const groups: ScannedGroup[] = [];
-    for (const groupRelativePath of item.groups) {
-      const dirPath = join(gallery.rootPath, groupRelativePath);
-      groups.push({ dirName: groupRelativePath, dirPath, files: await collectImageFiles(dirPath) });
+    let characterRecord: Character;
+    try {
+      characterRecord = insertCharacter(galleryId, item.name, gallery.rootPath);
+    } catch (error) {
+      recordWriteFailure(`角色「${item.name}」`, error);
+      continue;
+    }
 
+    const groups: StoredGroup[] = [];
+    for (const groupRelativePath of item.groups) {
       collectedGroups += 1;
+      try {
+        const dirPath = join(gallery.rootPath, groupRelativePath);
+        const files = await collectImageFiles(dirPath);
+        const groupRecord = insertImageGroup(
+          characterRecord.id, groupRelativePath, dirPath, files.length,
+        );
+        groups.push({ dirName: groupRelativePath, dirPath, files, groupId: groupRecord.id });
+      } catch (error) {
+        recordWriteFailure(`目录「${groupRelativePath}」`, error);
+      }
+
       ctx.report(
         2 + Math.round((collectedGroups / Math.max(totalGroups, 1)) * 18),
         `收集文件 ${collectedGroups}/${totalGroups}`,
@@ -86,41 +102,22 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     characters.push({ name: item.name, sourcePath: gallery.rootPath, groups });
   }
 
-  // ---- 3. 在工作线程里补齐宽高与缩略图 ----
-  const totalFiles = characters.reduce(
+    // ---- 3. 逐张生成缩略图并立刻入库：一张一条 INSERT，写一张落一张 ----
+  totalFiles = characters.reduce(
     (sum, character) => sum + character.groups.reduce((count, group) => count + group.files.length, 0),
     0,
   );
 
-  let thumbnailFailures = 0;
-  let thumbnailEngine: ThumbnailEngineName | 'none' = 'none';
   if (totalFiles > 0) {
     const outcome = await generateThumbnails(ctx, characters, totalFiles);
     thumbnailFailures = outcome.failures;
     thumbnailEngine = outcome.engine;
   }
 
-  // ---- 4. 原子入库 ----
-  ctx.report(97, '写入数据库');
-  await ctx.checkpoint();
+  updateGalleryScannedAt(galleryId);
 
-  beginBatch();
-  try {
-    clearGalleryData(galleryId);
-    for (const character of characters) {
-      const characterRecord = insertCharacter(galleryId, character.name, character.sourcePath);
-      for (const group of character.groups) {
-        const groupRecord = insertImageGroup(
-          characterRecord.id, group.dirName, group.dirPath, group.files.length,
-        );
-        if (group.files.length > 0) {
-          insertImageFiles(groupRecord.id, group.files);
-        }
-      }
-    }
-    updateGalleryScannedAt(galleryId);
-  } finally {
-    endBatch();
+  if (failedWrites > 0) {
+    console.error(`扫描写入结束：${failedWrites} 处写入失败，图库数据可能不完整`);
   }
 
   const thumbnails = characters.reduce(
@@ -141,18 +138,17 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
 }
 
 /**
- * 生成缩略图。
+ * 逐张生成缩略图并立即入库。
  *
- * 分批依据是**解码所需内存**而不是文件体积：一批里所有图片的
- * 「宽 × 高 × 4」之和不超过 {@link DECODE_MEMORY_BUDGET_BYTES}，同时不超过
- * 线程数。这样普通图片照旧并发，一亿像素级的大图自然独占一批。
- * 每个批次之后都是一个暂停 / 取消的生效点，单张失败只让它自己没有缩略图。
+ * 一批同时解线程池规模那么多张；sharp 按需缩放解码，单张内存很小，
+ * 不再按内存估算分批。每个批次之后是暂停 / 取消的生效点，单张失败只让它
+ * 自己没有缩略图，写库失败只让它自己缺一行。
  *
  * @returns 生成失败的张数，以及实际用到的解码引擎
  */
 async function generateThumbnails(
   ctx: TaskContext,
-  characters: ScannedCharacter[],
+  characters: StoredCharacter[],
   totalFiles: number,
 ): Promise<{ failures: number; engine: ThumbnailEngineName | 'none' }> {
   const pool = new ThumbnailPool();
@@ -160,20 +156,22 @@ async function generateThumbnails(
   ctx.onAbort(() => pool.terminate());
   const batchSize = pool.concurrency;
   let doneFiles = 0;
+  let storedFiles = 0;
   let failures = 0;
 
-  /** 估算一张图解码要占多少内存 */
-  const estimateBytes = (file: ScannedFile): number => {
-    const pixels = (file.width ?? 0) * (file.height ?? 0);
-    return pixels > 0 ? pixels * DECODE_BYTES_PER_PIXEL : UNKNOWN_SIZE_BYTES;
-  };
-
-  const analyzeFile = async (file: ScannedFile): Promise<void> => {
+  const analyzeFile = async (group: StoredGroup, file: ScannedFile): Promise<void> => {
     const startedAt = Date.now();
-    const size = `${file.width ?? '?'}×${file.height ?? '?'}`;
+    const size = `${file.width}×${file.height}`;
     try {
-      const outcome = await pool.analyze(file.filePath, estimateBytes(file));
+      const outcome = await pool.analyze(file.filePath);
       file.thumbnail = outcome.thumbnail;
+      // sharp 读到的宽高优先；它读不出就用遍历阶段 image-size 的结果
+      if (outcome.width > 0) {
+        file.width = outcome.width;
+      }
+      if (outcome.height > 0) {
+        file.height = outcome.height;
+      }
       if (outcome.thumbnail === null) {
         // 解码失败也要计数并报出来，不能只剩一个「这张图没有缩略图」
         failures += 1;
@@ -186,10 +184,18 @@ async function generateThumbnails(
       console.error(`缩略图生成失败：${file.filePath}（${size}，${seconds}s）`, (error as Error).message);
     }
 
+    // 无论这张有没有缩略图都立刻入库；写失败只让它自己缺一行
+    try {
+      insertImageFiles(group.groupId, [file]);
+      storedFiles += 1;
+    } catch (error) {
+      console.error(`图片入库失败：${file.filePath}`, (error as Error).message);
+    }
+
     doneFiles += 1;
     ctx.report(
       20 + Math.round((doneFiles / Math.max(totalFiles, 1)) * 75),
-      `生成缩略图 ${doneFiles}/${totalFiles}`,
+      `写入图片 ${doneFiles}/${totalFiles}`,
     );
   };
 
@@ -197,7 +203,6 @@ async function generateThumbnails(
     for (const character of characters) {
       for (const group of character.groups) {
         let batch: ScannedFile[] = [];
-        let batchBytes = 0;
 
         const flushBatch = async (): Promise<void> => {
           if (batch.length === 0) {
@@ -205,22 +210,16 @@ async function generateThumbnails(
           }
           const current = batch;
           batch = [];
-          batchBytes = 0;
 
-          await Promise.all(current.map(analyzeFile));
+          await Promise.all(current.map((file) => analyzeFile(group, file)));
           await ctx.checkpoint();
         };
 
         for (const file of group.files) {
-          const bytes = estimateBytes(file);
-          const overBudget = batchBytes + bytes > DECODE_MEMORY_BUDGET_BYTES;
-
-          if (batch.length > 0 && (overBudget || batch.length >= batchSize)) {
+          if (batch.length >= batchSize) {
             await flushBatch();
           }
-
           batch.push(file);
-          batchBytes += bytes;
         }
 
         await flushBatch();

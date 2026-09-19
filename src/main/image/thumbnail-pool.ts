@@ -2,7 +2,7 @@ import { cpus } from 'os';
 import type { Worker } from 'worker_threads';
 import createThumbnailWorker from '@/image/thumbnail-worker?nodeWorker';
 import type { ThumbnailEngineName } from '@common/types';
-import type { ThumbnailOutcome, ThumbnailRequest, ThumbnailResponse } from '@/image/thumbnail-decode';
+import type { ThumbnailRequest, ThumbnailResponse } from '@/image/thumbnail-worker';
 
 /** 线程数上限：留出核心给主进程与渲染进程 */
 const MAX_WORKERS = 4;
@@ -10,8 +10,8 @@ const MAX_WORKERS = 4;
 /**
  * 单个线程的 V8 堆上限。
  *
- * 注意它只管 V8 堆，解码产生的 RGBA 缓冲区是堆外内存不受此限制；
- * 真正约束峰值内存的是扫描器对大文件「单独串行」的调度。
+ * 它只管 V8 堆：sharp（libvips）的解码缓冲在堆外，不受此限制，
+ * 这里只是防止纯 JS 侧的对象把线程堆撑爆。
  */
 const WORKER_MEMORY_LIMIT_MB = 1024;
 
@@ -26,14 +26,13 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** 连续补位失败多少次后判定线程池不可用 */
 const MAX_REPLACEMENTS = 8;
 
-/**
- * 处理过这么大的图片之后就把线程换掉。
- *
- * 解码大幅图片会在工作线程里留下大量内存碎片，且不会及时归还给系统；
- * 换掉线程是唯一能确定释放的方式。放在这里而不是交给 GC，是因为
- * 实测解完一张 1.3 亿像素的图，进程 RSS 会停在 GB 级。
- */
-const RETIRE_AFTER_BYTES = 256 * 1024 * 1024;
+/** 一次缩略图生成的结果：缩略图本体 + 原图宽高（读不出来时为 0） */
+interface ThumbnailOutcome {
+  thumbnail: string | null;
+  width: number;
+  height: number;
+  engine: ThumbnailEngineName;
+}
 
 /** 池中的一个线程；alive 变为 false 后不再派发任何任务 */
 interface PoolWorker {
@@ -85,12 +84,8 @@ export class ThumbnailPool {
     return this.lastEngine;
   }
 
-  /**
-   * 生成一张缩略图。
-   *
-   * @param estimatedBytes 这张图解码预计要占的内存，用于决定是否值得换掉线程
-   */
-  async analyze(filePath: string, estimatedBytes: number): Promise<ThumbnailOutcome> {
+  /** 生成一张缩略图，并返回从 sharp 读到的原图宽高 */
+  async analyze(filePath: string): Promise<ThumbnailOutcome> {
     const slot = await this.acquire();
     try {
       const outcome = await this.dispatch(slot, filePath);
@@ -99,11 +94,7 @@ export class ThumbnailPool {
       this.lastEngine = outcome.engine;
       return outcome;
     } finally {
-      if (estimatedBytes >= RETIRE_AFTER_BYTES) {
-        this.retire(slot);
-      } else {
-        this.release(slot);
-      }
+      this.release(slot);
     }
   }
 
@@ -178,19 +169,6 @@ export class ThumbnailPool {
     const idleIndex = this.idle.indexOf(slot);
     if (idleIndex >= 0) {
       this.idle.splice(idleIndex, 1);
-    }
-  }
-
-  /** 主动结束一个线程并补位，用来释放它残留的内存 */
-  private retire(slot: PoolWorker): void {
-    if (!slot.alive) {
-      return;
-    }
-    this.detach(slot);
-    void slot.worker.terminate();
-
-    if (!this.closed) {
-      this.spawn();
     }
   }
 
@@ -273,7 +251,7 @@ export class ThumbnailPool {
         if (error) {
           reject(error);
         } else {
-          resolve(outcome ?? { thumbnail: null, engine: 'builtin' });
+          resolve(outcome ?? { thumbnail: null, width: 0, height: 0, engine: 'sharp' });
         }
       };
 
@@ -289,7 +267,12 @@ export class ThumbnailPool {
         if (response.error) {
           finish(new Error(`缩略图处理失败：${response.error}`));
         } else {
-          finish(null, { thumbnail: response.thumbnail ?? null, engine: response.engine ?? 'builtin' });
+          finish(null, {
+            thumbnail: response.thumbnail ?? null,
+            width: response.width ?? 0,
+            height: response.height ?? 0,
+            engine: response.engine ?? 'sharp',
+          });
         }
       };
       const onError = (error: Error): void => {
