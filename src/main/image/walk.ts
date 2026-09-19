@@ -14,6 +14,10 @@ import { readdirSync, statSync } from 'fs';
 import { extname, join } from 'path';
 import type { DirNode, ScannedFile } from '@common/types';
 
+// 只读图片头几 KB 就能拿到宽高；扫描器需要它来估算解码内存，决定哪些图能并发。
+// 同样用 require：与其它图像库一致，不交给打包器内联。
+const { imageSize } = require('image-size');
+
 /** 每处理这么多条目就让出一次事件循环，避免长时间霸占主进程 */
 const YIELD_EVERY = 200;
 
@@ -46,8 +50,8 @@ async function step(): Promise<void> {
 /**
  * 构建目录树，只读取目录结构与文件名。
  *
- * 只做 readdir/stat，不读取图片内容：尺寸与缩略图都由工作线程负责，
- * 主进程在这条路径上完全不碰图片。
+ * 只做 readdir/stat 与图片头读取（拿到宽高供调度用），不做任何解码；
+ * 真正吃内存的缩略图生成全部在工作线程里。
  *
  * @returns 根目录下的节点；children 为 null 表示文件，[] 表示空目录
  */
@@ -120,8 +124,7 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
         fileName: entry,
         filePath: fullPath,
         fileSize: stat.size,
-        width: null,
-        height: null,
+        ...readImageDimensions(fullPath),
         extension: extname(entry).toLowerCase().replace('.', ''),
         thumbnail: null,
       });
@@ -129,6 +132,21 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
     await step();
   }
   return files;
+}
+
+/**
+ * 读图片头拿宽高。
+ *
+ * 放在遍历阶段而不是解码线程里，是因为扫描器要根据「宽 × 高 × 4」估算解码
+ * 需要多少内存，才能决定这张图能不能和别的图一起并发解码。
+ */
+function readImageDimensions(filePath: string): { width: number | null; height: number | null } {
+  try {
+    const dimensions = imageSize(filePath);
+    return { width: dimensions.width ?? null, height: dimensions.height ?? null };
+  } catch {
+    return { width: null, height: null };
+  }
 }
 
 /** 判断扩展名是否在收录白名单中 */

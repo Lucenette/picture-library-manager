@@ -203,6 +203,35 @@ export interface BatchProcessInitData {
   count: number;
 }
 
+/**
+ * 原生确认 / 提示窗口的初始化数据。
+ *
+ * `mode` 为 `confirm` 时显示两个按钮，为 `alert` 时只显示确认按钮。
+ */
+export interface ConfirmDialogData {
+  title: string;
+  /** 正文，可含换行 */
+  message: string;
+  /** 确认按钮文案，默认「确定」 */
+  confirmText?: string;
+  /** 取消按钮文案，默认「取消」 */
+  cancelText?: string;
+  mode?: 'confirm' | 'alert';
+  /** 危险操作，确认按钮标红 */
+  danger?: boolean;
+  /** 结果回发到主窗口的通道名 */
+  channel: string;
+  /** 原样带回调用方的上下文 */
+  payload?: unknown;
+}
+
+/** 原生确认 / 提示窗口的结果 */
+export interface ConfirmDialogResult {
+  channel: string;
+  confirmed: boolean;
+  payload?: unknown;
+}
+
 /** 通用输入窗口初始化数据 */
 export interface PromptInitData {
   title: string;
@@ -268,11 +297,19 @@ export interface ExportTaskPayload {
 
 export type TaskPayload = ScanTaskPayload | ProcessTaskPayload | ExportTaskPayload;
 
+/** 缩略图实际使用的解码引擎 */
+export type ThumbnailEngineName = 'sharp' | 'builtin';
+
 export interface ScanTaskResult {
   characters: number;
   groups: number;
   files: number;
+  /** 成功生成缩略图的张数 */
   thumbnails: number;
+  /** 生成失败（格式不支持、文件损坏或解码超时）的张数 */
+  thumbnailFailures: number;
+  /** 本次扫描实际使用的解码引擎；一张都没处理时为 none */
+  thumbnailEngine: ThumbnailEngineName | 'none';
 }
 
 export interface ProcessTaskResult {

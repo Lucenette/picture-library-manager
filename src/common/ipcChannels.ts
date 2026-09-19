@@ -27,6 +27,13 @@ export const IPC = {
   BATCH_PROCESS_CONFIRM: 'batch-process:confirm',
   BATCH_PROCESS_CONFIRMED: 'batch-process:confirmed',
 
+  // 原生确认 / 提示窗口
+  CONFIRM_OPEN: 'confirm:open',
+  CONFIRM_INIT: 'confirm:init',
+  CONFIRM_SUBMIT: 'confirm:submit',
+  /** 弹窗结果回发到主窗口的通道 */
+  CONFIRM_RESULT: 'confirm:result',
+
   // 通用输入窗口
   PROMPT_OPEN: 'prompt:open',
   PROMPT_INIT: 'prompt:init',

@@ -1,6 +1,7 @@
 import { join } from 'path';
 import type {
-  ScannedCharacter, ScannedGroup, ScanTaskPayload, ScanTaskResult, StructureInput, StructureOutput,
+  ScannedCharacter, ScannedFile, ScannedGroup, ScanTaskPayload, ScanTaskResult,
+  StructureInput, StructureOutput, ThumbnailEngineName,
 } from '@common/types';
 import {
   beginBatch, clearGalleryData, endBatch, getGalleryById,
@@ -10,6 +11,28 @@ import { buildDirTree, collectImageFiles } from '@/image/walk';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
 import { ThumbnailPool } from '@/image/thumbnail-pool';
+
+/**
+ * 同时解码的内存预算。
+ *
+ * 解码一张图要按「宽 × 高 × 4」分配 RGBA 缓冲区，外加解码器的内部缓冲；
+ * 几张一亿像素级的图并发就足以吃穿内存、让系统开始换页，单张解码从十秒
+ * 恶化到几分钟。按内存预算分批后：普通图照旧并发，超大图独占一批。
+ *
+ * 注意不能用文件体积来判断——实测 7.6 MB 的 JPEG 就要 380 MB 内存。
+ */
+const DECODE_MEMORY_BUDGET_BYTES = 768 * 1024 * 1024;
+
+/**
+ * 每个像素的估算字节数。
+ *
+ * RGBA 本身是 4 字节，再留一倍余量覆盖解码器的内部缓冲与内存碎片——
+ * 实测解码期间的 RSS 约为 RGBA 缓冲区的 1.9 倍。
+ */
+const DECODE_BYTES_PER_PIXEL = 8;
+
+/** 读不出尺寸时的保守估算，避免这类文件被当成小图塞满一整批 */
+const UNKNOWN_SIZE_BYTES = 64 * 1024 * 1024;
 
 /**
  * 扫描一个图库。
@@ -64,8 +87,12 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     0,
   );
 
+  let thumbnailFailures = 0;
+  let thumbnailEngine: ThumbnailEngineName | 'none' = 'none';
   if (totalFiles > 0) {
-    await generateThumbnails(ctx, characters, totalFiles);
+    const outcome = await generateThumbnails(ctx, characters, totalFiles);
+    thumbnailFailures = outcome.failures;
+    thumbnailEngine = outcome.engine;
   }
 
   // ---- 4. 原子入库 ----
@@ -103,47 +130,89 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     groups: collectedGroups,
     files: totalFiles,
     thumbnails,
+    thumbnailFailures,
+    thumbnailEngine,
   };
 }
 
 /**
- * 按线程数分批并发处理缩略图。
+ * 生成缩略图。
  *
- * 批与批之间是暂停与取消的生效点，因此响应延迟约等于一张图的解码时间。
+ * 分批依据是**解码所需内存**而不是文件体积：一批里所有图片的
+ * 「宽 × 高 × 4」之和不超过 {@link DECODE_MEMORY_BUDGET_BYTES}，同时不超过
+ * 线程数。这样普通图片照旧并发，一亿像素级的大图自然独占一批。
+ * 每个批次之后都是一个暂停 / 取消的生效点，单张失败只让它自己没有缩略图。
+ *
+ * @returns 生成失败的张数，以及实际用到的解码引擎
  */
 async function generateThumbnails(
   ctx: TaskContext,
   characters: ScannedCharacter[],
   totalFiles: number,
-): Promise<void> {
+): Promise<{ failures: number; engine: ThumbnailEngineName | 'none' }> {
   const pool = new ThumbnailPool();
   const batchSize = pool.concurrency;
   let doneFiles = 0;
+  let failures = 0;
+
+  /** 估算一张图解码要占多少内存 */
+  const estimateBytes = (file: ScannedFile): number => {
+    const pixels = (file.width ?? 0) * (file.height ?? 0);
+    return pixels > 0 ? pixels * DECODE_BYTES_PER_PIXEL : UNKNOWN_SIZE_BYTES;
+  };
+
+  const analyzeFile = async (file: ScannedFile): Promise<void> => {
+    try {
+      const outcome = await pool.analyze(file.filePath, estimateBytes(file));
+      file.thumbnail = outcome.thumbnail;
+    } catch (error) {
+      failures += 1;
+      console.error(`缩略图生成失败：${file.filePath}`, (error as Error).message);
+    }
+
+    doneFiles += 1;
+    ctx.report(
+      20 + Math.round((doneFiles / Math.max(totalFiles, 1)) * 75),
+      `生成缩略图 ${doneFiles}/${totalFiles}`,
+    );
+  };
 
   try {
     for (const character of characters) {
       for (const group of character.groups) {
-        for (let start = 0; start < group.files.length; start += batchSize) {
-          const batch = group.files.slice(start, start + batchSize);
+        let batch: ScannedFile[] = [];
+        let batchBytes = 0;
 
-          await Promise.all(batch.map(async (file) => {
-            const metrics = await pool.analyze(file.filePath);
-            file.width = metrics.width;
-            file.height = metrics.height;
-            file.thumbnail = metrics.thumbnail;
+        const flushBatch = async (): Promise<void> => {
+          if (batch.length === 0) {
+            return;
+          }
+          const current = batch;
+          batch = [];
+          batchBytes = 0;
 
-            doneFiles += 1;
-            ctx.report(
-              20 + Math.round((doneFiles / Math.max(totalFiles, 1)) * 75),
-              `生成缩略图 ${doneFiles}/${totalFiles}`,
-            );
-          }));
-
+          await Promise.all(current.map(analyzeFile));
           await ctx.checkpoint();
+        };
+
+        for (const file of group.files) {
+          const bytes = estimateBytes(file);
+          const overBudget = batchBytes + bytes > DECODE_MEMORY_BUDGET_BYTES;
+
+          if (batch.length > 0 && (overBudget || batch.length >= batchSize)) {
+            await flushBatch();
+          }
+
+          batch.push(file);
+          batchBytes += bytes;
         }
+
+        await flushBatch();
       }
     }
   } finally {
     pool.terminate();
   }
+
+  return { failures, engine: pool.engine };
 }
