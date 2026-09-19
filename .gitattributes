@@ -1,0 +1,23 @@
+# 仓库内统一以 LF 存储，检出时由 Git 按平台处理
+* text=auto
+
+# 二进制文件不做行尾转换与合并
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.bmp  binary
+*.ico  binary
+*.exe  binary
+*.dll  binary
+*.wasm binary
+
+# 锁文件与产物
+*.db   binary
+*.pak  binary
+
+# 语言统计：这些不该被识别为其他语言
+*.md       text
+package.json text
+yarn.lock  text

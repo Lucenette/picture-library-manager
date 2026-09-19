@@ -200,6 +200,8 @@ picture-library-manager/
 │   └── common/                  # 主进程与渲染进程共享的契约
 │       ├── types.ts             #   类型定义
 │       └── ipcChannels.ts       #   IPC 通道常量
+├── docs/                        # 文档（架构 / 脚本 / 疑难排查 / 需求规格）
+├── .github/                     # Issue 与 PR 模板、CI、Dependabot
 ├── electron-builder.yml         # 打包配置
 ├── electron.vite.config.ts      # Vite 配置
 ├── AGENTS.md                    # 给编码代理的开发约定
@@ -268,9 +270,27 @@ ctx = {
 
 ---
 
+## 📚 文档
+
+| 文档 | 内容 |
+|---|---|
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | 环境准备、开发流程、提交与分支规范、自检清单 |
+| [AGENTS.md](./AGENTS.md) | 分层规则、代码规范、运行时约定（人与 AI 共用） |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 进程模型、任务系统、线程边界、数据流、关键取舍 |
+| [docs/SCRIPTING.md](./docs/SCRIPTING.md) | 脚本接口参考、完整示例、错误语义与调试方式 |
+| [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | 按现象排查：卡顿、缩略图、数据库、构建、脚本 |
+| [docs/requirements.md](./docs/requirements.md) | 最初的需求规格（历史文档，部分已被实现取代） |
+| [CHANGELOG.md](./CHANGELOG.md) | 版本变更记录 |
+| [SECURITY.md](./SECURITY.md) | 安全模型与漏洞报告方式 |
+
+---
+
 ## 🤝 贡献
 
-欢迎提 Issue 和 PR。动手前请先看 `AGENTS.md`——里面写了本项目的分层规则、代码规范与自检清单。
+欢迎提 Issue 和 PR。
+
+- 开工前请先读 [CONTRIBUTING.md](./CONTRIBUTING.md) 与 [AGENTS.md](./AGENTS.md)
+- 缺陷请走 [Bug 反馈模板](.github/ISSUE_TEMPLATE/bug_report.yml)，安全问题见 [SECURITY.md](./SECURITY.md)
 
 分支约定：`develop`；提交信息用中文，形如 `范围：做了什么`。
 
