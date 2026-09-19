@@ -31,6 +31,8 @@ export interface TaskContext {
   report(progress: number, message: string): void;
   /** 单元边界：暂停挂起、取消抛出、并让出事件循环 */
   checkpoint(): Promise<void>;
+  /** 注册取消 / 退出时要立刻释放的资源，不能等下一个检查点 */
+  onAbort(cleanup: () => void): void;
 }
 
 type TaskRunner = (context: TaskContext) => Promise<TaskResult>;
@@ -292,6 +294,7 @@ class TaskManager {
       payload: JSON.parse(task.row.payload) as TaskPayload,
       report: (progress, message) => this.reportProgress(task, progress, message),
       checkpoint: () => task.control.checkpoint(),
+      onAbort: (cleanup) => task.control.onAbort(cleanup),
     };
   }
 

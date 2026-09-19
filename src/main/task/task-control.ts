@@ -23,6 +23,8 @@ export class TaskControl {
   private paused = false;
   private aborted = false;
   private resumeWaiters: Array<() => void> = [];
+  /** 立刻中止时要执行的清理（例如掐掉解码线程池） */
+  private abortCleanups: Array<() => void> = [];
 
   get isPaused(): boolean {
     return this.paused;
@@ -47,10 +49,30 @@ export class TaskControl {
     }
   }
 
-  /** 取消：唤醒可能挂起的 runner，并让它在检查点抛出 */
+  /**
+   * 注册「立刻中止」的清理动作。
+   *
+   * runner 只在检查点响应取消，而线程池、句柄这类资源不能等到下一个检查点——
+   * 它们会让主进程退不掉。已经在取消状态时立即执行。
+   */
+  onAbort(cleanup: () => void): void {
+    if (this.aborted) {
+      cleanup();
+      return;
+    }
+    this.abortCleanups.push(cleanup);
+  }
+
+  /** 取消：唤醒可能挂起的 runner、立刻执行清理，并让它在检查点抛出 */
   abort(): void {
     this.aborted = true;
     this.resume();
+
+    const cleanups = this.abortCleanups;
+    this.abortCleanups = [];
+    for (const cleanup of cleanups) {
+      cleanup();
+    }
   }
 
   /**

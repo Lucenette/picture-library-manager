@@ -107,12 +107,27 @@ export class ThumbnailPool {
     }
   }
 
+  /**
+   * 立刻收掉全部线程。
+   *
+   * worker 线程会阻止主进程退出，所以这一步必须能从任务之外触发（强制结束、退出），
+   * 不能只依赖 runner 走到下一个检查点。可重复调用。
+   */
   terminate(): void {
+    if (this.closed) {
+      return;
+    }
     this.closed = true;
+
+    // 等待中的请求必须立刻失败，否则 terminate 之后它们永远不结算
+    this.failWaiters(new Error('缩略图线程池已关闭'));
+
     for (const slot of this.slots) {
       slot.alive = false;
       void slot.worker.terminate();
     }
+    this.slots.length = 0;
+    this.idle.length = 0;
   }
 
   // ----------------------------------------------------------
@@ -123,12 +138,13 @@ export class ThumbnailPool {
   private spawn(): void {
     let slot: PoolWorker;
     try {
-      slot = {
-        worker: createThumbnailWorker({
-          resourceLimits: { maxOldGenerationSizeMb: WORKER_MEMORY_LIMIT_MB },
-        }),
-        alive: true,
-      };
+      const worker = createThumbnailWorker({
+        resourceLimits: { maxOldGenerationSizeMb: WORKER_MEMORY_LIMIT_MB },
+      });
+      // 刻意 unref：线程池不该成为「窗口关了进程还不退」的原因，
+      // 进程寿命由窗口与任务决定，线程的回收走 terminate()
+      worker.unref();
+      slot = { worker, alive: true };
     } catch (error) {
       const failure = new Error(`缩略图工作线程启动失败：${(error as Error).message}`);
       this.failWaiters(failure);

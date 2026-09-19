@@ -31,8 +31,13 @@ const DECODE_MEMORY_BUDGET_BYTES = 768 * 1024 * 1024;
  */
 const DECODE_BYTES_PER_PIXEL = 8;
 
-/** 读不出尺寸时的保守估算，避免这类文件被当成小图塞满一整批 */
-const UNKNOWN_SIZE_BYTES = 64 * 1024 * 1024;
+/**
+ * 读不出尺寸时的估算值。
+ *
+ * 取整批预算，于是「尺寸未知」的图必然独占一批。原来取 64MB，等于允许十几张
+ * 未知尺寸的大图凑满一整批并发解码，内存预算形同虚设。
+ */
+const UNKNOWN_SIZE_BYTES = DECODE_MEMORY_BUDGET_BYTES;
 
 /**
  * 扫描一个图库。
@@ -151,6 +156,8 @@ async function generateThumbnails(
   totalFiles: number,
 ): Promise<{ failures: number; engine: ThumbnailEngineName | 'none' }> {
   const pool = new ThumbnailPool();
+  // 强制结束 / 退出时立刻掐掉解码线程，不等 runner 走到下一个检查点
+  ctx.onAbort(() => pool.terminate());
   const batchSize = pool.concurrency;
   let doneFiles = 0;
   let failures = 0;
@@ -162,12 +169,21 @@ async function generateThumbnails(
   };
 
   const analyzeFile = async (file: ScannedFile): Promise<void> => {
+    const startedAt = Date.now();
+    const size = `${file.width ?? '?'}×${file.height ?? '?'}`;
     try {
       const outcome = await pool.analyze(file.filePath, estimateBytes(file));
       file.thumbnail = outcome.thumbnail;
+      if (outcome.thumbnail === null) {
+        // 解码失败也要计数并报出来，不能只剩一个「这张图没有缩略图」
+        failures += 1;
+        console.error(`缩略图生成失败：${file.filePath}（${size}）`, '解码器读不出这张图');
+      }
     } catch (error) {
       failures += 1;
-      console.error(`缩略图生成失败：${file.filePath}`, (error as Error).message);
+      // 带上像素数与实际耗时，只报「超时」看不出是图太大还是解码器卡死
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      console.error(`缩略图生成失败：${file.filePath}（${size}，${seconds}s）`, (error as Error).message);
     }
 
     doneFiles += 1;
