@@ -16,7 +16,6 @@
 
     <div class="table-wrap">
       <el-table
-        v-loading="exporting"
         :data="pagedImages"
         row-key="id"
         style="width: 100%"
@@ -57,34 +56,22 @@
       layout="total, sizes, prev, pager, next, jumper"
       class="pager"
     />
-
-    <el-dialog v-model="exportProgressVisible" title="导出进度" width="400px" :close-on-click-modal="false">
-      <el-progress :percentage="exportPercent" />
-      <p style="margin-top: 12px">
-        已导出 {{ exportedCount }} / {{ totalExportCount }}，错误 {{ exportErrorCount }}
-      </p>
-      <template #footer>
-        <el-button :disabled="exporting" @click="exportProgressVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { extname, join } from 'path';
 import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
-import type { Gallery, ProcessedImageView, ViewerPayload } from '@common/types';
+import type { Gallery, ProcessedImageView, TaskView, ViewerPayload } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
+import { useIpcListener } from '@/composables/useIpcListener';
+import { useTasks } from '@/composables/useTasks';
 import { deleteProcessedImage, getAllGalleries, getAllProcessedImages } from '@/db/database';
-
-/** 导出进度的刷新间隔，同时让出主线程给界面渲染 */
-const EXPORT_REFRESH_MS = 50;
 
 // ------------------------------------------------------------
 // 状态
@@ -93,13 +80,6 @@ const EXPORT_REFRESH_MS = 50;
 const processedImages = ref<ProcessedImageView[]>([]);
 const galleries = ref<Gallery[]>([]);
 const selectedIds = ref<number[]>([]);
-
-const exporting = ref(false);
-const exportProgressVisible = ref(false);
-const exportPercent = ref(0);
-const exportedCount = ref(0);
-const totalExportCount = ref(0);
-const exportErrorCount = ref(0);
 
 const page = ref(1);
 const pageSize = ref(20);
@@ -110,6 +90,8 @@ const galleryFilter = ref<number | undefined>(undefined);
 const characterFilter = ref('');
 const fileNameFilter = ref('');
 const scriptFilter = ref('');
+
+const { actions } = useTasks();
 
 const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilter } = useFilterOrder(() => {
   page.value = 1;
@@ -306,22 +288,21 @@ async function batchDelete(): Promise<void> {
 // 导出
 // ------------------------------------------------------------
 
-/**
- * 导出到指定目录，结构为 {目标目录}/{角色名}/{角色名}_{0001}.{扩展名}。
- *
- * 序号按角色在本轮导出中的出现顺序递增，这里保持原有约定不变。
- */
+/** 导出任务结束后刷新列表，让新增的失败记录可见 */
+useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => {
+  if (task.type !== 'export') {
+    return;
+  }
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
+    void loadData();
+  }
+});
+
+/** 选中目录后把待导出记录固化成 id 快照，实际复制交给主进程 */
 async function exportImages(): Promise<void> {
   const targetDir: string | null = await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR);
   if (!targetDir) {
     return;
-  }
-
-  if (!existsSync(targetDir)) {
-    if (!confirm(`目录「${targetDir}」不存在，是否创建？`)) {
-      return;
-    }
-    mkdirSync(targetDir, { recursive: true });
   }
 
   const images = selectedIds.value.length > 0
@@ -331,49 +312,8 @@ async function exportImages(): Promise<void> {
     return;
   }
 
-  exporting.value = true;
-  exportProgressVisible.value = true;
-  exportedCount.value = 0;
-  totalExportCount.value = images.length;
-  exportErrorCount.value = 0;
-  exportPercent.value = 0;
-
-  const counters = new Map<string, number>();
-  try {
-    for (const [index, image] of images.entries()) {
-      try {
-        copyImage(image, targetDir, counters);
-        exportedCount.value += 1;
-      } catch (error) {
-        exportErrorCount.value += 1;
-        console.error(`导出失败 [${image.selectedFile}]：`, error);
-      }
-
-      exportPercent.value = Math.round(((index + 1) / images.length) * 100);
-      await delay(EXPORT_REFRESH_MS);
-    }
-  } finally {
-    exporting.value = false;
-  }
-
-  alert(`导出完成！\n成功：${exportedCount.value}，错误：${exportErrorCount.value}`);
-}
-
-/** 按「角色名 / 角色名_序号.扩展名」复制一张图片 */
-function copyImage(image: ProcessedImageView, targetDir: string, counters: Map<string, number>): void {
-  const sequence = (counters.get(image.characterName) ?? 0) + 1;
-  counters.set(image.characterName, sequence);
-
-  const characterDir = join(targetDir, image.characterName);
-  mkdirSync(characterDir, { recursive: true });
-
-  const fileName = `${image.characterName}_${String(sequence).padStart(4, '0')}${extname(image.selectedFile)}`;
-  copyFileSync(image.selectedFile, join(characterDir, fileName));
-}
-
-/** 等待若干毫秒，给界面渲染的机会 */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  await actions.submit('export', { imageIds: images.map((image) => image.id), targetDir });
+  ElMessage.success(`已提交 ${images.length} 张图片的导出任务，可在「任务」页查看进度`);
 }
 
 onMounted(loadData);

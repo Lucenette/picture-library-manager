@@ -1,14 +1,15 @@
 import {
   closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync,
 } from 'fs';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { app, ipcMain } from 'electron';
 import initSqlJs, { type Database as SqlJsDatabase, type SqlValue } from 'sql.js';
 import { IPC } from '@common/ipcChannels';
-import { compileScriptModule } from '@common/script';
+import { compileScriptModule } from '@/script/compile';
 import type {
   Character, Gallery, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
+  TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import { DDL_ALL, SQL } from '@/sql';
 
@@ -214,8 +215,27 @@ export async function initDatabase(): Promise<void> {
   for (const ddl of DDL_ALL) {
     db.run(ddl);
   }
+  ensureTaskTable();
+
   dirty = true;
   persist();
+}
+
+/**
+ * 确保任务表与当前代码一致。
+ *
+ * 上一版遗留的 task 表列名不同且从未启用，这里用列名做一次性兼容判断后重建；
+ * 判断列名而不是无条件 DROP，是为了以后不会误删真实的任务历史。
+ */
+function ensureTaskTable(): void {
+  const columns = queryAll<{ name: string }>('PRAGMA table_info(task)').map((column) => column.name);
+  if (columns.length > 0 && !columns.includes('queue_order')) {
+    db!.run('DROP TABLE task');
+  }
+
+  db!.run(SQL.CREATE_TASK);
+  db!.run(SQL.CREATE_INDEX_TASK_STATUS);
+  db!.run(SQL.CREATE_INDEX_TASK_ORDER);
 }
 
 /** 落盘并关闭数据库，供退出前调用 */
@@ -259,10 +279,15 @@ export function endBatch(): void {
 // Gallery
 // ------------------------------------------------------------
 
-/** 新增图库；root_path 重复时由 SQLite 抛出唯一约束错误 */
-export function addGallery(name: string, rootPath: string): Gallery {
-  const id = insert(SQL.INSERT_GALLERY, [name, rootPath]);
+/** 新增图库，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
+export function addGallery(rootPath: string): Gallery {
+  const id = insert(SQL.INSERT_GALLERY, [basename(rootPath), rootPath]);
   return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id])!;
+}
+
+/** 按 id 查询图库 */
+export function getGalleryById(id: number): Gallery | undefined {
+  return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id]);
 }
 
 /** 查询全部图库，按创建时间倒序 */
@@ -364,6 +389,19 @@ export function getImageFilesByGroup(groupId: number): ImageFile[] {
   return queryAll<ImageFile>(SQL.SELECT_IMAGE_FILES_BY_GROUP, [groupId]);
 }
 
+/** 按 id 批量查询图片组视图，用于批量选图任务提交时固化的快照 */
+export function getImageGroupsViewByIds(ids: number[]): ImageGroupView[] {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const placeholders = ids.map(() => '?').join(', ');
+  return queryAll<ImageGroupView>(
+    `${SQL.SELECT_IMAGE_GROUPS_VIEW_BASE} AND ig.id IN (${placeholders})`,
+    ids,
+  );
+}
+
 /** 按文件路径反查所属图片组；文件不在图库中时返回 null */
 export function getImageGroupIdByFilePath(filePath: string): number | null {
   const row = queryOne<{ imageGroupId: number }>(SQL.SELECT_GROUP_ID_BY_FILE_PATH, [filePath]);
@@ -398,7 +436,7 @@ function makeBrief(code: string): string {
 }
 
 /** 检测脚本导出了哪些可识别的方法 */
-export function detectScriptTypes(code: string): ScriptType[] {
+function detectScriptTypes(code: string): ScriptType[] {
   try {
     const scriptExports = compileScriptModule(code);
     return ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function');
@@ -435,7 +473,7 @@ function getScriptByPath(filePath: string): ProcessScript {
  *
  * @param types 显式指定类型；省略时自动检测
  */
-export function upsertScript(name: string, filePath: string, code: string, types?: ScriptType[]): ProcessScript {
+function upsertScript(name: string, filePath: string, code: string, types?: ScriptType[]): ProcessScript {
   const resolvedTypes = types ?? detectScriptTypes(code);
   const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
 
@@ -450,13 +488,23 @@ export function upsertScript(name: string, filePath: string, code: string, types
 }
 
 /** 用新源码覆盖已入库的脚本，并重新检测类型 */
-export function reloadScript(filePath: string, code: string): ProcessScript {
+function reloadScript(filePath: string, code: string): ProcessScript {
   const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
   run(SQL.RELOAD_SCRIPT, [code, makeBrief(code), filePath]);
   if (existing) {
     replaceScriptTypes(existing.id, detectScriptTypes(code));
   }
   return getScriptByPath(filePath);
+}
+
+/** 从磁盘导入脚本：主进程读取源码并入库，名称取文件名 */
+export function importScript(filePath: string): ProcessScript {
+  return upsertScript(basename(filePath), filePath, readFileSync(filePath, 'utf-8'));
+}
+
+/** 用磁盘上的最新内容重新载入已入库的脚本 */
+export function reloadScriptFromFile(filePath: string): ProcessScript {
+  return reloadScript(filePath, readFileSync(filePath, 'utf-8'));
 }
 
 /** 查询全部脚本，按名称升序 */
@@ -526,6 +574,26 @@ export function getAllProcessedImages(galleryId?: number, characterName?: string
   return queryAll<ProcessedImageView>(`${sql} ORDER BY c.name`, params);
 }
 
+/** 导出任务唯一需要的字段 */
+export interface ProcessedExportRow {
+  id: number;
+  selectedFile: string;
+  characterName: string;
+}
+
+/** 按 id 批量查询导出所需的准图库记录 */
+export function getProcessedForExport(ids: number[]): ProcessedExportRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const placeholders = ids.map(() => '?').join(', ');
+  return queryAll<ProcessedExportRow>(
+    `${SQL.SELECT_PROCESSED_EXPORT_BASE} AND pi.id IN (${placeholders})`,
+    ids,
+  );
+}
+
 /** 删除准图库记录，并把对应图片组退回未处理 */
 export function deleteProcessedImage(id: number): void {
   const row = queryOne<{ imageGroupId: number }>(SQL.SELECT_PROCESSED_BY_ID_GROUP, [id]);
@@ -537,6 +605,73 @@ export function deleteProcessedImage(id: number): void {
 }
 
 // ------------------------------------------------------------
+// Task
+// ------------------------------------------------------------
+
+/** 新建任务并返回其 id */
+export function insertTask(type: TaskType, queueOrder: number, payload: string): number {
+  return insert(SQL.INSERT_TASK, [type, queueOrder, payload]);
+}
+
+/** 按 id 查询任务 */
+export function getTaskRow(id: number): TaskRow | undefined {
+  return queryOne<TaskRow>(SQL.SELECT_TASK_BY_ID, [id]);
+}
+
+/** 查询全部任务，按入队顺序排列 */
+export function getAllTasks(): TaskRow[] {
+  return queryAll<TaskRow>(SQL.SELECT_TASKS_ALL);
+}
+
+/** 当前最大的入队序号，用于把新任务排到队尾 */
+export function getMaxQueueOrder(): number {
+  const row = queryOne<{ maxQueueOrder: number }>(SQL.SELECT_MAX_QUEUE_ORDER);
+  return Number(row?.maxQueueOrder ?? 0);
+}
+
+/** 任务开始执行 */
+export function markTaskRunning(id: number, message: string): void {
+  run(SQL.UPDATE_TASK_RUNNING, [message, id]);
+}
+
+/** 被暂停的任务恢复执行，不刷新 started_at */
+export function resumeTask(id: number): void {
+  run(SQL.UPDATE_TASK_RESUME, [id]);
+}
+
+/** 任务暂停 */
+export function markTaskPaused(id: number): void {
+  run(SQL.UPDATE_TASK_PAUSED, [id]);
+}
+
+/** 更新进度与阶段描述 */
+export function updateTaskProgress(id: number, progress: number, message: string): void {
+  run(SQL.UPDATE_TASK_PROGRESS, [progress, message, id]);
+}
+
+/** 写入终态 */
+export function finishTask(
+  id: number,
+  status: TaskStatus,
+  progress: number,
+  message: string,
+  result: string,
+  error: string,
+): void {
+  run(SQL.UPDATE_TASK_FINISHED, [status, progress, message, result, error, id]);
+}
+
+/** 调整任务在队列中的顺序 */
+export function updateTaskQueueOrder(id: number, queueOrder: number): void {
+  run(SQL.UPDATE_TASK_QUEUE_ORDER, [queueOrder, id]);
+}
+
+/** 清空全部终态任务 */
+export function deleteFinishedTasks(): void {
+  run(SQL.DELETE_TASKS_FINISHED);
+}
+
+// ------------------------------------------------------------
 // IPC 调度
 // ------------------------------------------------------------
 
@@ -545,31 +680,22 @@ type DbMethod = (...args: any[]) => unknown;
 
 /** 暴露给渲染进程的数据库方法 */
 const DB_METHODS: Record<string, DbMethod> = {
-  beginBatch,
-  endBatch,
-
   addGallery,
   getAllGalleries,
   clearGalleryData,
   deleteGallery,
-  updateGalleryScannedAt,
 
-  insertCharacter,
   getCharactersByGallery,
   renameCharacter,
 
-  insertImageGroup,
   getImageGroupsView,
   updateImageGroupStatus,
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
 
-  insertImageFiles,
-
-  upsertScript,
-  reloadScript,
+  importScript,
+  reloadScriptFromFile,
   getAllScripts,
-  getScriptById,
   getScriptsByType,
   renameScript,
   deleteScript,

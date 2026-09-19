@@ -1,36 +1,27 @@
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, Gallery, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
+  Character, Gallery, ImageFile, ImageGroupStatus, ImageGroupView,
+  ProcessedImage, ProcessedImageView, ProcessScript, ScriptType,
 } from '@common/types';
 
-/** 调用主进程的数据库方法 */
+/**
+ * 渲染进程的数据库访问层。
+ *
+ * 只保留界面直接需要的读写；扫描、选图、导出这些批量写入都搬到了主进程的
+ * 任务里，由它们直接调用数据库模块，不再经过 IPC。
+ */
 function call<T>(method: string, ...args: unknown[]): Promise<T> {
   return ipcRenderer.invoke(IPC.DB, method, ...args) as Promise<T>;
-}
-
-// ------------------------------------------------------------
-// 批量提交
-// ------------------------------------------------------------
-
-/** 开始批量写入，期间的改动只在主进程内存中累积 */
-export function beginBatch(): Promise<void> {
-  return call('beginBatch');
-}
-
-/** 结束批量写入并立即落盘 */
-export function endBatch(): Promise<void> {
-  return call('endBatch');
 }
 
 // ------------------------------------------------------------
 // Gallery
 // ------------------------------------------------------------
 
-/** 新增图库 */
-export function addGallery(name: string, rootPath: string): Promise<Gallery> {
-  return call('addGallery', name, rootPath);
+/** 新增图库，名称由主进程取目录名 */
+export function addGallery(rootPath: string): Promise<Gallery> {
+  return call('addGallery', rootPath);
 }
 
 /** 查询全部图库 */
@@ -48,19 +39,9 @@ export function deleteGallery(galleryId: number): Promise<void> {
   return call('deleteGallery', galleryId);
 }
 
-/** 记录图库最近一次扫描完成时间 */
-export function updateGalleryScannedAt(galleryId: number): Promise<void> {
-  return call('updateGalleryScannedAt', galleryId);
-}
-
 // ------------------------------------------------------------
 // Character
 // ------------------------------------------------------------
-
-/** 写入角色，同图库下同名时返回既有记录 */
-export function insertCharacter(galleryId: number, name: string, sourcePath: string): Promise<Character> {
-  return call('insertCharacter', galleryId, name, sourcePath);
-}
 
 /** 查询图库下的角色 */
 export function getCharactersByGallery(galleryId: number): Promise<Character[]> {
@@ -75,16 +56,6 @@ export function renameCharacter(id: number, name: string): Promise<void> {
 // ------------------------------------------------------------
 // ImageGroup
 // ------------------------------------------------------------
-
-/** 写入图片组，同路径时返回既有记录 */
-export function insertImageGroup(
-  characterId: number,
-  dirName: string,
-  dirPath: string,
-  fileCount: number,
-): Promise<ImageGroup> {
-  return call('insertImageGroup', characterId, dirName, dirPath, fileCount);
-}
 
 /** 查询图片组列表 */
 export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number): Promise<ImageGroupView[]> {
@@ -107,36 +78,22 @@ export function getImageGroupIdByFilePath(filePath: string): Promise<number | nu
 }
 
 // ------------------------------------------------------------
-// ImageFile
-// ------------------------------------------------------------
-
-/** 批量写入图片组内的图片文件 */
-export function insertImageFiles(groupId: number, files: ScannedFile[]): Promise<void> {
-  return call('insertImageFiles', groupId, files);
-}
-
-// ------------------------------------------------------------
 // ProcessScript
 // ------------------------------------------------------------
 
-/** 新增或更新脚本 */
-export function upsertScript(name: string, filePath: string, code: string): Promise<ProcessScript> {
-  return call('upsertScript', name, filePath, code);
+/** 从磁盘导入脚本，源码由主进程读取 */
+export function importScript(filePath: string): Promise<ProcessScript> {
+  return call('importScript', filePath);
 }
 
-/** 用新源码覆盖已入库的脚本 */
-export function reloadScript(filePath: string, code: string): Promise<ProcessScript> {
-  return call('reloadScript', filePath, code);
+/** 用磁盘上的最新内容重新载入脚本 */
+export function reloadScriptFromFile(filePath: string): Promise<ProcessScript> {
+  return call('reloadScriptFromFile', filePath);
 }
 
 /** 查询全部脚本 */
 export function getAllScripts(): Promise<ProcessScript[]> {
   return call('getAllScripts');
-}
-
-/** 按 id 查询脚本 */
-export function getScriptById(id: number): Promise<ProcessScript | undefined> {
-  return call('getScriptById', id);
 }
 
 /** 查询能处理指定类型的脚本 */
@@ -158,7 +115,7 @@ export function deleteScript(id: number): Promise<void> {
 // ProcessedImage
 // ------------------------------------------------------------
 
-/** 写入或更新图片组的选图结果 */
+/** 写入或更新图片组的选图结果（手动确认走这里） */
 export function upsertProcessedImage(
   imageGroupId: number,
   characterId: number,

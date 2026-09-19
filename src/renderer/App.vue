@@ -24,6 +24,16 @@
         </el-menu>
 
         <router-link
+          to="/tasks"
+          class="header-scripts-link"
+          :class="{ active: activeMenu === '/tasks' }"
+        >
+          <el-icon><List /></el-icon>
+          <span>任务管理</span>
+          <span v-if="activeTaskCount > 0" class="task-badge">{{ activeTaskCount }}</span>
+        </router-link>
+
+        <router-link
           to="/scripts"
           class="header-scripts-link"
           :class="{ active: activeMenu === '/scripts' }"
@@ -43,7 +53,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { FolderOpened, Grid, PictureFilled, Setting, User } from '@element-plus/icons-vue';
+import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
+import { useTasks } from '@/composables/useTasks';
 
 /** 这些路由属于独立的原生子窗口，不套主窗口的导航骨架 */
 const POPUP_ROUTES = ['/viewer', '/scan-config', '/batch-process', '/prompt', '/file-viewer', '/script-list'];
@@ -51,6 +62,10 @@ const POPUP_ROUTES = ['/viewer', '/scan-config', '/batch-process', '/prompt', '/
 const route = useRoute();
 const isPopup = computed(() => POPUP_ROUTES.includes(route.path));
 const activeMenu = computed(() => route.path);
+
+// 运行中与排队中的任务数，用角标挂在导航上
+const { runningCount, pendingCount } = useTasks();
+const activeTaskCount = computed(() => runningCount.value + pendingCount.value);
 </script>
 
 <style>
@@ -105,6 +120,16 @@ body {
 .header-scripts-link.active {
   color: #3871e1;
   border-bottom-color: #3871e1;
+}
+
+.task-badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #3871e1;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .app-main {

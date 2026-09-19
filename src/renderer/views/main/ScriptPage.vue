@@ -61,8 +61,6 @@
 </template>
 
 <script setup lang="ts">
-import { readFileSync } from 'fs';
-import { basename } from 'path';
 import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
@@ -72,9 +70,9 @@ import { useIpcListener } from '@/composables/useIpcListener';
 import {
   deleteScript,
   getAllScripts,
-  reloadScript as dbReloadScript,
+  importScript,
+  reloadScriptFromFile,
   renameScript as dbRenameScript,
-  upsertScript,
 } from '@/db/database';
 
 /** 脚本类型对应的标签配色 */
@@ -162,14 +160,14 @@ async function addScript(): Promise<void> {
   }
 
   for (const filePath of filePaths) {
-    await upsertScript(basename(filePath), filePath, readFileSync(filePath, 'utf-8'));
+    await importScript(filePath);
   }
   await loadData();
 }
 
 async function reloadScriptFile(script: ProcessScript): Promise<void> {
   try {
-    await dbReloadScript(script.filePath, readFileSync(script.filePath, 'utf-8'));
+    await reloadScriptFromFile(script.filePath);
     await loadData();
   } catch (error) {
     alert(`重载失败：${(error as Error).message}`);
@@ -180,7 +178,7 @@ async function batchReload(): Promise<void> {
   const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id));
   for (const script of targets) {
     try {
-      await dbReloadScript(script.filePath, readFileSync(script.filePath, 'utf-8'));
+      await reloadScriptFromFile(script.filePath);
     } catch (error) {
       console.error(`重载失败 [${script.name}]：`, error);
     }

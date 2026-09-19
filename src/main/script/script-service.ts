@@ -1,11 +1,12 @@
-import { compileScriptModule } from '@common/script';
+import { compileScriptModule } from '@/script/compile';
 import type { ScriptType } from '@common/types';
-import { getScriptById } from '@/db/database';
+import { getScriptById } from '@/db';
 
 /**
- * 执行处理脚本中导出的指定方法。
+ * 在主进程中执行处理脚本的方法。
  *
- * 脚本每次调用都重新编译，因此改动源码后无需重启应用。
+ * 扫描与批量选图都已搬到主进程，脚本也一并在这里执行，省掉了每次调用
+ * 一次 IPC 往返的开销。
  *
  * @param scriptId 脚本 id
  * @param method 要调用的导出方法名
@@ -18,7 +19,7 @@ export async function executeScript<T = unknown>(
   method: ScriptType,
   ...args: unknown[]
 ): Promise<T> {
-  const script = await getScriptById(scriptId);
+  const script = getScriptById(scriptId);
   if (!script) {
     throw new Error(`脚本不存在（id=${scriptId}）`);
   }

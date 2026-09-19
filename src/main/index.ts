@@ -1,6 +1,8 @@
 import { app, Menu } from 'electron';
 import { closeDatabase, initDatabase, initDbIpc } from '@/db';
 import { initDialogs } from '@/dialogs';
+import { initTaskIpc } from '@/task/ipc';
+import { taskManager } from '@/task/manager';
 import { closeAll, createMain, get } from '@/window-manager';
 
 // ------------------------------------------------------------
@@ -31,12 +33,13 @@ function configureCommandLine(): void {
 // 启动
 // ------------------------------------------------------------
 
-/** 初始化数据库、IPC 与主窗口 */
+/** 初始化数据库、IPC 与主窗口，并把任务进度通知挂到主窗口上 */
 async function bootstrap(): Promise<void> {
   await initDatabase();
   initDbIpc();
+  initTaskIpc();
   initDialogs();
-  createMain();
+  taskManager.init(createMain());
 }
 
 /** 已有实例再启动时，把焦点交还给它的主窗口 */
@@ -57,7 +60,11 @@ configureCommandLine();
 if (app.requestSingleInstanceLock()) {
   app.on('second-instance', focusMainWindow);
   app.whenReady().then(bootstrap);
-  app.on('before-quit', () => closeDatabase());
+  app.on('before-quit', () => {
+    // 先终止进行中的任务，再落盘；未开始的 pending 会保留到下次启动
+    taskManager.shutdown();
+    closeDatabase();
+  });
   app.on('window-all-closed', () => {
     closeAll();
     app.quit();

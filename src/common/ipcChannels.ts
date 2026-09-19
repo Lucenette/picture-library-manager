@@ -41,6 +41,19 @@ export const IPC = {
   FILE_VIEWER_SELECT: 'file-viewer:select',
   FILE_VIEWER_SELECTED: 'file-viewer:selected',
 
+  // 后台任务
+  TASK_SUBMIT: 'task:submit',
+  TASK_CANCEL: 'task:cancel',
+  TASK_PAUSE: 'task:pause',
+  TASK_RESUME: 'task:resume',
+  TASK_FORCE_STOP: 'task:forceStop',
+  TASK_MOVE: 'task:move',
+  TASK_RETRY: 'task:retry',
+  TASK_LIST: 'task:list',
+  TASK_CLEAR_FINISHED: 'task:clearFinished',
+  TASK_CHANGED: 'task:changed',
+  TASK_PROGRESS: 'task:progress',
+
   // 脚本下拉浮窗
   DROPDOWN_OPEN: 'script-list:open',
   DROPDOWN_INIT: 'script-list:init',

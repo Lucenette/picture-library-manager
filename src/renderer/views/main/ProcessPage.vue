@@ -15,7 +15,6 @@
 
     <div class="table-wrap">
       <el-table
-        v-loading="processing"
         :data="pagedGroups"
         row-key="id"
         style="width: 100%"
@@ -52,44 +51,26 @@
       layout="total, sizes, prev, pager, next, jumper"
       class="pager"
     />
-
-    <el-dialog v-model="processProgressVisible" title="处理进度" width="400px" :close-on-click-modal="false">
-      <el-progress :percentage="processPercent" />
-      <p style="margin-top: 12px">已处理 {{ processedCount }} / {{ totalCount }}，错误 {{ errorCount }}</p>
-      <template #footer>
-        <el-button :disabled="processing" @click="processProgressVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { randomUUID } from 'crypto';
 import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { ElMessage } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
 import type {
-  BatchProcessInitData, FileViewerInitData, Gallery, ImageGroupStatus, ImageGroupView, ProcessScript,
+  BatchProcessInitData, FileViewerInitData, Gallery, ImageGroupStatus, ImageGroupView, ProcessScript, TaskView,
 } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
+import { useTasks } from '@/composables/useTasks';
 import {
-  beginBatch,
-  endBatch,
-  getAllGalleries,
-  getImageFilesByGroup,
-  getImageGroupIdByFilePath,
-  getImageGroupsView,
-  getScriptsByType,
-  updateImageGroupStatus,
-  upsertProcessedImage,
+  getAllGalleries, getImageFilesByGroup, getImageGroupIdByFilePath, getImageGroupsView,
+  getScriptsByType, updateImageGroupStatus, upsertProcessedImage,
 } from '@/db/database';
-import { executeScript } from '@/services/script-runner';
-
-/** 处理进度的刷新间隔，同时让出主线程给界面渲染 */
-const PROGRESS_REFRESH_MS = 50;
 
 /** 状态筛选项 */
 const STATUS_ITEMS: FilterItem[] = [
@@ -106,14 +87,6 @@ const groups = ref<ImageGroupView[]>([]);
 const scripts = ref<ProcessScript[]>([]);
 const galleries = ref<Gallery[]>([]);
 const selectedIds = ref<number[]>([]);
-const selectedScriptId = ref<number | null>(null);
-
-const processing = ref(false);
-const processProgressVisible = ref(false);
-const processPercent = ref(0);
-const processedCount = ref(0);
-const totalCount = ref(0);
-const errorCount = ref(0);
 
 const page = ref(1);
 const pageSize = ref(20);
@@ -124,6 +97,8 @@ const galleryFilter = ref<number | undefined>(undefined);
 const characterFilter = ref('');
 const pathFilter = ref('');
 const statusFilter = ref('');
+
+const { actions } = useTasks();
 
 const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilter } = useFilterOrder(() => {
   page.value = 1;
@@ -340,18 +315,27 @@ async function confirmSelectedFile(filePath: string): Promise<void> {
 }
 
 // ------------------------------------------------------------
-// 批量处理
+// 批量选图
 // ------------------------------------------------------------
 
 useIpcListener(IPC.BATCH_PROCESS_CONFIRMED, (scriptId: number) => {
-  selectedScriptId.value = scriptId;
-  void doBatchProcess();
+  void submitProcessTask(scriptId);
+});
+
+/** 选图任务结束后刷新列表，让处理状态立刻反映出来 */
+useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => {
+  if (task.type !== 'process') {
+    return;
+  }
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
+    void loadData();
+  }
 });
 
 function openBatchDialog(): void {
   const targets = resolveTargets();
   if (targets.length === 0) {
-    alert('选中的图片组都被排除');
+    ElMessage.warning('选中的图片组都被排除');
     return;
   }
 
@@ -370,91 +354,16 @@ function resolveTargets(): ImageGroupView[] {
   return candidates.filter((group) => group.status !== 'excluded');
 }
 
-/**
- * 逐个图片组执行选图脚本。
- *
- * 每个图片组都要读文件、跑脚本、写结果，整个过程包在一次批量提交里，
- * 结束后统一落盘；每条之间让出事件循环，让进度弹窗能够刷新。
- */
-async function doBatchProcess(): Promise<void> {
-  const scriptId = selectedScriptId.value;
-  if (scriptId === null) {
-    return;
-  }
-
+/** 提交时把目标固化成 id 快照，执行期间筛选或数据变化都不影响本次任务 */
+async function submitProcessTask(scriptId: number): Promise<void> {
   const targets = resolveTargets();
   if (targets.length === 0) {
-    alert('选中的图片组都已被排除');
+    ElMessage.warning('选中的图片组都已被排除');
     return;
   }
 
-  processing.value = true;
-  processProgressVisible.value = true;
-  processedCount.value = 0;
-  totalCount.value = targets.length;
-  errorCount.value = 0;
-  processPercent.value = 0;
-
-  await beginBatch();
-  try {
-    for (const [index, group] of targets.entries()) {
-      try {
-        await processGroup(group, scriptId);
-      } catch (error) {
-        errorCount.value += 1;
-        console.error(`图片组处理失败：${group.dirPath}`, error);
-      }
-
-      processedCount.value = index + 1;
-      processPercent.value = Math.round(((index + 1) / targets.length) * 100);
-      await delay(PROGRESS_REFRESH_MS);
-    }
-  } finally {
-    await endBatch();
-    processing.value = false;
-    await loadData();
-  }
-}
-
-/** 对单个图片组执行选图脚本并写入结果 */
-async function processGroup(group: ImageGroupView, scriptId: number): Promise<void> {
-  const files = await getImageFilesByGroup(group.id);
-
-  // 脚本只认临时 uuid，避免让它直接依赖数据库主键
-  const filePathByUuid = new Map<string, string>();
-  const scriptFiles = files.map((file) => {
-    const uuid = randomUUID();
-    filePathByUuid.set(uuid, file.filePath);
-    return {
-      uuid,
-      fileName: file.fileName,
-      filePath: file.filePath,
-      width: file.width,
-      height: file.height,
-      fileSize: file.fileSize ?? 0,
-      ext: file.extension,
-    };
-  });
-
-  const selectedUuid = await executeScript<string>(scriptId, 'select-image', {
-    characterName: group.characterName,
-    groupDirPath: group.dirPath,
-    files: scriptFiles,
-  });
-
-  const selectedFile = filePathByUuid.get(selectedUuid);
-  if (!selectedFile) {
-    throw new Error('脚本返回了未知的文件标识');
-  }
-
-  await upsertProcessedImage(
-    group.id, group.characterId, group.galleryId, group.dirPath, selectedFile, scriptId,
-  );
-}
-
-/** 等待若干毫秒，给界面渲染的机会 */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  await actions.submit('process', { groupIds: targets.map((group) => group.id), scriptId });
+  ElMessage.success(`已提交 ${targets.length} 个图片组的选图任务，可在「任务」页查看进度`);
 }
 
 onMounted(loadData);

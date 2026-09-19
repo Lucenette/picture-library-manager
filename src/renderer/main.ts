@@ -16,6 +16,7 @@ import GalleryPage from '@/views/main/GalleryPage.vue';
 import LibraryPage from '@/views/main/LibraryPage.vue';
 import ProcessPage from '@/views/main/ProcessPage.vue';
 import ScriptPage from '@/views/main/ScriptPage.vue';
+import TaskPage from '@/views/main/TaskPage.vue';
 
 /**
  * 全部窗口共用同一份渲染进程入口，通过 hash 路由区分：
@@ -29,6 +30,7 @@ const router = createRouter({
     { path: '/characters', name: 'characters', component: CharacterPage },
     { path: '/process', name: 'process', component: ProcessPage },
     { path: '/library', name: 'library', component: LibraryPage },
+    { path: '/tasks', name: 'tasks', component: TaskPage },
 
     { path: '/viewer', name: 'viewer', component: ImageViewer },
     { path: '/scan-config', name: 'scanConfig', component: ScanConfigDialog },

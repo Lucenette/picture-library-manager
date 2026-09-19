@@ -172,6 +172,47 @@ export const SQL = {
   DELETE_PROCESSED: 'DELETE FROM processed_image WHERE id = ?',
   DELETE_PROCESSED_BY_GROUP: 'DELETE FROM processed_image WHERE image_group_id = ?',
 
+  /** 导出任务用的精简查询，只取需要的列，不带缩略图 */
+  SELECT_PROCESSED_EXPORT_BASE: `SELECT pi.id, pi.selected_file, c.name AS characterName
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  WHERE 1 = 1`,
+
+  // ----------------------------------------------------------
+  // 后台任务
+  // ----------------------------------------------------------
+
+  CREATE_TASK: `CREATE TABLE IF NOT EXISTS task (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','paused','done','failed','cancelled')),
+  queue_order INTEGER NOT NULL DEFAULT 0,
+  progress INTEGER NOT NULL DEFAULT 0,
+  message TEXT NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '{}',
+  result TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  started_at TEXT,
+  finished_at TEXT
+)`,
+
+  CREATE_INDEX_TASK_STATUS: 'CREATE INDEX IF NOT EXISTS idx_task_status ON task(status)',
+  CREATE_INDEX_TASK_ORDER: 'CREATE INDEX IF NOT EXISTS idx_task_queue_order ON task(queue_order)',
+
+  INSERT_TASK: 'INSERT INTO task (type, queue_order, payload) VALUES (?, ?, ?)',
+  SELECT_TASKS_ALL: 'SELECT * FROM task ORDER BY queue_order, id',
+  SELECT_MAX_QUEUE_ORDER: 'SELECT COALESCE(MAX(queue_order), 0) AS maxQueueOrder FROM task',
+  SELECT_TASK_BY_ID: 'SELECT * FROM task WHERE id = ?',
+  UPDATE_TASK_RUNNING: "UPDATE task SET status = 'running', started_at = datetime('now','localtime'), message = ? WHERE id = ?",
+  UPDATE_TASK_RESUME: "UPDATE task SET status = 'running' WHERE id = ?",
+  UPDATE_TASK_PAUSED: "UPDATE task SET status = 'paused' WHERE id = ?",
+  UPDATE_TASK_PROGRESS: 'UPDATE task SET progress = ?, message = ? WHERE id = ?',
+  UPDATE_TASK_FINISHED: `UPDATE task SET status = ?, progress = ?, message = ?, result = ?, error = ?,
+  finished_at = datetime('now','localtime') WHERE id = ?`,
+  UPDATE_TASK_QUEUE_ORDER: 'UPDATE task SET queue_order = ? WHERE id = ?',
+  DELETE_TASKS_FINISHED: "DELETE FROM task WHERE status IN ('done','failed','cancelled')",
+
   /** 准图库列表基语句，调用方按需追加 WHERE 与 ORDER BY */
   SELECT_PROCESSED_VIEW_BASE: `SELECT pi.*, c.name AS characterName, g.name AS galleryName,
     ps.name AS scriptName, pi.selected_file AS selectedFileName,

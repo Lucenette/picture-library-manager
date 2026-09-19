@@ -156,15 +156,6 @@ export interface ScannedCharacter {
   groups: ScannedGroup[];
 }
 
-/** 扫描进度回调参数 */
-export interface ScanProgress {
-  stage: 'scanning' | 'done';
-  charactersFound: number;
-  groupsFound: number;
-  filesFound: number;
-  currentCharacter: string | null;
-}
-
 // ------------------------------------------------------------
 // 原生窗口初始化数据
 // ------------------------------------------------------------
@@ -246,3 +237,88 @@ export interface ScriptListOpenData extends ScriptListInitData {
   controlRect: { x: number; y: number; width: number; height: number };
   listHeight: number;
 }
+
+// ------------------------------------------------------------
+// 后台任务
+// ------------------------------------------------------------
+
+/** 任务类型 */
+export type TaskType = 'scan' | 'process' | 'export';
+
+/** 任务状态；paused 与 running 一样占用队列 */
+export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
+
+/** 扫描任务入参：一次扫描一个图库，便于独立取消与原子提交 */
+export interface ScanTaskPayload {
+  galleryId: number;
+  scriptId: number;
+}
+
+/** 批量选图任务入参：提交时固化的图片组快照 */
+export interface ProcessTaskPayload {
+  groupIds: number[];
+  scriptId: number;
+}
+
+/** 导出任务入参：提交时固化的准图库记录快照 */
+export interface ExportTaskPayload {
+  imageIds: number[];
+  targetDir: string;
+}
+
+export type TaskPayload = ScanTaskPayload | ProcessTaskPayload | ExportTaskPayload;
+
+export interface ScanTaskResult {
+  characters: number;
+  groups: number;
+  files: number;
+  thumbnails: number;
+}
+
+export interface ProcessTaskResult {
+  processed: number;
+  failed: number;
+}
+
+export interface ExportTaskResult {
+  copied: number;
+  failed: number;
+}
+
+export type TaskResult = ScanTaskResult | ProcessTaskResult | ExportTaskResult;
+
+/** 任务在数据库中的存储形态 */
+export interface TaskRow {
+  id: number;
+  type: TaskType;
+  status: TaskStatus;
+  /** 待执行任务之间的先后顺序 */
+  queueOrder: number;
+  /** 0 ~ 100 */
+  progress: number;
+  /** 当前阶段描述 */
+  message: string;
+  payload: string;
+  result: string;
+  error: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+/** 推送给渲染进程的任务视图：payload/result 已解析，并附带可读标题 */
+export interface TaskView extends Omit<TaskRow, 'payload' | 'result'> {
+  title: string;
+  payload: TaskPayload;
+  result: TaskResult | null;
+}
+
+/** 高频进度事件，渲染进程只需原地打补丁 */
+export interface TaskProgressEvent {
+  id: number;
+  progress: number;
+  message: string;
+}
+
+/** 调整待执行任务顺序的方向 */
+export type TaskMoveDirection = 'up' | 'down';
