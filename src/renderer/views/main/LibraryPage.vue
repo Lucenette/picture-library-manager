@@ -5,6 +5,9 @@
         <CategorySearch :sections="filterSections" :order="filterOrder" />
       </div>
       <div class="toolbar-right">
+        <el-button :disabled="recognizing" @click="recognizeSimilar">
+          {{ recognizing ? '识别中…' : '识别相似图片' }}
+        </el-button>
         <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
           删除选中 ({{ selectedIds.length }})
         </el-button>
@@ -60,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
@@ -72,6 +75,7 @@ import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import { deleteProcessedImage, getAllGalleries, getAllProcessedImages } from '@/db/database';
+import { confirmDialog } from '@/services/dialog-service';
 
 // ------------------------------------------------------------
 // 状态
@@ -91,7 +95,59 @@ const characterFilter = ref('');
 const fileNameFilter = ref('');
 const scriptFilter = ref('');
 
-const { actions } = useTasks();
+const { tasks, actions } = useTasks();
+
+/** 识别任务是否在跑：跑的过程中禁用按钮 */
+const recognizing = ref(false);
+/** 本次要等的那条识别任务；0 表示当前没有在等 */
+const watchedTaskId = ref(0);
+
+/**
+ * 提交识别任务并记住它的 id。
+ *
+ * 走 actions.submit 而不是直接调 submitTask：命令会返回整表（服务端已排好序），
+ * 用它替换本地列表，顺序才不会错。
+ */
+async function recognizeSimilar(): Promise<void> {
+  if (recognizing.value) {
+    return;
+  }
+  recognizing.value = true;
+  try {
+    // 提交命令直接返回新任务 id，不需要去列表里猜
+    watchedTaskId.value = await actions.submit('similar', {});
+    ElMessage.success('已开始识别，完成后会自动打开结果窗口');
+  } catch (error) {
+    recognizing.value = false;
+    ElMessage.error(`提交识别任务失败：${(error as Error).message}`);
+  }
+}
+
+// 只盯自己提交的那条任务：完成就开窗，失败或被取消就放开按钮。
+// 按 id 认任务，不靠"列表里第一条已完成的识别任务"——那会在重复提交时认错。
+watch(tasks, (list) => {
+  if (watchedTaskId.value === 0) {
+    return;
+  }
+
+  const task = list.find((item) => item.id === watchedTaskId.value);
+  if (!task) {
+    return;
+  }
+
+  if (task.status === 'done') {
+    watchedTaskId.value = 0;
+    recognizing.value = false;
+    void ipcRenderer.invoke(IPC.SIMILAR_OPEN);
+    return;
+  }
+
+  if (task.status === 'failed' || task.status === 'cancelled') {
+    watchedTaskId.value = 0;
+    recognizing.value = false;
+    ElMessage.error('识别相似图片未完成，详情见任务页');
+  }
+}, { deep: true });
 
 const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilter } = useFilterOrder(() => {
   page.value = 1;

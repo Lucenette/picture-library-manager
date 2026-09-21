@@ -7,8 +7,9 @@ import { compileScriptModule } from '@/script/compile';
 import type {
   Character, Gallery, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
-  TaskRow, TaskStatus, TaskType,
+  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
+import type { SimilarInputRow } from '@/image/similar';
 import { DDL_ALL, SQL } from '@/sql';
 
 // ------------------------------------------------------------
@@ -338,6 +339,82 @@ export function updateImageGroupStatus(id: number, status: ImageGroupStatus): vo
 /** 查询图片组内的全部图片文件，按文件名升序 */
 export function getImageFilesByGroup(groupId: number): ImageFile[] {
   return queryAll<ImageFile>(SQL.SELECT_IMAGE_FILES_BY_GROUP, [groupId]);
+}
+
+// ------------------------------------------------------------
+// 相似图片识别结果
+// ------------------------------------------------------------
+
+/** 结果表 join image_file 之后的一行 */
+interface SimilarRow {
+  groupId: number;
+  kind: string;
+  filePath: string;
+  fileName: string | null;
+  thumbnail: string | null;
+  width: number | null;
+  height: number | null;
+  distance: number;
+}
+
+/** 第四页签的图片（每个图片组选定的那一张）及其感知哈希 */
+export function getSimilarInputRows(): SimilarInputRow[] {
+  return queryAll<SimilarInputRow>(SQL.SELECT_SIMILAR_INPUT);
+}
+
+/** 清空上一次识别结果：结果表只保留最近一次，避免无限增长 */
+export function clearSimilarData(): void {
+  run(SQL.CLEAR_SIMILAR_MEMBERS);
+  run(SQL.CLEAR_SIMILAR_GROUPS);
+  run(SQL.CLEAR_SIMILAR_RUNS);
+}
+
+/** 写入一次识别的统计，返回 run id */
+export function insertSimilarRun(compared: number, skipped: number): number {
+  return insert(SQL.INSERT_SIMILAR_RUN, [compared, skipped]);
+}
+
+/** 写入一个结果组，返回 group id */
+export function insertSimilarGroup(runId: number, kind: string, size: number): number {
+  return insert(SQL.INSERT_SIMILAR_GROUP, [runId, kind, size]);
+}
+
+/** 写入结果组里的一个成员 */
+export function insertSimilarMember(groupId: number, filePath: string, distance: number): void {
+  run(SQL.INSERT_SIMILAR_MEMBER, [groupId, filePath, distance]);
+}
+
+/** 读取最近一次识别结果；一次都没跑过时返回 null */
+export function getSimilarData(): SimilarData | null {
+  const latest = queryOne<{ compared: number; skipped: number }>(SQL.SELECT_SIMILAR_RUN_LATEST);
+  if (!latest) {
+    return null;
+  }
+
+  const groups = new Map<number, SimilarGroup>();
+  for (const row of queryAll<SimilarRow>(SQL.SELECT_SIMILAR_GROUPS)) {
+    let group = groups.get(row.groupId);
+    if (!group) {
+      group = { kind: row.kind === 'similar' ? 'similar' : 'same', members: [] };
+      groups.set(row.groupId, group);
+    }
+    group.members.push({
+      filePath: row.filePath,
+      fileName: row.fileName ?? '',
+      thumbnail: row.thumbnail,
+      width: row.width,
+      height: row.height,
+      distance: row.distance,
+    });
+  }
+
+  const all = [...groups.values()];
+  return {
+    same: all.filter((group) => group.kind === 'same'),
+    similar: all.filter((group) => group.kind === 'similar'),
+    compared: latest.compared,
+    skipped: latest.skipped,
+  };
 }
 
 /** 按 id 批量查询图片组视图，用于批量选图任务提交时固化的快照 */

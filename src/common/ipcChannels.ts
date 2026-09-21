@@ -61,6 +61,10 @@ export const IPC = {
   TASK_CHANGED: 'task:changed',
   TASK_PROGRESS: 'task:progress',
 
+  // 相似图片识别结果窗口
+  SIMILAR_OPEN: 'similar:open',
+  SIMILAR_DATA: 'similar:data',
+
   // 脚本下拉浮窗
   DROPDOWN_OPEN: 'script-list:open',
   DROPDOWN_INIT: 'script-list:init',

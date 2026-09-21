@@ -258,6 +258,24 @@ export function createFileViewer(): BrowserWindow {
   });
 }
 
+/** 相似图片识别结果窗口 */
+export function createSimilar(): BrowserWindow {
+  return create('similar', {
+    width: 1080,
+    height: 760,
+    minWidth: 720,
+    minHeight: 520,
+    backgroundColor: '#1e1f22',
+    title: '相似图片',
+    route: '/similar',
+    parentId: 'main',
+    modal: false,
+    frame: false,
+    minimizable: true,
+    maximizable: true,
+  });
+}
+
 // ------------------------------------------------------------
 // 内部工具
 // ------------------------------------------------------------

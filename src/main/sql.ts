@@ -88,6 +88,52 @@ export const SQL = {
   CREATE_INDEX_PROCESSED_GALLERY: 'CREATE INDEX IF NOT EXISTS idx_processed_gallery ON processed_image(gallery_id)',
 
   // ----------------------------------------------------------
+  // 相似图片识别结果
+  //
+  // 只保留最近一次识别：重跑时先清空三张表再写入，避免结果无限增长。
+  // 成员只存路径与距离，缩略图等信息读的时候再 join image_file。
+  // ----------------------------------------------------------
+
+  CREATE_SIMILAR_RUN: `CREATE TABLE IF NOT EXISTS similar_run (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  compared INTEGER NOT NULL,
+  skipped INTEGER NOT NULL
+)`,
+  CREATE_SIMILAR_GROUP: `CREATE TABLE IF NOT EXISTS similar_group (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  size INTEGER NOT NULL
+)`,
+  CREATE_SIMILAR_MEMBER: `CREATE TABLE IF NOT EXISTS similar_member (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL,
+  file_path TEXT NOT NULL,
+  distance INTEGER NOT NULL
+)`,
+  CREATE_INDEX_SIMILAR_GROUP_RUN: 'CREATE INDEX IF NOT EXISTS idx_similar_group_run ON similar_group(run_id)',
+  CREATE_INDEX_SIMILAR_MEMBER_GROUP: 'CREATE INDEX IF NOT EXISTS idx_similar_member_group ON similar_member(group_id)',
+
+  CLEAR_SIMILAR_MEMBERS: 'DELETE FROM similar_member',
+  CLEAR_SIMILAR_GROUPS: 'DELETE FROM similar_group',
+  CLEAR_SIMILAR_RUNS: 'DELETE FROM similar_run',
+  INSERT_SIMILAR_RUN: 'INSERT INTO similar_run (compared, skipped) VALUES (?, ?)',
+  INSERT_SIMILAR_GROUP: 'INSERT INTO similar_group (run_id, kind, size) VALUES (?, ?, ?)',
+  INSERT_SIMILAR_MEMBER: 'INSERT INTO similar_member (group_id, file_path, distance) VALUES (?, ?, ?)',
+  SELECT_SIMILAR_RUN_LATEST: 'SELECT compared, skipped FROM similar_run ORDER BY id DESC LIMIT 1',
+  SELECT_SIMILAR_GROUPS: `SELECT g.id AS group_id, g.kind AS kind, m.file_path AS file_path, m.distance AS distance,
+  f.file_name AS file_name, f.thumbnail AS thumbnail, f.width AS width, f.height AS height
+  FROM similar_group g
+  JOIN similar_member m ON m.group_id = g.id
+  LEFT JOIN image_file f ON f.file_path = m.file_path
+  ORDER BY g.id, m.distance`,
+  SELECT_SIMILAR_INPUT: `SELECT f.file_path AS file_path, f.file_name AS file_name, f.thumbnail AS thumbnail,
+  f.width AS width, f.height AS height, f.phash AS phash
+  FROM processed_image pi
+  JOIN image_file f ON f.file_path = pi.selected_file`,
+
+  // ----------------------------------------------------------
   // Gallery
   // ----------------------------------------------------------
 
@@ -239,4 +285,9 @@ export const DDL_ALL: string[] = [
   SQL.CREATE_PROCESSED_IMAGE,
   SQL.CREATE_INDEX_PROCESSED_CHARACTER,
   SQL.CREATE_INDEX_PROCESSED_GALLERY,
+  SQL.CREATE_SIMILAR_RUN,
+  SQL.CREATE_SIMILAR_GROUP,
+  SQL.CREATE_INDEX_SIMILAR_GROUP_RUN,
+  SQL.CREATE_SIMILAR_MEMBER,
+  SQL.CREATE_INDEX_SIMILAR_MEMBER_GROUP,
 ];

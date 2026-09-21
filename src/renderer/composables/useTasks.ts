@@ -11,16 +11,6 @@ import {
 const tasks = ref<TaskView[]>([]);
 let subscribed = false;
 
-/** 用最新的一条任务替换本地记录 */
-function upsert(task: TaskView): void {
-  const index = tasks.value.findIndex((item) => item.id === task.id);
-  if (index < 0) {
-    tasks.value = [...tasks.value, task];
-    return;
-  }
-  tasks.value[index] = task;
-}
-
 /** 进度是高频事件，只就地打补丁，避免整表刷新 */
 function applyProgress(event: TaskProgressEvent): void {
   const index = tasks.value.findIndex((item) => item.id === event.id);
@@ -37,7 +27,11 @@ function ensureSubscribed(): void {
   }
   subscribed = true;
 
-  useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => upsert(task));
+  // 推送就是整张排好序的列表，直接替换：既不会本地顺序漂移，
+  // 也不用为每次状态变化再拉一次列表
+  useIpcListener(IPC.TASK_CHANGED, (list: TaskView[]) => {
+    tasks.value = list;
+  });
   useIpcListener(IPC.TASK_PROGRESS, (event: TaskProgressEvent) => applyProgress(event));
   void refresh();
 }
@@ -69,7 +63,12 @@ export function useTasks() {
   );
 
   const actions = {
-    submit: (type: TaskType, payload: TaskPayload) => run(() => submitTask(type, payload)),
+    // 提交要单独写：它除了替换整表，还要把新任务 id 交给调用方
+    submit: async (type: TaskType, payload: TaskPayload): Promise<number> => {
+      const result = await submitTask(type, payload);
+      tasks.value = result.tasks;
+      return result.id;
+    },
     cancel: (id: number) => run(() => cancelTask(id)),
     pause: (id: number) => run(() => pauseTask(id)),
     resume: (id: number) => run(() => resumeTask(id)),

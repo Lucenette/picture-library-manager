@@ -12,6 +12,7 @@ import { TaskCancelledError, TaskControl } from '@/task/task-control';
 import { runExport } from '@/task/runners/export';
 import { runProcess } from '@/task/runners/process';
 import { runScan } from '@/task/runners/scan';
+import { runSimilar } from '@/task/runners/similar';
 
 // ------------------------------------------------------------
 // 常量与类型
@@ -42,6 +43,7 @@ const RUNNERS: Record<TaskType, TaskRunner> = {
   scan: runScan,
   process: runProcess,
   export: runExport,
+  similar: runSimilar,
 };
 
 /** 内存中的任务记录 */
@@ -80,7 +82,7 @@ class TaskManager {
     const row = getTaskRow(id)!;
     this.tasks.set(id, { row, control: new TaskControl(), title: buildTitle(type, payload) });
 
-    this.notifyChanged(id);
+    this.notifyChanged();
     this.tick();
     return id;
   }
@@ -104,7 +106,7 @@ class TaskManager {
     task.control.pause();
     task.row.status = 'paused';
     markTaskPaused(id);
-    this.notifyChanged(id);
+    this.notifyChanged();
   }
 
   /** 继续被暂停的任务 */
@@ -117,7 +119,7 @@ class TaskManager {
     task.row.status = 'running';
     resumeTask(id);
     task.control.resume();
-    this.notifyChanged(id);
+    this.notifyChanged();
   }
 
   /**
@@ -153,7 +155,8 @@ class TaskManager {
       return;
     }
 
-    const neighbour = pending[direction === 'up' ? index - 1 : index + 1];
+    // 列表里"先开始的靠下"，所以上移一格是把这条推后开始（换成 queue_order 更大的邻居）
+    const neighbour = pending[direction === 'up' ? index + 1 : index - 1];
     if (!neighbour) {
       return;
     }
@@ -166,8 +169,8 @@ class TaskManager {
     updateTaskQueueOrder(current.row.id, current.row.queueOrder);
     updateTaskQueueOrder(neighbour.row.id, neighbour.row.queueOrder);
 
-    this.notifyChanged(current.row.id);
-    this.notifyChanged(neighbour.row.id);
+    // 两条任务的 queue_order 互换了，推一次整表就够
+    this.notifyChanged();
   }
 
   /** 用同样的入参重新提交一个已结束的任务 */
@@ -241,7 +244,7 @@ class TaskManager {
     this.runningId = next.row.id;
     markTaskRunning(next.row.id, '开始执行');
     next.row = getTaskRow(next.row.id) ?? next.row;
-    this.notifyChanged(next.row.id);
+    this.notifyChanged();
 
     void this.run(next);
   }
@@ -287,7 +290,7 @@ class TaskManager {
 
     finishTask(task.row.id, status, task.row.progress, message, result, error);
     task.row = getTaskRow(task.row.id) ?? task.row;
-    this.notifyChanged(task.row.id);
+    this.notifyChanged();
   }
 
   // ----------------------------------------------------------
@@ -328,11 +331,9 @@ class TaskManager {
     };
   }
 
-  private notifyChanged(id: number): void {
-    const task = this.tasks.get(id);
-    if (task) {
-      this.send(IPC.TASK_CHANGED, this.toView(task));
-    }
+  /** 推送整张列表：顺序只由主进程决定，渲染进程整表替换即可 */
+  private notifyChanged(): void {
+    this.send(IPC.TASK_CHANGED, this.list());
   }
 
   private send(channel: string, payload: unknown): void {
@@ -357,21 +358,21 @@ function buildTitle(type: TaskType, payload: TaskPayload): string {
   if (type === 'process') {
     return `批量选图 ${(payload as ProcessTaskPayload).groupIds.length} 个图片组`;
   }
+  if (type === 'similar') {
+    return '识别相似图片';
+  }
   return `导出 ${(payload as ExportTaskPayload).imageIds.length} 张图片`;
 }
 
-/** 列表排序权重：占用队列的排前面 */
+/** 列表分段权重：未开始 → 执行中（含暂停）→ 已完成 */
 function displayRank(status: TaskStatus): number {
-  if (status === 'running') {
+  if (status === 'pending') {
     return 0;
   }
-  if (status === 'paused') {
+  if (status === 'running' || status === 'paused') {
     return 1;
   }
-  if (status === 'pending') {
-    return 2;
-  }
-  return 3;
+  return 2;
 }
 
 function compareForDisplay(left: ActiveTask, right: ActiveTask): number {
@@ -379,11 +380,18 @@ function compareForDisplay(left: ActiveTask, right: ActiveTask): number {
   if (rank !== 0) {
     return rank;
   }
+
+  // 未开始的按队列顺序**倒排**：谁先开始谁靠下
   if (left.row.status === 'pending') {
-    return left.row.queueOrder - right.row.queueOrder;
+    return right.row.queueOrder - left.row.queueOrder || left.row.id - right.row.id;
   }
 
-  // 终态按提交时间倒序，最近结束的排前面
+  // 已完成的按开始时间倒序，最近开始的排前面；从没开始过的（排队时被取消）退回创建时间
+  const leftTime = left.row.startedAt ?? left.row.createdAt;
+  const rightTime = right.row.startedAt ?? right.row.createdAt;
+  if (leftTime !== rightTime) {
+    return leftTime < rightTime ? 1 : -1;
+  }
   return right.row.id - left.row.id;
 }
 

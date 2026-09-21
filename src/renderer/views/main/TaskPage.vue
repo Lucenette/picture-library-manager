@@ -13,7 +13,7 @@
       <el-table :data="pagedTasks" row-key="id">
         <el-table-column label="任务" min-width="260" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-tag :type="typeTag(row.type)" size="small" class="type-tag">{{ typeLabel(row.type) }}</el-tag>
+            <el-tag :class="`type-tag--${row.type}`" :type="typeTag(row.type)" size="small" class="type-tag">{{ typeLabel(row.type) }}</el-tag>
             <span>{{ row.title }}</span>
           </template>
         </el-table-column>
@@ -38,6 +38,18 @@
 
         <el-table-column label="耗时" width="110" align="center">
           <template #default="{ row }">{{ formatDuration(row) }}</template>
+        </el-table-column>
+
+        <el-table-column label="创建时间" width="170" align="center">
+          <template #default="{ row }">{{ row.createdAt || '—' }}</template>
+        </el-table-column>
+
+        <el-table-column label="开始时间" width="170" align="center">
+          <template #default="{ row }">{{ row.startedAt || '—' }}</template>
+        </el-table-column>
+
+        <el-table-column label="结束时间" width="170" align="center">
+          <template #default="{ row }">{{ row.finishedAt || '—' }}</template>
         </el-table-column>
 
         <el-table-column label="操作" width="240" fixed="right">
@@ -80,7 +92,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import type {
-  ExportTaskResult, ProcessTaskResult, ScanTaskResult, TaskStatus, TaskType, TaskView,
+  ExportTaskResult, SimilarTaskResult, ProcessTaskResult, ScanTaskResult, TaskStatus, TaskType, TaskView,
 } from '@common/types';
 import { useTasks } from '@/composables/useTasks';
 import { confirmDialog } from '@/services/dialog-service';
@@ -131,16 +143,21 @@ const STATUS_TAGS: Record<TaskStatus, 'info' | 'primary' | 'warning' | 'success'
   cancelled: 'info',
 };
 
+/** 任务类型标签的配色 */
+type TaskTagType = 'primary' | 'success' | 'warning' | 'info';
+
 const TYPE_LABELS: Record<TaskType, string> = {
   scan: '扫描',
   process: '选图',
   export: '导出',
+  similar: '识图',
 };
 
-const TYPE_TAGS: Record<TaskType, 'primary' | 'success' | 'warning'> = {
+const TYPE_TAGS: Record<TaskType, TaskTagType> = {
   scan: 'primary',
   process: 'success',
   export: 'warning',
+  similar: 'info',
 };
 
 function statusLabel(status: TaskStatus): string {
@@ -155,7 +172,7 @@ function typeLabel(type: TaskType): string {
   return TYPE_LABELS[type];
 }
 
-function typeTag(type: TaskType): 'primary' | 'success' | 'warning' {
+function typeTag(type: TaskType): TaskTagType {
   return TYPE_TAGS[type];
 }
 
@@ -187,6 +204,12 @@ function resultSummary(row: TaskView): string {
   if (row.type === 'process') {
     const process = result as ProcessTaskResult;
     return `成功 ${process.processed} · 失败 ${process.failed}`;
+  }
+
+  if (row.type === 'similar') {
+    const similar = result as SimilarTaskResult;
+    const skipped = similar.skipped > 0 ? ` · 跳过 ${similar.skipped}（没有感知哈希）` : '';
+    return `比对 ${similar.compared} 张 · 相同 ${similar.sameGroups} 组 · 相似 ${similar.similarGroups} 组${skipped}`;
   }
 
   const exported = result as ExportTaskResult;

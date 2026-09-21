@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import type { TaskMoveDirection, TaskPayload, TaskType, TaskView } from '@common/types';
+import type { TaskMoveDirection, TaskPayload, TaskSubmitResult, TaskType, TaskView } from '@common/types';
 
 /** 调用主进程的任务命令；每个命令都返回最新的任务列表 */
 function invoke(channel: string, ...args: unknown[]): Promise<TaskView[]> {
@@ -12,9 +12,9 @@ export function listTasks(): Promise<TaskView[]> {
   return invoke(IPC.TASK_LIST);
 }
 
-/** 提交任务 */
-export function submitTask(type: TaskType, payload: TaskPayload): Promise<TaskView[]> {
-  return invoke(IPC.TASK_SUBMIT, type, payload);
+/** 提交任务；额外返回新任务的 id */
+export function submitTask(type: TaskType, payload: TaskPayload): Promise<TaskSubmitResult> {
+  return ipcRenderer.invoke(IPC.TASK_SUBMIT, type, payload) as Promise<TaskSubmitResult>;
 }
 
 /** 取消尚未开始的任务 */

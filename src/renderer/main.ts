@@ -40,6 +40,7 @@ const router = createRouter({
     { path: '/prompt', name: 'prompt', component: PromptDialog },
     { path: '/file-viewer', name: 'fileViewer', component: FileViewerDialog },
     { path: '/script-list', name: 'scriptList', component: Dropdown },
+    { path: '/similar', name: 'similar', component: () => import('@/views/dialogs/SimilarDialog.vue') },
   ],
 });
 

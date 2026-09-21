@@ -275,7 +275,7 @@ export interface ScriptListOpenData extends ScriptListInitData {
 // ------------------------------------------------------------
 
 /** 任务类型 */
-export type TaskType = 'scan' | 'process' | 'export';
+export type TaskType = 'scan' | 'process' | 'export' | 'similar';
 
 /** 任务状态；paused 与 running 一样占用队列 */
 export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
@@ -298,7 +298,20 @@ export interface ExportTaskPayload {
   targetDir: string;
 }
 
-export type TaskPayload = ScanTaskPayload | ProcessTaskPayload | ExportTaskPayload;
+/** 识别相似图片：没有入参，比对的是第四页签里的全部图片 */
+export type SimilarTaskPayload = Record<string, never>;
+
+/** 识别相似图片的结果统计 */
+export interface SimilarTaskResult {
+  /** 参与比对的张数 */
+  compared: number;
+  /** 因为没有感知哈希而跳过的张数（老数据要重扫一次才有） */
+  skipped: number;
+  sameGroups: number;
+  similarGroups: number;
+}
+
+export type TaskPayload = ScanTaskPayload | ProcessTaskPayload | ExportTaskPayload | SimilarTaskPayload;
 
 /** 缩略图实际使用的解码引擎 */
 export type ThumbnailEngineName = 'sharp' | 'builtin';
@@ -315,6 +328,39 @@ export interface ScanTaskResult {
   thumbnailEngine: ThumbnailEngineName | 'none';
 }
 
+// ------------------------------------------------------------
+// 相似图片识别
+// ------------------------------------------------------------
+
+/** 相似图片结果里的一张图 */
+export interface SimilarMember {
+  filePath: string;
+  fileName: string;
+  /** 缩略图 Data URL，供界面直接显示 */
+  thumbnail: string | null;
+  width: number | null;
+  height: number | null;
+  /** 与同组锚点的汉明距离；锚点自己为 0 */
+  distance: number;
+}
+
+/** 一组相同或相似的图片 */
+export interface SimilarGroup {
+  /** same：彼此"相同"的图；similar：彼此"相似"但不是同一张的证据不足 */
+  kind: 'same' | 'similar';
+  members: SimilarMember[];
+}
+
+/** 相似图片识别的完整结果 */
+export interface SimilarData {
+  same: SimilarGroup[];
+  similar: SimilarGroup[];
+  /** 参与比对的张数 */
+  compared: number;
+  /** 因为没有感知哈希而跳过的张数（老数据要重扫一次才有） */
+  skipped: number;
+}
+
 export interface ProcessTaskResult {
   processed: number;
   failed: number;
@@ -325,7 +371,7 @@ export interface ExportTaskResult {
   failed: number;
 }
 
-export type TaskResult = ScanTaskResult | ProcessTaskResult | ExportTaskResult;
+export type TaskResult = ScanTaskResult | ProcessTaskResult | ExportTaskResult | SimilarTaskResult;
 
 /** 任务在数据库中的存储形态 */
 export interface TaskRow {
@@ -344,6 +390,12 @@ export interface TaskRow {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+/** 提交任务的返回：新任务的 id 与最新任务列表 */
+export interface TaskSubmitResult {
+  id: number;
+  tasks: TaskView[];
 }
 
 /** 推送给渲染进程的任务视图：payload/result 已解析，并附带可读标题 */
