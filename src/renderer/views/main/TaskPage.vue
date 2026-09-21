@@ -30,7 +30,11 @@
               :percentage="row.progress"
               :status="row.status === 'failed' ? 'exception' : row.status === 'done' ? 'success' : ''"
             />
-            <div class="progress-message" :class="{ 'progress-message--warn': hasFailure(row) }">
+            <div
+              class="progress-message"
+              :class="{ 'progress-message--warn': hasFailure(row) }"
+              :title="statusMessage(row)"
+            >
               {{ statusMessage(row) }}
             </div>
           </template>
