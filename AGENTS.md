@@ -7,7 +7,7 @@
 ## 项目速览
 
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
-- **技术栈**：Electron 40 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + sql.js（WASM SQLite）。
+- **技术栈**：Electron 40 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
 - **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在 exe 同级的 `data/` 下。
 
@@ -16,7 +16,7 @@
 | 命令 | 作用 | 备注 |
 |---|---|---|
 | `yarn dev` | 启动开发环境 | 主进程/preload 由 electron-vite 构建，渲染进程走 Vite |
-| `yarn typecheck` | `tsc`（主进程）+ `vue-tsc`（渲染进程） | 需先 `yarn install`，`vue-tsc` 是 devDependency |
+| `yarn typecheck` | `tsc`（主进程与 `common`）+ `vue-tsc`（渲染进程，含 `.vue`） | **`.vue` 的类型错误只有 `vue-tsc` 能发现**，只跑 `tsc` 会漏 |
 | `yarn build` | 打包 NSIS 安装程序 | 产物 `dist/PLManager_Setup_<version>.exe` |
 
 ---
@@ -38,9 +38,19 @@
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | |
-| `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖** |
+| `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
+| `docs/` | 设计说明、不变量、排障 | 尚未实施的方案——放进 `docs/roadmap/` |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`db` 也只被少数模块用，但它独立存在）。
+
+---
+
+## 文档与状态
+
+- 设计说明、不变量与排障写在 `docs/`；**尚未实施的方案写在 `docs/roadmap/`**，一个功能一个文件（kebab-case），状态取值见该目录的 README。
+- 文档写**为什么**与**约束**，不重抄代码已经表达清楚的"怎么做"。
+- 方案落地后更新 roadmap 中对应文件的状态并补上提交号，**不要删除文件**。
+- AI 或工具的临时工作状态（待办清单、缓存、会话记录）**不进版本库**，放各自的工具目录并由 `.gitignore` 忽略。
 
 ---
 
@@ -118,17 +128,29 @@ function upsertScript(...) {}
 
 渲染进程**不得**出现 `fs` / `path` / `crypto` / `jimp` / `image-size` 或图像解码器。需要文件读取、批量写库、脚本执行的工作一律放主进程。
 
-### 2. 主进程也不许长时间霸占主线程
+唯一例外是 `electron` 本身（`ipcRenderer` 等）：本项目渲染进程启用了 `nodeIntegration`、关闭了上下文隔离，全部 IPC 直接引用 `electron`。这是既有设计，不算违规；静态检查时把它与真正的 Node 内置模块区分开。
 
-浏览器进程被同步 CPU 占住，窗口就会拖不动。因此：
+### 2. 主进程不许长时间霸占主线程
 
+主进程就是浏览器的 browser process：窗口拖动、新建窗口、与渲染进程的合成 IPC 都依赖它的事件循环。
+它一旦被占住，界面立刻表现为卡顿（此时渲染进程本身可能仍然流畅）。因此：
+
+- **I/O 一律用异步 API**（`fs.promises.*`，等待发生在 libuv 线程池）。**不要用 `readdirSync` / `statSync` / `copyFileSync` / `readFileSync` 这类同步版本**：在网络盘（SMB）上每次调用都是一次网络往返，
+  单次就可能几十毫秒，而 `setImmediate` 分片救不了同步调用——调用没返回，事件循环就没有机会跑。
+  实测症状：遍历网络图库时 CPU 接近 0、网络占满、窗口拖动卡死。
 - 长循环必须分片并周期性让出事件循环（`await setImmediate`），见 `image/walk.ts` 的 `step()`。
 - **单次不可打断的重计算必须走工作线程**，见 `image/thumbnail-pool.ts`（`?nodeWorker` + `worker_threads`）。
-- 判断标准：一次调用若可能持续几十毫秒以上且中途无法让出，就别放主线程。
+- 判断标准：一次调用若可能持续几十毫秒以上且中途无法让出（无论 CPU 还是 I/O），就别放主线程。
 
-### 3. 数据库写入必须批量提交
+### 3. 数据库：事务只用于原子性
 
-写操作要包在 `beginBatch()` / `endBatch()` 之间，由后者统一落盘。落盘是"整库导出 + 原子替换"，逐条写会把一次扫描放大成几百次全库重写。
+存储是 Electron 内置的 `node:sqlite`（真实文件 + WAL），单条写入只追加日志，毫秒级完成。
+因此：
+
+- **`beginBatch()` / `endBatch()` 只用来表达"要么全做、要么全不做"**（例如"清空图库 + 写入新数据"），
+  不再需要为了减少落盘次数而攒批。
+- **逐单元提交是允许且鼓励的**：扫描现在是"一张图一条 INSERT、写一张落一张"，取消或崩溃都不会丢掉已完成的部分。
+- 不要手写落盘：sql.js 时代那套"整库导出 + 原子替换"（`persist()`、`writeFileAtomic`）已随迁移删除。
 
 ### 4. 新增 IPC 的归属
 
@@ -148,12 +170,28 @@ function upsertScript(...) {}
 
 只有**两个进程都在用**的东西才能进 `src/common/`。曾经出现过 `common/script.ts`、`common/image.ts` 只被主进程使用的错误，已被移回。
 
+### 7. 任务系统的不变量
+
+改动任务相关代码前，先确认以下几条不被破坏：
+
+- **状态变化推送整张列表**（`task:changed` 携带排好序的完整列表），渲染进程整表替换、不自行插入；
+  高频进度只发 `{ id, progress, message }` 就地打补丁（`task:progress`）。顺序的唯一来源是主进程。
+  曾经的实现让渲染进程把新任务插到列表末尾，导致顺序漂移与"卡在识别中"。
+- **提交命令额外返回新任务 id**（`TaskSubmitResult`）：它是唯一带额外返回值的命令，调用方不应去列表里猜。
+- **取消与强制结束必须经 `ctx.onAbort(...)` 立刻释放资源**（线程池、句柄），不能等 runner 走到下一个检查点：
+  worker 线程会阻止主进程退出，等待检查点会让"关窗不退出"复发。
+- 进度写库节流到不低于 1 秒；任务成功结束时进度记为 100%。
+- 新增一种任务照 `docs/ARCHITECTURE.md` 末尾的五步配方；runner 只在单元边界调用 `ctx.checkpoint()`。
+
 ---
 
 ## 已知环境限制
 
 - **`yarn build` 可能无法在受限沙箱里跑完**：esbuild 需要 `spawn` 子进程并用命名管道通信，沙箱会以 `spawn EPERM` 拒绝。遇到时如实说明"构建未验证"，不要假装通过，也不要绕过沙箱。
-- **`yarn typecheck` 依赖 `vue-tsc`**：未安装时会失败，先 `yarn install`。
+- **`vue-tsc` 已随依赖安装**（当前 5.9.3）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
+  只跑 `tsc` 就宣称"类型已检查"是错的——曾经因此漏掉一个缺失的 import，对应按钮一点就报 `ReferenceError`。
+- **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
+- **`yarn.lock` 被 `.gitignore` 忽略**：CI 无法使用冻结锁文件，依赖版本以 `package.json` 为准。
 - **`?nodeWorker` 是 electron-vite 的虚拟模块**：静态的"导入路径是否存在"检查工具会把它报成无法解析，这是正常的，不是错误。
 - **`ReplaceFileW EIO (Win32 32)`**：`yarn dev` 或 IDE 正在占用该文件，稍后重试即可。
 
@@ -164,8 +202,9 @@ function upsertScript(...) {}
 提交前至少做到：
 
 1. `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `common`。
-2. 渲染进程的 `.ts`：用一份只 include `src/common/**/*.ts` 与 `src/renderer/**/*.ts` 的临时 tsconfig 跑 `tsc`（`.vue` 不在其内）。
-3. `.vue`：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
+2. `node_modules/.bin/vue-tsc -p tsconfig.web.json` —— 覆盖渲染进程，**含 `.vue`**。
+   这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
+3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
 4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
 5. 导入解析：确认所有 `@/` 与 `@common/` 路径都能落到真实文件（`?nodeWorker` 除外）。
 6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
@@ -179,4 +218,6 @@ function upsertScript(...) {}
 - 不要擅自 `git commit` / `git push`，除非明确要求。
 - 不要顺手改动目录结构或文件位置（见开头"动手前的边界"）。
 - 不要改动 `data/` 下示例脚本的语义。
+- **不要改动 `package.json`、不要自行安装或卸载依赖**（包括 `yarn add`）：需要新依赖时说明理由与命令，等使用者执行。
+- **不要结束进程、不要改系统状态**（杀他人的进程、改环境变量、动用户目录）：只报告现象，由使用者决定。
 - 不要把"静默降级"当作容错：功能性失败要能被看见（写进任务错误、日志或界面提示），而不是悄悄退回慢路径。
