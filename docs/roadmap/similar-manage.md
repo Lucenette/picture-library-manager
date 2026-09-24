@@ -76,7 +76,7 @@
 |---|---|
 | `SimilarDialog.vue` | 选择状态、模式切换、汇总、确认按钮、点击打开查看器 |
 | `main/dialogs/similar.ts`、`common/ipcChannels.ts` | 新增「提交保留结果」的通道与载荷 |
-| `db.ts`、`sql.ts` | 删除未保留记录的语句（按 3.4 选定的方案）与结果同步更新 |
+| `database/db.ts`、`database/sql.ts` | 删除未保留记录的语句（按 3.4 选定的方案）与结果同步更新 |
 | `main/dialogs/image-viewer.ts` | 确认可由调用方传入任意文件列表（若已支持则无需改动） |
 
 ## 5. 风险

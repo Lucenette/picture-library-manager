@@ -2,7 +2,7 @@ import type { SimilarTaskResult } from '@common/types';
 import {
   beginBatch, clearSimilarData, endBatch, getSimilarInputRows,
   insertSimilarGroup, insertSimilarMember, insertSimilarRun,
-} from '@/db';
+} from '@/database/db';
 import { buildSimilarGroups } from '@/image/similar';
 import type { TaskContext } from '@/task/manager';
 

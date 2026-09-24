@@ -7,7 +7,7 @@ import type {
 import {
   deleteFinishedTasks, finishTask, getAllTasks, getGalleryById, getMaxQueueOrder, getTaskRow,
   insertTask, markTaskPaused, markTaskRunning, resumeTask, updateTaskProgress, updateTaskQueueOrder,
-} from '@/db';
+} from '@/database/db';
 import { TaskCancelledError, TaskControl } from '@/task/task-control';
 import { runExport } from '@/task/runners/export';
 import { runProcess } from '@/task/runners/process';

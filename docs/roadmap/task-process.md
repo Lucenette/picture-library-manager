@@ -49,7 +49,7 @@ src/
     ipcChannels.ts
     taskProtocol.ts       ← 新增：主进程与任务进程的消息及 RPC 定义
   main/                   主进程：窗口、数据库（唯一写者）、对外命令、编排
-    db.ts / sql.ts        唯一写者；仅此模块打开数据库连接
+    database/            唯一写者；仅此模块打开数据库连接
     window-manager.ts
     dialogs/              含新增的退出询问弹窗
     task/
@@ -120,7 +120,7 @@ ack 或超时。
 
 ## 6. 数据库写入：保持单一写者
 
-- 任务进程**不打开数据库**，全部读写经 `rpc` 交由主进程的 `db.ts` 执行。
+- 任务进程**不打开数据库**，全部读写经 `rpc` 交由主进程的 `database/db.ts` 执行。
 - 因此**不存在跨进程事务**：`beginBatch` 与 `endBatch` 对任务进程不可用。
   - scan 当前已是逐张自动提交，符合要求；
   - **process 与 export 目前包在 `beginBatch` 与 `endBatch` 之间，需改为逐单元提交**，这对续跑也更为正确。

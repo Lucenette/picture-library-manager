@@ -42,6 +42,7 @@ const windows = new Map<string, BrowserWindow>();
 
 /** 创建并注册窗口；同 id 的旧窗口会先被关闭 */
 export function create(id: string, config: WindowConfig): BrowserWindow {
+  const startedAt = Date.now();
   const previous = windows.get(id);
   if (previous && !previous.isDestroyed()) {
     windows.delete(id);
@@ -80,6 +81,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     }
   });
   enableDevTools(window, isControl);
+  logWindowTiming(window, id, startedAt);
 
   windows.set(id, window);
   return window;
@@ -124,13 +126,13 @@ export function closeAll(): void {
 // 具体窗口
 // ------------------------------------------------------------
 
-/** 主窗口 */
-export function createMain(): BrowserWindow {
+/** 主窗口；启动时可能要先展示迁移页，所以初始路由可指定 */
+export function createMain(route = '/'): BrowserWindow {
   const window = create('main', {
     width: 1400,
     height: 900,
     backgroundColor: '#1e1f22',
-    route: '/',
+    route,
   });
   // 主窗口关闭后图片查看器没有存在意义
   window.on('closed', () => close('viewer'));
@@ -300,8 +302,27 @@ function createWebPreferences(): WebPreferences {
     nodeIntegration: true,
     contextIsolation: false,
     sandbox: false,
+    // 本项目不做拼写检查，关掉可以省去每个渲染进程各自加载一次词典
+    spellcheck: false,
     webSecurity: app.isPackaged,
   };
+}
+
+/**
+ * 开发态记录窗口从创建到首帧的耗时。
+ *
+ * 用它判断一个窗口慢在哪一段：文档加载（JS 求值）还是首帧渲染；打包后不产生输出。
+ */
+function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): void {
+  if (app.isPackaged) {
+    return;
+  }
+  window.webContents.once('did-finish-load', () => {
+    console.log(`[窗口] ${id} 文档加载完成 ${Date.now() - startedAt}ms`);
+  });
+  window.once('ready-to-show', () => {
+    console.log(`[窗口] ${id} 首帧就绪 ${Date.now() - startedAt}ms`);
+  });
 }
 
 /** 开发态自动打开开发者工具，并支持 F12 切换 */

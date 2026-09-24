@@ -7,10 +7,14 @@ import { compileScriptModule } from '@/script/compile';
 import type {
   Character, Gallery, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
-  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
+  MigrationProgress, SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
-import { DDL_ALL, SQL } from '@/sql';
+import { runChangesets } from '@/database/changeset';
+import type { MigrationOutcome } from '@/database/changeset';
+import { initChangesetIpc } from '@/database/changeset-ipc';
+import { CHANGELOG_FILES } from '@/database/changesets';
+import { SQL } from '@/database/sql';
 
 // ------------------------------------------------------------
 // 常量
@@ -146,10 +150,10 @@ function getDataDir(): string {
 }
 
 /**
- * 打开（必要时创建）数据库并确保表结构就绪。
+ * 打开（必要时创建）数据库文件。
  *
- * 用 Node 内置的 SQLite：库是真实文件，单条 INSERT 只追加 WAL，
- * 不再需要「整库导出 + 整文件重写」那套落盘逻辑。
+ * 只负责开库与 pragma，不改动任何结构：结构由 changelog 里的 changeset 演进。
+ * 用 Node 内置的 SQLite：库是真实文件，单条 INSERT 只追加 WAL。
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
@@ -159,28 +163,21 @@ export function initDatabase(): void {
   db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
-
-  for (const ddl of DDL_ALL) {
-    db.exec(ddl);
-  }
-  ensureTaskTable();
 }
 
-/**
- * 确保任务表与当前代码一致。
- *
- * 上一版遗留的 task 表列名不同且从未启用，这里用列名做一次性兼容判断后重建；
- * 判断列名而不是无条件 DROP，是为了以后不会误删真实的任务历史。
- */
-function ensureTaskTable(): void {
-  const columns = queryAll<{ name: string }>('PRAGMA table_info(task)').map((column) => column.name);
-  if (columns.length > 0 && !columns.includes('queue_order')) {
-    db!.exec('DROP TABLE task');
-  }
-
-  db!.exec(SQL.CREATE_TASK);
-  db!.exec(SQL.CREATE_INDEX_TASK_STATUS);
-  db!.exec(SQL.CREATE_INDEX_TASK_ORDER);
+/** 执行待处理的 changeset，并在动库之前留一份备份 */
+export function runMigrations(
+  onProgress: (progress: MigrationProgress) => void,
+  shouldAbort?: () => boolean,
+): Promise<MigrationOutcome> {
+  return runChangesets({
+    db: db!,
+    dbPath,
+    backupsDir: join(getDataDir(), 'backups'),
+    files: CHANGELOG_FILES,
+    onProgress,
+    shouldAbort,
+  });
 }
 
 /** 关闭数据库，供退出前调用；WAL 会在关闭时合并回主文件 */
@@ -730,8 +727,10 @@ const DB_METHODS: Record<string, DbMethod> = {
   deleteProcessedImage,
 };
 
-/** 注册数据库 IPC 通道 */
+/** 注册数据库相关的全部 IPC 通道，含加载页用的那三条 changelog 通道 */
 export function initDbIpc(): void {
+  initChangesetIpc();
+
   ipcMain.handle(IPC.DB, (_event, method: string, ...args: unknown[]) => {
     const handler = DB_METHODS[method];
     if (!handler) {

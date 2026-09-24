@@ -1,6 +1,6 @@
 import { compileScriptModule } from '@/script/compile';
 import type { ScriptType } from '@common/types';
-import { getScriptById } from '@/db';
+import { getScriptById } from '@/database/db';
 
 /**
  * 在主进程中执行处理脚本的方法。

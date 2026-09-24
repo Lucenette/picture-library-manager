@@ -68,7 +68,7 @@
 |---|---|
 | `src/renderer/components/` | 新增平铺容器组件（封面、标题、附加信息、选中态、悬停操作） |
 | `GalleryPage.vue` / `CharacterPage.vue` | 视图切换、平铺渲染、选中状态与现有工具栏联动 |
-| `src/main/sql.ts` + `db.ts` | 新增「按图库或角色取代表缩略图」的查询 |
+| `src/main/database/`（`db.ts` + `sql.ts` + `changesets/`）` | 新增「按图库或角色取代表缩略图」的查询 |
 | `common/types.ts` | 按需补充返回行类型 |
 
 ## 5. 风险

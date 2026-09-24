@@ -56,18 +56,24 @@ import { useRoute } from 'vue-router';
 import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
 import { useTasks } from '@/composables/useTasks';
 
-/** 这些路由属于独立的原生子窗口，不套主窗口的导航骨架 */
+/** 这些路由不套主窗口的导航骨架：独立子窗口，以及启动阶段的迁移页 */
 const POPUP_ROUTES = [
   '/viewer', '/scan-config', '/batch-process', '/confirm', '/prompt', '/file-viewer', '/script-list', '/similar',
+  '/loading',
 ];
 
 const route = useRoute();
 const isPopup = computed(() => POPUP_ROUTES.includes(route.path));
 const activeMenu = computed(() => route.path);
 
-// 运行中与排队中的任务数，用角标挂在导航上
-const { runningCount, pendingCount } = useTasks();
-const activeTaskCount = computed(() => runningCount.value + pendingCount.value);
+// 只有主界面需要任务角标：迁移页在主进程注册任务通道之前就已加载，那时拉列表必然失败
+const tasks = isPopup.value ? null : useTasks();
+const activeTaskCount = computed(() => {
+  if (!tasks) {
+    return 0;
+  }
+  return tasks.runningCount.value + tasks.pendingCount.value;
+});
 </script>
 
 <style>

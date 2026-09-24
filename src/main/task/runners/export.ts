@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import type { ExportTaskPayload, ExportTaskResult } from '@common/types';
-import { getProcessedForExport, type ProcessedExportRow } from '@/db';
+import { getProcessedForExport, type ProcessedExportRow } from '@/database/db';
 import type { TaskContext } from '@/task/manager';
 
 /**

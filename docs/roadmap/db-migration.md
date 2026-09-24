@@ -1,6 +1,6 @@
 # 数据库版本升级
 
-**状态**：待实施
+**状态**：进行中（引擎、changelog、启动迁移页已实现，待提交与人工冒烟）
 **最后更新**：2026-09-24
 
 ---
@@ -32,7 +32,7 @@
 1. 结构变更与数据订正都以「版本化的 changeset」表达，按顺序执行，可重复、可审计；
 2. 每条 changeset 在独立事务内执行：失败即回滚、之前成功的保留，中断后能从下一条接着来；
 3. 执行前自动备份，可人工恢复；
-4. 启动时若存在待执行的 changeset，先在主窗口展示迁移进度，完成后再进主界面；
+4. 主窗口启动时先落在加载页，有变更就展示进度，完成后自动切回主界面；
 5. 库中记录了本应用不认识的 changeset 时给出提示，避免旧版本写入新结构。
 
 **非目标**
@@ -51,13 +51,13 @@
 |---|---|
 | `<databaseChangeLog>` | 根元素 |
 | `<changeSet id author>` | 一条 changeset，`id` 与 `author` 参与构成它的身份 |
-| `<comment>` | 迁移页上展示的标题 |
+| `<comment>` | 这条 changeset 的标题：写进账本，也在加载页上展示 |
 | `<sql>` | 要执行的 SQL，原样交给 SQLite |
 
 遇到其它标签、或 `<sql>` 带任何属性，一律报错。
 
 XML 正文里只有 `<` 与 `&` 需要转义，写成 `&lt;` 与 `&amp;`；引号只在属性值里才需要，`>` 在正文里合法。
-为此有两条硬性检查兜底，见 3.4。
+**这两条由写 changelog 的人保证，解析器不做校验**：漏写 `<` 可能报错，也可能被 XML 当成标签吞掉。
 
 ```xml
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
@@ -107,13 +107,13 @@ export const CHANGELOG_FILES: readonly ChangeLogFile[] = [
 
 执行顺序由两处显式决定：清单数组的顺序 → 文件内 `<changeSet>` 的文档顺序。
 
-### 3.4 解析：两条硬性检查
+### 3.4 解析
 
-使用 `@xmldom/xmldom`（W3C DOM 接口，零依赖）：
+使用 `@xmldom/xmldom`（W3C DOM 接口，零依赖）。解析器接上 `onError` 并抛错：它的默认行为是记一条日志
+后继续，返回的可能是半个文档。
 
-1. **必须接上 `onError` 并抛错**：该解析器默认只记一条日志就继续，返回的可能是半个文档。
-2. **`<sql>` 的内容只能是文本节点。** 解析出子元素即报错。正文里漏转义的 `<` 可能恰好凑成一段合法
-   标签（例如 `WHERE a <b AND c>b` 里的 `<b AND c>`），`textContent` 会把它吞掉，SQL 就变了样。
+除「缺 `id` / `author` / `<sql>`」以外不做校验——这三样缺了就没法构成一条能记账的 changeset，
+其余语法与转义由写 changelog 的人负责。
 
 ### 3.5 账本
 
@@ -137,15 +137,16 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 
 ### 3.6 执行流程
 
-在 `openDatabase()` 之后、创建主窗口之前：
+在 `initDatabase()` 之后、加载页切回主界面之前：
 
 1. 建账本表，读出已执行集合；
 2. 按顺序算出待执行的 changeset；
-3. 有待执行时，先 `PRAGMA wal_checkpoint(TRUNCATE)`，再把数据库复制到
+3. 有待执行时，先推一条进度（当前步骤记为「正在备份数据库」）——备份要复制整个库，不能让它空着；
+   然后 `PRAGMA wal_checkpoint(TRUNCATE)`，把数据库复制到
    `data/backups/pre-migration-<yyyyMMdd-HHmmss>.db`，保留最近 5 份。备份写不出来就中止；
 4. 逐条执行：`BEGIN` → `db.exec(这条的 sql 文本)` → 写账本 → `COMMIT`；抛错则 `ROLLBACK` →
    记一行 `failed` → 停止；
-5. 每条之间让出一次事件循环（`await setImmediate`），让迁移页有机会先画出来；同时检查主窗口是否已被关闭，
+5. 每条之间让出一次事件循环（`await setImmediate`），让加载页有机会先画出来；同时检查主窗口是否已被关闭，
    已关闭就立即收手；
 6. 进度 = 已完成的 changeset 数 / 总数，由主进程算好后推送。
 
@@ -154,25 +155,31 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 **边界**：changeset 只做集合式 SQL 与表结构变更；逐行、需要解码或文件 IO 的补数据（例如 phash
 回填）仍归任务系统。
 
-### 3.7 启动迁移页
+### 3.7 启动加载页
 
-- `createMain(route = '/')` 接收初始路由。有待执行 changeset 时主窗口先落在 `/migration`，否则直接落在 `/`；
-  健康库的启动路径与现在完全一致，不产生额外开销，也不会闪过一个页面。
+主窗口一律先落在 `/loading`：
+
+- 主窗口排在开库与注册通道**之前**：窗口的显示、渲染进程的启动、changelog 的执行三者重叠。
+  开库与注册通道合计十几毫秒，且都是同步代码，排在第一个 `await` 之前——渲染进程发来的 invoke 要等
+  主进程回到事件循环才会被派发，所以先建窗口再注册通道不存在竞态。
+- 启动流程只有一条路径，不需要预先判断有没有待执行的 changeset。正常启动时状态要么还没到、要么已是终态，
+  页面什么都不画，所以不会闪出加载页。
 - 页面显示进度条、当前 changeset 的标题、已完成与总数；失败时显示错误原因与备份路径，并提供「退出」。
 - 主进程推送 `CHANGESET_PROGRESS`；渲染进程挂载时先订阅推送、再 `invoke(CHANGESET_STATE)` 取一次快照，
-  因此「迁移比页面加载还快」时也能正确落到终态并切回主界面。
-- 迁移进行中主窗口不可关闭（`close` 事件 `preventDefault`）；失败后放开，关闭与「退出」等价。
+  因此「升级比页面加载还快」时也能拿到终态。
+- 读到终态后用 `router.replace('/')` 切回主界面——是 replace 不是 push，加载页不会留在历史里，后退键回不去。
+- 升级期间关掉窗口即退出应用：`before-quit` 会关库，正在执行的那条 changeset 随事务回滚。
 
 ### 3.8 什么会停下，什么不会
 
 | | 情形 |
 |---|---|
-| **会停下**（迁移页显示错误） | 文件解析失败、出现不支持的标签、`<sql>` 带属性、`<sql>` 里出现子元素、SQL 执行报错、备份写不出来 |
+| **会停下**（加载页显示错误） | changelog 解析失败、缺少 `id` / `author` / `<sql>`、SQL 执行报错、备份写不出来 |
 | **只提示**（`console.warn`，照常继续） | 账本里有当前代码不认识的身份（可能是降级到旧版本）、待执行的 changeset 排在已执行的之前（往已发布文件的中间插了东西） |
 
 ### 3.9 与唯一写者的关系
 
-迁移只在启动阶段执行，此时主窗口尚未创建、其它进程也未启动，不存在并发写入。
+迁移只在启动阶段执行，此时只有加载页窗口、其它进程也未启动，不存在并发写入。
 这也是对后续任何新增进程的约束：它们必须在主进程完成迁移之后才能打开数据库。
 
 ## 4. 改动清单
@@ -181,20 +188,20 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 `src/main/database/sql.ts`（由 `src/main/sql.ts` 搬入并删去建表语句）、
 `src/main/database/changeset.ts`、`src/main/database/changeset-ipc.ts`、
 `src/main/database/changesets/1.0.0.xml`、`src/main/database/changesets/index.ts`、
-`src/renderer/views/startup/MigrationPage.vue`、以及 `src/main/env.d.ts` 追加 `*?raw` 的模块声明。
+`src/renderer/views/startup/LoadingPage.vue`、以及 `src/main/env.d.ts` 追加 `*?raw` 的模块声明。
 
 **修改**
 
 | 文件 | 改动 |
 |---|---|
 | 8 处 `@/db` 导入 | 改为 `@/database/db` |
-| `src/main/database/db.ts` | `initDatabase()` 改为 `openDatabase()`；删除 `ensureTaskTable()` 与 `DDL_ALL` 循环；新增 `planChangesets()` / `runChangesets()` |
-| `src/main/index.ts` | `bootstrap()` 按 3.7 改写；启动失败时兜底 `dialog.showErrorBox` 并退出（只剩余「库根本打不开」这一种场景） |
+| `src/main/database/db.ts` | `initDatabase()` 不再建表，只开库与 pragma；删除 `ensureTaskTable()` 与 `DDL_ALL` 循环；新增 `runMigrations()`，changelog 的三条通道并入 `initDbIpc()` |
+| `src/main/index.ts` | `bootstrap()` 收敛成「开库 → 注册通道 → 建窗口（落 `/loading`）→ 跑迁移」；启动失败时兜底 `dialog.showErrorBox` 并退出（只剩余「库根本打不开」这一种场景） |
 | `src/main/window-manager.ts` | `createMain(route = '/')` |
-| `src/common/ipcChannels.ts` | 新增四条 `changeset:*` 通道 |
+| `src/common/ipcChannels.ts` | 新增三条 `changeset:*` 通道（state / progress / quit） |
 | `src/common/types.ts` | 新增 `MigrationProgress` |
-| `src/renderer/main.ts` | 新增 `/migration` 路由 |
-| `src/renderer/App.vue` | `/migration` 加入「不套导航骨架的路由」；`useTasks()` 收窄到非弹窗路由（迁移期间 `task:list` 尚未注册） |
+| `src/renderer/main.ts` | 新增 `/loading` 路由 |
+| `src/renderer/App.vue` | `/loading` 加入「不套导航骨架的路由」；`useTasks()` 只在主界面调用（任务角标只挂在那里） |
 
 ## 5. 风险
 

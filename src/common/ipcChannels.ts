@@ -70,4 +70,9 @@ export const IPC = {
   DROPDOWN_INIT: 'script-list:init',
   DROPDOWN_SELECT: 'script-list:select',
   DROPDOWN_SELECTED: 'script-list:selected',
+
+  // 数据库升级
+  CHANGESET_STATE: 'changeset:state',
+  CHANGESET_PROGRESS: 'changeset:progress',
+  CHANGESET_QUIT: 'changeset:quit',
 } as const;

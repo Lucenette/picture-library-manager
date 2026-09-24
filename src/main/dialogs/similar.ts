@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import { getSimilarData } from '@/db';
+import { getSimilarData } from '@/database/db';
 import { createSimilar } from '@/window-manager';
 
 /**

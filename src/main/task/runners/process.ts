@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { ImageGroupView, ProcessTaskPayload, ProcessTaskResult } from '@common/types';
 import {
   beginBatch, endBatch, getImageFilesByGroup, getImageGroupsViewByIds, upsertProcessedImage,
-} from '@/db';
+} from '@/database/db';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
 

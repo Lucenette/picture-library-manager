@@ -36,12 +36,13 @@
 | `src/common/` | **主进程与渲染进程都在用**的契约（类型、IPC 通道名） | 只被单进程使用的模块——放回该进程目录 |
 | `src/main/image/` | 图片处理流水线：目录遍历 + 解码线程池 | 业务语义（任务、进度、图库概念） |
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
+| `src/main/database/` | 开库、CRUD、changelog 迁移与账本、DB 的 IPC 调度 | 业务编排；建表语句——结构写在 `changesets/*.xml` 里 |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
 | `docs/` | 设计说明、不变量、排障 | 尚未实施的方案——放进 `docs/roadmap/` |
 
-判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`db` 也只被少数模块用，但它独立存在）。
+判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`database` 也只被少数模块用，但它独立存在）。
 
 ---
 
@@ -60,11 +61,11 @@
 
 ```ts
 // ❌
-import * as db from '@/db';
+import * as db from '@/database/db';
 export * from './types';
 
 // ✅
-import { getAllGalleries, insertTask } from '@/db';
+import { getAllGalleries, insertTask } from '@/database/db';
 ```
 
 ### 2. 控制语句必须带大括号
@@ -182,6 +183,18 @@ function upsertScript(...) {}
   worker 线程会阻止主进程退出，等待检查点会让"关窗不退出"复发。
 - 进度写库节流到不低于 1 秒；任务成功结束时进度记为 100%。
 - 新增一种任务照 `docs/ARCHITECTURE.md` 末尾的五步配方；runner 只在单元边界调用 `ctx.checkpoint()`。
+
+### 8. 数据库结构由 changelog 演进
+
+- 建表语句不进代码，写进 `src/main/database/changesets/<package.json 的版本号>.xml` 的 `<changeSet>` 里；
+  一条 changeset 用 `<comment>` 说明它做了什么。
+- **已发布的版本文件冻结**：新的结构变更写进新版本的文件。改一条已经执行过的 changeset 不会生效——
+  它会被账本判定为已跑过而跳过，而且没有任何校验会告诉你这件事。
+- 一条 changeset 的身份是 `(author, id, filename)`，`id` 用 20 位定长数字时间戳；账本表
+  `schema_migration` 记着哪些跑过了。**账本表由 `changeset.ts` 用代码创建，不要写进 changelog**：
+  账本不存在时，没有任何地方能记录「创建账本」这件事。
+- 结构与数据订正都写在这里；需要图片解码或文件 IO 的补数据仍归任务系统，不要塞进 changeset。
+- 转义由写的人负责：`<sql>` 里出现 `<` 写成 `&lt;`（漏写可能被 XML 当成标签吞掉），`&` 写成 `&amp;`。
 
 ---
 

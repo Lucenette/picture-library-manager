@@ -16,7 +16,7 @@
 | 任务独立进程与全任务断点续跑 | 待实施 | [task-process.md](./task-process.md) |
 | 任务剩余耗时估算 | 待实施 | [task-eta.md](./task-eta.md) |
 | 日志系统 | 待评审 | [logging.md](./logging.md) |
-| 数据库版本升级 | 待实施 | [db-migration.md](./db-migration.md) |
+| 数据库版本升级 | 进行中 | [db-migration.md](./db-migration.md) |
 | 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
 

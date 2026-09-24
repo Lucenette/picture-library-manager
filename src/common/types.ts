@@ -414,3 +414,20 @@ export interface TaskProgressEvent {
 
 /** 调整待执行任务顺序的方向 */
 export type TaskMoveDirection = 'up' | 'down';
+
+/** 数据库升级进度；百分比由主进程算好，界面只负责展示 */
+export interface MigrationProgress {
+  status: 'running' | 'succeeded' | 'failed';
+  /** 待执行的 changeset 总数 */
+  total: number;
+  /** 已完成的条数 */
+  done: number;
+  /** 整体百分比，0-100 */
+  percent: number;
+  /** 当前（或最后一条）changeset 的标题 */
+  currentTitle: string;
+  /** 失败原因；成功时为空串 */
+  error: string;
+  /** 升级前的备份路径；没有产生备份时为空串 */
+  backupPath: string;
+}

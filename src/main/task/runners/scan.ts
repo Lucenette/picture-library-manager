@@ -6,7 +6,7 @@ import type {
 import {
   beginBatch, clearGalleryData, endBatch, getGalleryById,
   insertCharacter, insertImageFiles, insertImageGroup, updateGalleryScannedAt,
-} from '@/db';
+} from '@/database/db';
 import { buildDirTree, collectImageFiles } from '@/image/walk';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';

@@ -10,110 +10,11 @@
  */
 export const SQL = {
   // ----------------------------------------------------------
-  // 建表
-  // ----------------------------------------------------------
-
-  CREATE_GALLERY: `CREATE TABLE IF NOT EXISTS gallery (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  root_path TEXT NOT NULL UNIQUE,
-  scanned_at TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-)`,
-
-  CREATE_CHARACTER: `CREATE TABLE IF NOT EXISTS character (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  gallery_id INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  source_path TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  UNIQUE(gallery_id, name)
-)`,
-
-  CREATE_IMAGE_GROUP: `CREATE TABLE IF NOT EXISTS image_group (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  character_id INTEGER NOT NULL,
-  dir_name TEXT NOT NULL,
-  dir_path TEXT NOT NULL UNIQUE,
-  file_count INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processed','excluded')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-)`,
-
-  CREATE_IMAGE_FILE: `CREATE TABLE IF NOT EXISTS image_file (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  image_group_id INTEGER NOT NULL,
-  file_name TEXT NOT NULL,
-  file_path TEXT NOT NULL UNIQUE,
-  file_size INTEGER,
-  width INTEGER,
-  height INTEGER,
-  extension TEXT NOT NULL,
-  thumbnail BLOB,
-  phash BLOB,
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-)`,
-
-  CREATE_PROCESS_SCRIPT: `CREATE TABLE IF NOT EXISTS process_script (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  file_path TEXT NOT NULL UNIQUE,
-  code TEXT NOT NULL,
-  brief TEXT NOT NULL DEFAULT '',
-  loaded_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-)`,
-
-  CREATE_SCRIPT_TYPE: `CREATE TABLE IF NOT EXISTS script_type (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  script_id INTEGER NOT NULL,
-  type TEXT NOT NULL,
-  UNIQUE(script_id, type)
-)`,
-
-  CREATE_PROCESSED_IMAGE: `CREATE TABLE IF NOT EXISTS processed_image (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  image_group_id INTEGER NOT NULL UNIQUE,
-  character_id INTEGER NOT NULL,
-  gallery_id INTEGER NOT NULL,
-  original_path TEXT NOT NULL,
-  selected_file TEXT NOT NULL,
-  script_id INTEGER,
-  confirmed_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
-)`,
-
-  CREATE_INDEX_IMAGE_FILE_GROUP: 'CREATE INDEX IF NOT EXISTS idx_image_file_group ON image_file(image_group_id)',
-  CREATE_INDEX_PROCESSED_CHARACTER: 'CREATE INDEX IF NOT EXISTS idx_processed_character ON processed_image(character_id)',
-  CREATE_INDEX_PROCESSED_GALLERY: 'CREATE INDEX IF NOT EXISTS idx_processed_gallery ON processed_image(gallery_id)',
-
-  // ----------------------------------------------------------
   // 相似图片识别结果
   //
   // 只保留最近一次识别：重跑时先清空三张表再写入，避免结果无限增长。
   // 成员只存路径与距离，缩略图等信息读的时候再 join image_file。
   // ----------------------------------------------------------
-
-  CREATE_SIMILAR_RUN: `CREATE TABLE IF NOT EXISTS similar_run (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  compared INTEGER NOT NULL,
-  skipped INTEGER NOT NULL
-)`,
-  CREATE_SIMILAR_GROUP: `CREATE TABLE IF NOT EXISTS similar_group (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id INTEGER NOT NULL,
-  kind TEXT NOT NULL,
-  size INTEGER NOT NULL
-)`,
-  CREATE_SIMILAR_MEMBER: `CREATE TABLE IF NOT EXISTS similar_member (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  group_id INTEGER NOT NULL,
-  file_path TEXT NOT NULL,
-  distance INTEGER NOT NULL
-)`,
-  CREATE_INDEX_SIMILAR_GROUP_RUN: 'CREATE INDEX IF NOT EXISTS idx_similar_group_run ON similar_group(run_id)',
-  CREATE_INDEX_SIMILAR_MEMBER_GROUP: 'CREATE INDEX IF NOT EXISTS idx_similar_member_group ON similar_member(group_id)',
 
   CLEAR_SIMILAR_MEMBERS: 'DELETE FROM similar_member',
   CLEAR_SIMILAR_GROUPS: 'DELETE FROM similar_group',
@@ -229,24 +130,6 @@ export const SQL = {
   // 后台任务
   // ----------------------------------------------------------
 
-  CREATE_TASK: `CREATE TABLE IF NOT EXISTS task (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','paused','done','failed','cancelled')),
-  queue_order INTEGER NOT NULL DEFAULT 0,
-  progress INTEGER NOT NULL DEFAULT 0,
-  message TEXT NOT NULL DEFAULT '',
-  payload TEXT NOT NULL DEFAULT '{}',
-  result TEXT NOT NULL DEFAULT '',
-  error TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  started_at TEXT,
-  finished_at TEXT
-)`,
-
-  CREATE_INDEX_TASK_STATUS: 'CREATE INDEX IF NOT EXISTS idx_task_status ON task(status)',
-  CREATE_INDEX_TASK_ORDER: 'CREATE INDEX IF NOT EXISTS idx_task_queue_order ON task(queue_order)',
-
   INSERT_TASK: 'INSERT INTO task (type, queue_order, payload) VALUES (?, ?, ?)',
   SELECT_TASKS_ALL: 'SELECT * FROM task ORDER BY queue_order, id',
   SELECT_MAX_QUEUE_ORDER: 'SELECT COALESCE(MAX(queue_order), 0) AS maxQueueOrder FROM task',
@@ -272,22 +155,3 @@ export const SQL = {
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
 };
-
-/** 全部建表语句，按外键依赖顺序排列 */
-export const DDL_ALL: string[] = [
-  SQL.CREATE_GALLERY,
-  SQL.CREATE_CHARACTER,
-  SQL.CREATE_IMAGE_GROUP,
-  SQL.CREATE_IMAGE_FILE,
-  SQL.CREATE_INDEX_IMAGE_FILE_GROUP,
-  SQL.CREATE_PROCESS_SCRIPT,
-  SQL.CREATE_SCRIPT_TYPE,
-  SQL.CREATE_PROCESSED_IMAGE,
-  SQL.CREATE_INDEX_PROCESSED_CHARACTER,
-  SQL.CREATE_INDEX_PROCESSED_GALLERY,
-  SQL.CREATE_SIMILAR_RUN,
-  SQL.CREATE_SIMILAR_GROUP,
-  SQL.CREATE_INDEX_SIMILAR_GROUP_RUN,
-  SQL.CREATE_SIMILAR_MEMBER,
-  SQL.CREATE_INDEX_SIMILAR_MEMBER_GROUP,
-];

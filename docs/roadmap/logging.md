@@ -96,7 +96,7 @@
 | **新增** `src/main/log/ipc.ts` | 渲染进程的 `log:write` 通道 |
 | `common/ipcChannels.ts` | 增加 `LOG_WRITE` |
 | `src/main/index.ts` | 启动早期初始化，退出前 flush |
-| 既有模块 | 将 `console.*` 替换为 logger（`db.ts`、`task/*`、`image/*`、`dialogs/*`） |
+| 既有模块 | 将 `console.*` 替换为 logger（`database/db.ts`、`task/*`、`image/*`、`dialogs/*`） |
 
 ## 5. 风险
 
