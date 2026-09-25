@@ -2,7 +2,8 @@
 
 本目录收录**尚未开始或正在进行**的功能方案，一个功能一个文件，文件名使用 kebab-case 且与功能同名。
 
-功能落地后，将文件中的状态改为 `已实施` 并补上提交号；文件保留在原处，历史由 git 记录。
+功能落地后，将文件中的状态改为 `已实施` 并补上提交号，然后 `git mv` 到 [../design/](../design/) 作为该子系统的设计说明。
+本目录只保留尚未完成的事项——已完成的文档不删除，只是换个地方继续被读。
 
 - 结构性说明（目录为何如此划分）见 [ARCHITECTURE.md](../ARCHITECTURE.md)
 - 代码与目录的硬性约定见 [AGENTS.md](../../AGENTS.md)
@@ -16,7 +17,6 @@
 | 任务独立进程与全任务断点续跑 | 待实施 | [task-process.md](./task-process.md) |
 | 任务剩余耗时估算 | 待实施 | [task-eta.md](./task-eta.md) |
 | 日志系统 | 待评审 | [logging.md](./logging.md) |
-| 数据库版本升级 | 已实施 | [db-migration.md](./db-migration.md) |
 | 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
 
