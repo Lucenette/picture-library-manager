@@ -18,6 +18,7 @@
 | `yarn dev` | 启动开发环境 | 主进程/preload 由 electron-vite 构建，渲染进程走 Vite |
 | `yarn typecheck` | `tsc`（主进程与 `common`）+ `vue-tsc`（渲染进程，含 `.vue`） | **`.vue` 的类型错误只有 `vue-tsc` 能发现**，只跑 `tsc` 会漏 |
 | `yarn build` | 打包 NSIS 安装程序 | 产物 `dist/PLManager_Setup_<version>.exe` |
+| `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 
 ---
 
@@ -50,6 +51,7 @@
 
 - 设计说明、不变量与排障写在 `docs/`；**尚未实施的方案写在 `docs/roadmap/`**，一个功能一个文件（kebab-case），状态取值见该目录的 README。
 - 文档写**为什么**与**约束**，不重抄代码已经表达清楚的"怎么做"。
+- 各层文档的边界与归属见 `docs/README.md`；新增或修订文档前先在那里找到位置。
 - 方案落地后更新 roadmap 中对应文件的状态并补上提交号，再用 `git mv` 把它挪到 `docs/design/` 作为该子系统的
   设计说明——**不要删除文件**，也不要让它留在路线图里冒充未完成事项。
 - AI 或工具的临时工作状态（待办清单、缓存、会话记录）**不进版本库**，放各自的工具目录并由 `.gitignore` 忽略。
@@ -222,6 +224,7 @@ function upsertScript(...) {}
 4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
 5. 导入解析：确认所有 `@/` 与 `@common/` 路径都能落到真实文件（`?nodeWorker` 除外）。
 6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
+7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 

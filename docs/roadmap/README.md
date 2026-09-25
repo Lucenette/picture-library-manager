@@ -7,6 +7,7 @@
 
 - 结构性说明（目录为何如此划分）见 [ARCHITECTURE.md](../ARCHITECTURE.md)
 - 代码与目录的硬性约定见 [AGENTS.md](../../AGENTS.md)
+- 各层文档的分工与边界见 [文档地图](../README.md)
 
 本目录只回答三个问题：做什么、为什么、怎么做。
 
