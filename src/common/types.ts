@@ -415,6 +415,17 @@ export interface TaskProgressEvent {
 /** 调整待执行任务顺序的方向 */
 export type TaskMoveDirection = 'up' | 'down';
 
+/**
+ * 仿原生浮窗的种类。
+ *
+ * 所有浮窗共用同一个窗口（同一时刻只可能有一个可见），靠 kind 切换渲染哪个组件；
+ * 新增一种浮窗就在这里加一个字面量，并在渲染进程的 PopupHost 里登记对应组件。
+ */
+export type PopupKind = 'script-list';
+
+/** 推给浮窗宿主的数据：kind 决定渲染哪个组件，payload 是那个组件自己的入参 */
+export type PopupShowData = { kind: 'script-list'; payload: ScriptListInitData };
+
 /** 数据库升级进度；百分比由主进程算好，界面只负责展示 */
 export interface MigrationProgress {
   status: 'running' | 'succeeded' | 'failed';

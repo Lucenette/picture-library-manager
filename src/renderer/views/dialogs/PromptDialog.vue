@@ -24,14 +24,17 @@ const inputEl = ref<{ focus: () => void } | null>(null);
 /** 主进程下发的完整初始化数据，确认时要原样带回，用于区分调用方 */
 let initData: PromptInitData | null = null;
 
-function loadInitData(): void {
-  ipcRenderer.once(IPC.PROMPT_INIT, (_event, data: PromptInitData) => {
-    title.value = data.title;
-    placeholder.value = data.placeholder ?? '';
-    value.value = data.value ?? '';
-    initData = data;
-    nextTick(() => inputEl.value?.focus());
-  });
+/** 进窗口后自己去主进程取初始化数据 */
+async function loadInitData(): Promise<void> {
+  const data = (await ipcRenderer.invoke(IPC.PROMPT_INIT)) as PromptInitData | null;
+  if (!data) {
+    return;
+  }
+  title.value = data.title;
+  placeholder.value = data.placeholder ?? '';
+  value.value = data.value ?? '';
+  initData = data;
+  nextTick(() => inputEl.value?.focus());
 }
 
 function confirm(): void {

@@ -44,13 +44,15 @@ const files = ref<ImageFile[]>([]);
 const groupName = ref('');
 const groupDirPath = ref('');
 
-/** 主进程在窗口加载完成后下发初始化数据 */
-function loadInitData(): void {
-  ipcRenderer.once(IPC.FILE_VIEWER_INIT, (_event, data: FileViewerInitData) => {
-    files.value = data.files;
-    groupName.value = data.groupName;
-    groupDirPath.value = data.groupDirPath;
-  });
+/** 进窗口后自己去主进程取初始化数据 */
+async function loadInitData(): Promise<void> {
+  const data = (await ipcRenderer.invoke(IPC.FILE_VIEWER_INIT)) as FileViewerInitData | null;
+  if (!data) {
+    return;
+  }
+  files.value = data.files;
+  groupName.value = data.groupName;
+  groupDirPath.value = data.groupDirPath;
 }
 
 /** 相对图片组目录展示，避免整条绝对路径占满列宽 */

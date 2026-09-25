@@ -4,6 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>二次元壁纸图库管理器</title>
+    <style>
+      /*
+       * 外壳基础样式，必须内联。
+       *
+       * 外链 CSS 与组件样式（含各窗口自己的深色背景）都晚于首次绘制，页面又是按需加载的，
+       * 少了这一段：小窗口会先闪白底 → 出现滚动条 → 才变深色。
+       * 这里把「深色、无边距、不溢出」定死在文档上，任何窗口的第一帧就是对的。
+       * 各页面自己的滚动由组件内部的滚动容器负责（如 .app-main 的 overflow-y）。
+       */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--win-bg, #1e1f22);
+        color: #d8dadd;
+      }
+
+      #app {
+        height: 100%;
+      }
+    </style>
+    <script>
+      /*
+       * 窗口自己的底色由主进程作为查询参数带进来（见 window-manager 的 getRouteUrl）。
+       *
+       * 不能在这里写死一个颜色：下拉浮窗是 #2b2d30、图片查看器是 #0d0d0d，写死的话它们首帧会闪
+       * 一下别的颜色，而且主题一改这个值就过期了。放在样式之后、body 解析之前设置变量，
+       * 保证首帧就是窗口本来的颜色。
+       */
+      const winBackground = new URLSearchParams(window.location.search).get('bg');
+      if (winBackground) {
+        document.documentElement.style.setProperty('--win-bg', winBackground);
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

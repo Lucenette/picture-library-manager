@@ -27,14 +27,16 @@ const galleryName = ref('');
 const galleryCount = ref(1);
 const galleryIds = ref<number[]>([]);
 
-/** 主进程在窗口加载完成后下发初始化数据 */
-function loadInitData(): void {
-  ipcRenderer.once(IPC.SCAN_CONFIG_INIT, (_event, data: ScanConfigInitData) => {
-    scripts.value = data.scripts;
-    galleryName.value = data.galleryName;
-    galleryCount.value = data.galleryCount;
-    galleryIds.value = data.galleryIds;
-  });
+/** 进窗口后自己去主进程取初始化数据 */
+async function loadInitData(): Promise<void> {
+  const data = (await ipcRenderer.invoke(IPC.SCAN_CONFIG_INIT)) as ScanConfigInitData | null;
+  if (!data) {
+    return;
+  }
+  scripts.value = data.scripts;
+  galleryName.value = data.galleryName;
+  galleryCount.value = data.galleryCount;
+  galleryIds.value = data.galleryIds;
 }
 
 async function confirm(): Promise<void> {

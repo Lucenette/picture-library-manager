@@ -1,7 +1,9 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScriptListOpenData } from '@common/types';
-import { createDropdown } from '@/window-manager';
+
+import { hidePopup, showPopup } from '@/dialogs/control/popup';
 
 /** 浮窗与控件之间的间距 */
 const LIST_MARGIN = 10;
@@ -9,7 +11,7 @@ const LIST_MARGIN = 10;
 /** 浮窗距屏幕边缘的安全距离 */
 const SCREEN_SAFE_MARGIN = 20;
 
-/** 注册脚本下拉浮窗 */
+/** 注册脚本下拉浮窗：内容交给浮窗宿主渲染，这里只负责算位置与转交结果 */
 export function initDropdown(): void {
   ipcMain.handle(IPC.DROPDOWN_OPEN, (event, data: ScriptListOpenData) => {
     const parentWindow = BrowserWindow.fromWebContents(event.sender);
@@ -18,16 +20,11 @@ export function initDropdown(): void {
     }
 
     const position = resolveListPosition(parentWindow, data);
-    const listWindow = createDropdown(
+    showPopup(
       parentWindow,
-      position.x,
-      position.y,
-      data.controlRect.width,
-      data.listHeight,
+      { x: position.x, y: position.y, width: data.controlRect.width, height: data.listHeight },
+      { kind: 'script-list', payload: data },
     );
-    listWindow.webContents.once('did-finish-load', () => {
-      listWindow.webContents.send(IPC.DROPDOWN_INIT, data);
-    });
   });
 
   ipcMain.handle(IPC.DROPDOWN_SELECT, (event, id: number) => {
@@ -35,6 +32,7 @@ export function initDropdown(): void {
     if (parent) {
       parent.webContents.send(IPC.DROPDOWN_SELECTED, id);
     }
+    hidePopup();
   });
 }
 

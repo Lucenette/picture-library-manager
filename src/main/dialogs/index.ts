@@ -1,6 +1,7 @@
 import { initBatchProcess } from '@/dialogs/batch-process';
 import { initConfirm } from '@/dialogs/confirm';
 import { initDropdown } from '@/dialogs/control/dropdown';
+import { initPopup } from '@/dialogs/control/popup';
 import { initFileViewer } from '@/dialogs/file-viewer';
 import { initImageViewer } from '@/dialogs/image-viewer';
 import { initPrompt } from '@/dialogs/prompt';
@@ -18,5 +19,6 @@ export function initDialogs(): void {
   initPrompt();
   initFileViewer();
   initSimilar();
+  initPopup();
   initDropdown();
 }

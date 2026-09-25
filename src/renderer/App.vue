@@ -58,7 +58,7 @@ import { useTasks } from '@/composables/useTasks';
 
 /** 这些路由不套主窗口的导航骨架：独立子窗口，以及启动阶段的迁移页 */
 const POPUP_ROUTES = [
-  '/viewer', '/scan-config', '/batch-process', '/confirm', '/prompt', '/file-viewer', '/script-list', '/similar',
+  '/viewer', '/scan-config', '/batch-process', '/confirm', '/prompt', '/file-viewer', '/popup', '/similar',
   '/loading',
 ];
 

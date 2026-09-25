@@ -14,6 +14,9 @@ export function initConfirm(): void {
   /** 按弹窗渲染进程 id 记录它的作答回调 */
   const answers = new Map<number, (confirmed: boolean) => void>();
 
+  /** 待弹窗自己来取的初始数据 */
+  const pending = new Map<number, ConfirmDialogData>();
+
   ipcMain.handle(IPC.CONFIRM_OPEN, (_event, data: ConfirmDialogData) => {
     const window = createConfirm();
     const rendererId = window.webContents.id;
@@ -38,13 +41,17 @@ export function initConfirm(): void {
     };
 
     answers.set(rendererId, settle);
-
-    window.webContents.once('did-finish-load', () => {
-      window.webContents.send(IPC.CONFIRM_INIT, data);
-    });
+    pending.set(rendererId, data);
     // 窗口被直接关掉时按「取消」处理
-    window.on('closed', () => settle(false));
+    window.on('closed', () => {
+      settle(false);
+      pending.delete(rendererId);
+    });
   });
+
+  // 初始数据由弹窗挂载后自己来取（invoke），主进程不在 did-finish-load 时推送：
+  // 路由按需加载后组件挂载会晚于那个事件，推过去的消息会丢
+  ipcMain.handle(IPC.CONFIRM_INIT, (event) => pending.get(event.sender.id) ?? null);
 
   ipcMain.handle(IPC.CONFIRM_SUBMIT, (event, confirmed: boolean) => {
     const settle = answers.get(event.sender.id);

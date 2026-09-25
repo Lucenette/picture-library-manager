@@ -24,12 +24,14 @@ const scriptId = ref<number | null>(null);
 const scripts = ref<ScriptOption[]>([]);
 const count = ref(0);
 
-/** 主进程在窗口加载完成后下发初始化数据 */
-function loadInitData(): void {
-  ipcRenderer.once(IPC.BATCH_PROCESS_INIT, (_event, data: BatchProcessInitData) => {
-    scripts.value = data.scripts;
-    count.value = data.count;
-  });
+/** 进窗口后自己去主进程取初始化数据 */
+async function loadInitData(): Promise<void> {
+  const data = (await ipcRenderer.invoke(IPC.BATCH_PROCESS_INIT)) as BatchProcessInitData | null;
+  if (!data) {
+    return;
+  }
+  scripts.value = data.scripts;
+  count.value = data.count;
 }
 
 async function confirm(): Promise<void> {

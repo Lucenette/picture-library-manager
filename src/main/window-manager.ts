@@ -27,6 +27,15 @@ interface WindowConfig {
   resizable?: boolean;
   /** 原生控件窗口（下拉浮窗等），不打开开发者工具 */
   isControl?: boolean;
+  /** 创建时是否显示；false 表示由调用方自己决定何时 show()（复用型窗口，如下拉浮窗） */
+  visible?: boolean;
+  /**
+   * 等首帧画好再显示窗口。
+   *
+   * 窗口先可见、合成器还没画第一帧时，用户看到的是一个空白浅色框——比"晚一两百毫秒但一出现就是
+   * 完整的"更难受。主窗口不用这个：它要尽早出现，而且空白深色框本来就是正常的启动观感（接着会有加载页）。
+   */
+  showWhenReady?: boolean;
 }
 
 // ------------------------------------------------------------
@@ -52,11 +61,15 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   const parent = config.parentId ? windows.get(config.parentId) : undefined;
   const frame = config.frame ?? true;
   const isControl = config.isControl ?? false;
+  const showWhenReady = config.showWhenReady ?? false;
+  const visible = config.visible ?? true;
 
   const window = new BrowserWindow({
+    show: visible,
     width: config.width,
     height: config.height,
-    backgroundColor: config.backgroundColor,
+    // 兜底给深色：Electron 默认是白的，漏传就会在文档绘制前闪一下白
+    backgroundColor: config.backgroundColor ?? '#1e1f22',
     title: config.title,
     parent,
     modal: Boolean(parent && config.modal),
@@ -73,8 +86,12 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     webPreferences: createWebPreferences(),
   });
 
+  if (showWhenReady && visible) {
+    window.once('ready-to-show', () => window.show());
+  }
+
   window.setMenu(null);
-  window.loadURL(getRouteUrl(config.route));
+  window.loadURL(getRouteUrl(config.route, config.backgroundColor));
   window.on('closed', () => {
     if (windows.get(id) === window) {
       windows.delete(id);
@@ -147,31 +164,40 @@ export function createViewer(): BrowserWindow {
     backgroundColor: '#0d0d0d',
     title: '图片查看器',
     route: '/viewer',
+    showWhenReady: true,
   });
 }
 
-/** 脚本下拉浮窗，定位到父窗口中的控件下方或上方 */
-export function createDropdown(
-  parent: BrowserWindow,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): BrowserWindow {
-  const window = create('script-list', {
-    width,
-    height,
+/**
+ * 仿原生浮窗的宿主窗口。
+ *
+ * 所有浮窗（脚本下拉，以后的右键菜单等）共用这一个窗口：同一时刻只可能有一个可见，没必要为
+ * 每种浮窗各留一个渲染进程。与其他窗口不同，它**建好后一直复用**——渲染进程只启动一次，
+ * 之后每次展开都只是换内容、重新定位并显示。每次点开都新起一个渲染进程要等一百多毫秒，
+ * 浮窗这种控件等不起。
+ *
+ * 建好时默认隐藏；父窗口、坐标与要渲染的内容由 dialogs/control/popup.ts 在每次展开时设置。
+ */
+export function ensurePopup(): BrowserWindow {
+  const existing = get('popup');
+  if (existing) {
+    return existing;
+  }
+
+  const window = create('popup', {
+    width: 200,
+    height: 120,
     backgroundColor: '#2b2d30',
-    route: '/script-list',
-    parentId: getId(parent) || 'main',
-    modal: false,
+    route: '/popup',
     frame: false,
     minimizable: false,
     maximizable: false,
     resizable: false,
     isControl: true,
+    visible: false,
   });
-  window.setPosition(x, y);
+  // 失焦即收起。可见性由主进程掌握，渲染进程不销毁这个窗口
+  window.on('blur', () => window.hide());
   return window;
 }
 
@@ -270,6 +296,7 @@ export function createSimilar(): BrowserWindow {
     backgroundColor: '#1e1f22',
     title: '相似图片',
     route: '/similar',
+    showWhenReady: true,
     parentId: 'main',
     modal: false,
     frame: false,
@@ -282,13 +309,19 @@ export function createSimilar(): BrowserWindow {
 // 内部工具
 // ------------------------------------------------------------
 
-/** 渲染进程地址：开发态走 Vite 服务，打包后走本地文件 */
-function getRouteUrl(route: string): string {
+/**
+ * 渲染进程地址：开发态走 Vite 服务，打包后走本地文件。
+ *
+ * 顺带把窗口自己的底色作为查询参数带上，渲染进程的首帧就能用它作背景，
+ * 不必等组件样式到位（否则下拉浮窗、图片查看器会先闪一下默认色）。
+ */
+function getRouteUrl(route: string, background?: string): string {
+  const query = background ? `?bg=${encodeURIComponent(background)}` : '';
   if (process.env.ELECTRON_RENDERER_URL) {
-    return `${process.env.ELECTRON_RENDERER_URL}#${route}`;
+    return `${process.env.ELECTRON_RENDERER_URL}${query}#${route}`;
   }
   const indexHtml = resolve(__dirname, '../renderer/index.html');
-  return `${pathToFileURL(indexHtml).href}#${route}`;
+  return `${pathToFileURL(indexHtml).href}${query}#${route}`;
 }
 
 /**
@@ -325,7 +358,12 @@ function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): 
   });
 }
 
-/** 开发态自动打开开发者工具，并支持 F12 切换 */
+/**
+ * 开发态自动打开开发者工具，并支持 F12 切换。
+ *
+ * 每个窗口都自动开一个 detached DevTools 是**有意为之**（使用者的开发习惯），不是性能疏忽，
+ * 不要当成"窗口慢"的原因删掉：它只在开发态生效，打包后完全不执行。
+ */
 function enableDevTools(window: BrowserWindow, isControl: boolean): void {
   if (app.isPackaged || isControl) {
     return;

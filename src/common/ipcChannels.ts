@@ -65,11 +65,15 @@ export const IPC = {
   SIMILAR_OPEN: 'similar:open',
   SIMILAR_DATA: 'similar:data',
 
-  // 脚本下拉浮窗
+  // 脚本下拉浮窗（内容由浮窗宿主渲染）
   DROPDOWN_OPEN: 'script-list:open',
-  DROPDOWN_INIT: 'script-list:init',
   DROPDOWN_SELECT: 'script-list:select',
   DROPDOWN_SELECTED: 'script-list:selected',
+
+  // 仿原生浮窗宿主：一个窗口服务全部浮窗，内容与位置在每次展开时推给它
+  POPUP_SHOW: 'popup:show',
+  POPUP_STATE: 'popup:state',
+  POPUP_HIDE: 'popup:hide',
 
   // 数据库升级
   CHANGESET_STATE: 'changeset:state',
