@@ -95,6 +95,7 @@ if (app.requestSingleInstanceLock()) {
     taskManager.shutdown();
     closeDatabase();
   });
+  // 所有窗口关闭后退出。主窗口关闭时窗口管理器会先关掉其余窗口，所以这条一定会等到
   app.on('window-all-closed', () => {
     closeAll();
     app.quit();

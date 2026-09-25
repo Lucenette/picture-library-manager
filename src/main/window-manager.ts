@@ -151,8 +151,10 @@ export function createMain(route = '/'): BrowserWindow {
     backgroundColor: '#1e1f22',
     route,
   });
-  // 主窗口关闭后图片查看器没有存在意义
-  window.on('closed', () => close('viewer'));
+  // 主窗口是应用的生命周期锚点：它一关，其余窗口（查看器、各类弹窗、常驻的浮窗宿主）都不该再存在。
+  // 由注册表统一关掉（此时 main 已被 create() 的 closed 回调移出注册表）——只关查看器是不够的：
+  // 浮窗宿主建好后从不销毁，留着它就永远等不到 window-all-closed，进程会带着一个看不见的窗口挂着。
+  window.on('closed', () => closeAll());
   return window;
 }
 
