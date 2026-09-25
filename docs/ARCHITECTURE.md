@@ -11,7 +11,7 @@
 ```
 ┌──────────────────────── 主进程（Node） ──────────────────────────┐
 │                                                                  │
-│  index.ts            启动：开库 → IPC → 窗口 → 迁移 → 任务管理器 │
+│  index.ts            启动：窗口 → 开库 → IPC → 迁移 → 任务管理器 │
 │  database/           开库、CRUD、changelog 迁移与账本            │
 │  window-manager.ts   窗口工厂与注册表                            │
 │  dialogs/            每个辅助窗口一个模块 + 其 IPC               │
@@ -38,6 +38,10 @@
 所有窗口共用同一份渲染进程入口（`src/renderer/main.ts`），靠 **hash 路由**区分身份。`App.vue` 通过 `POPUP_ROUTES` 判断是否要套导航骨架：独立子窗口、以及启动阶段的加载页都不套。主窗口一律先落在 `/loading`，加载页读到 changelog 的终态后用 `router.replace('/')` 切回主界面——正常启动时它什么都不画，所以不会闪。
 
 辅助窗口目前包括图片查看器、扫描配置、批量处理、输入框、确认框、文件查看、下拉浮窗，每一个都对应 `main/dialogs/` 下的一个模块与一条 hash 路由。
+
+窗口的生死由 `window-manager` 的注册表统一管：主窗口是应用的**生命周期锚点**，它一关，其余窗口被一并关掉，
+进程随即退出。这条不能靠"最后一个窗口关闭"这个事件自己成立——下拉浮窗的宿主是常驻窗口，从不销毁。
+详见 [design/window-management.md](./design/window-management.md)。
 
 ---
 
@@ -115,15 +119,9 @@ pending ──开始──▶ running ──┬──▶ done
 
 ### 解码引擎
 
-`thumbnail-engine.ts` 在两种实现间选择：
-
-| 引擎 | 实现 | 内存 | 说明 |
-|---|---|---|---|
-| `sharp` | libvips | 低 | 可选依赖。对大图 shrink-on-load，不铺开整图；跨平台；N-API，无需 rebuild |
-| `builtin` | jpeg-js / pngjs / … | 高 | 开箱即用，零原生依赖。**必须先把整图铺成 RGBA**，一张 15360×8640 的 JPEG 就要 530 MB |
-
-`sharp` 加载失败或某张图它读不了时逐张回落到 `builtin`，因此它是「可选加速」而非硬依赖。
-实际使用的引擎会写进扫描任务的结果，任务页可见。
+`thumbnail-sharp.ts` 是唯一实现：libvips 对大图做 shrink-on-load（1/2、1/4、1/8），不把整图铺成
+RGBA 位图——一张 15360×8640 的 JPEG 按整图解码要 530 MB。**没有内置纯 JS 解码器，也没有回落**：
+`sharp` 是显式依赖，加载失败会直接报错，不会静默换成慢路径。
 
 **内存调度**：解码的内存需求是 `宽 × 高 × 4`（实测峰值约为它的 1.9 倍），**与文件体积无关**。
 调度按这个估算分批（`DECODE_MEMORY_BUDGET_BYTES`），而不是按文件大小——实测 7.6 MB 的 JPEG

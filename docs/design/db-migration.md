@@ -1,7 +1,7 @@
 # 数据库版本升级
 
 **状态**：已实施（提交 57595bd）
-**最后更新**：2026-09-24
+**最后更新**：2026-09-26
 
 ---
 
@@ -22,6 +22,7 @@
 | 日期 | 变更 | 原因 |
 |---|---|---|
 | 2026-09-24 | 首次定稿 | — |
+| 2026-09-26 | 删掉已兑现的前置条件与落地改动清单；改正一处与 3.7 矛盾的启动顺序 | 落地后文档该写现状，不写落地过程 |
 
 ---
 
@@ -96,6 +97,8 @@ export const CHANGELOG_FILES: readonly ChangeLogFile[] = [
 ];
 ```
 
+`env.d.ts` 声明了 `*?raw` 模块，changelog 因此以字符串形式进包，构建期不需要额外的文件读取。
+
 **规矩：开发期间往当前版本的文件末尾追加 `<changeSet>`；该版本发布后文件冻结，后续结构变更写进新版本
 的文件。** 账本按身份记账，改一条已经执行过的 changeset 不生效——它会被判定为已跑过而跳过。
 
@@ -109,8 +112,8 @@ export const CHANGELOG_FILES: readonly ChangeLogFile[] = [
 
 ### 3.4 解析
 
-使用 `@xmldom/xmldom`（W3C DOM 接口，零依赖）。解析器接上 `onError` 并抛错：它的默认行为是记一条日志
-后继续，返回的可能是半个文档。
+使用 `@xmldom/xmldom`（W3C DOM 接口，零依赖；在 `package.json` 里是显式依赖，不依赖传递依赖）。
+解析器接上 `onError` 并抛错：它的默认行为是记一条日志后继续，返回的可能是半个文档。
 
 除「缺 `id` / `author` / `<sql>`」以外不做校验——这三样缺了就没法构成一条能记账的 changeset，
 其余语法与转义由写 changelog 的人负责。
@@ -182,37 +185,15 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 迁移只在启动阶段执行，此时只有加载页窗口、其它进程也未启动，不存在并发写入。
 这也是对后续任何新增进程的约束：它们必须在主进程完成迁移之后才能打开数据库。
 
-## 4. 改动清单
-
-**新增**：`src/main/database/db.ts`（由 `src/main/db.ts` 搬入并修改）、
-`src/main/database/sql.ts`（由 `src/main/sql.ts` 搬入并删去建表语句）、
-`src/main/database/changeset.ts`、`src/main/database/changeset-ipc.ts`、
-`src/main/database/changesets/1.0.0.xml`、`src/main/database/changesets/index.ts`、
-`src/renderer/views/startup/LoadingPage.vue`、以及 `src/main/env.d.ts` 追加 `*?raw` 的模块声明。
-
-**修改**
-
-| 文件 | 改动 |
-|---|---|
-| 8 处 `@/db` 导入 | 改为 `@/database/db` |
-| `src/main/database/db.ts` | `initDatabase()` 不再建表，只开库与 pragma；删除 `ensureTaskTable()` 与 `DDL_ALL` 循环；新增 `runMigrations()`，changelog 的三条通道并入 `initDbIpc()` |
-| `src/main/index.ts` | `bootstrap()` 收敛成「开库 → 注册通道 → 建窗口（落 `/loading`）→ 跑迁移」；启动失败时兜底 `dialog.showErrorBox` 并退出（只剩余「库根本打不开」这一种场景） |
-| `src/main/window-manager.ts` | `createMain(route = '/')` |
-| `src/common/ipcChannels.ts` | 新增三条 `changeset:*` 通道（state / progress / quit） |
-| `src/common/types.ts` | 新增 `MigrationProgress` |
-| `src/renderer/main.ts` | 新增 `/loading` 路由 |
-| `src/renderer/App.vue` | `/loading` 加入「不套导航骨架的路由」；`useTasks()` 只在主界面调用（任务角标只挂在那里） |
-
-## 5. 风险
+## 4. 风险
 
 1. **迁移写错会破坏库** → 执行前强制备份、事务包裹、失败回滚。
 2. **大库建表或表重建耗时** → 在启动阶段执行，由迁移页给出进度，不阻塞界面。
-3. **XML 转义遗漏** → 漏写 `&` 是解析错误，漏写 `<` 可能被当成标签吞掉；两者都由 3.4 的检查兜住。
-4. **本次之前手工改过结构的库不会被修复** → 属已知代价，见第 7 节。
-5. **`?raw` 的构建支持未经验证** → 见第 7 节。
-6. **解析器默认不抛错** → 必须接 `onError`，否则错误会变成静默的不完整 SQL。
+3. **XML 转义遗漏** → 漏写 `&` 是解析错误，漏写 `<` 可能被当成标签吞掉；解析器不校验这两条（见 3.1），由写 changelog 的人负责。
+4. **本次之前手工改过结构的库不会被修复** → 属已知代价，见第 6 节。
+5. **解析器默认不抛错** → 必须接 `onError`，否则错误会变成静默的不完整 SQL。
 
-## 6. 验证方法
+## 5. 验证方法
 
 1. **静态检查**：`tsc -p tsconfig.node.json`、`vue-tsc -p tsconfig.web.json`、用 `@vue/compiler-sfc` 编译新页面、
    用 AST 检查控制语句大括号、确认 `@/` 与 `@common/` 路径可解析、渲染进程不得引用 Node 内置模块。
@@ -222,10 +203,8 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 3. **人工冒烟**（静态检查通过不等于功能正常）：首次启动应看到迁移页并在 `data/backups/` 留下备份；
    再次启动不应出现迁移页；人为写错一条 SQL，确认失败页显示错误与备份路径。
 
-## 7. 前置条件与已知代价
+## 6. 已知代价
 
 | # | 事项 | 说明 |
 |---|---|---|
-| 1 | 需要安装 `@xmldom/xmldom` | 它当前只是传递依赖，不能依赖传递依赖 |
-| 2 | 需要验证构建期是否支持 `?raw` 导入 | 若不支持，改为在 `.ts` 中包一层模板字符串，changelog 内容不变 |
-| 3 | 手工改过结构的旧库不在本次修复范围 | 本机库已是最终结构，无需迁移；账本自本次建立，此后不会再出现这种局面 |
+| 1 | 手工改过结构的旧库不在本次修复范围 | 本机库已是最终结构，无需迁移；账本自本次建立，此后不会再出现这种局面 |

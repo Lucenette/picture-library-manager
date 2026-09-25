@@ -64,9 +64,9 @@
 - 扫描时自动生成 100×100 中心裁剪缩略图（WebP），**任何尺寸的图片都会生成**
 - 解码与缩放运行在独立工作线程，扫描期间主进程保持响应
 - 解码按内存预算分批调度：普通图并发，上亿像素的大图独占一批
-- 可选安装 [sharp](https://sharp.pixelplumbing.com/) 切换到 libvips 缩放解码，内存与耗时降一个数量级
+- 解码与缩放统一用 [sharp](https://sharp.pixelplumbing.com/)（libvips）：按需缩放解码，内存与耗时降一个数量级
 - 以 WebP 字节存于数据库，预览零开销
-- 缩略图解码支持 JPEG / PNG / GIF / BMP / TIFF；WEBP / AVIF / SVG / ICO 仅收录元数据
+- 收录 PNG / JPEG / GIF / WebP / BMP / SVG / AVIF / ICO；每一张都会交给 sharp 尝试解码，生成缩略图与感知哈希，失败张数在任务结果里显示
 
 ### 图片查看器
 - 独立窗口浏览原图，支持缩放拖拽
@@ -93,9 +93,8 @@
 | 桌面壳 | Electron 40 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
 | 前端 | Vue 3 + Vite 6 + TypeScript 5 | Composition API + `<script setup>` |
 | UI 组件 | Element Plus 2 | 暗色主题全覆盖 |
-| 数据库 | SQLite (sql.js) | WASM 实现，零原生依赖，绿色便携 |
-| 图片解码 | jpeg-js / pngjs / omggif / bmp-ts / utif2 | 各格式原生解码器 |
-| 图像处理 | Jimp | 缩略图裁剪缩放 |
+| 数据库 | SQLite (node:sqlite) | Electron 内置，真实文件 + WAL，单条写入毫秒级落盘 |
+| 图片解码 | sharp (libvips) | 按需缩放解码 + 裁剪；原生依赖，各平台各自安装预编译包 |
 | 并发 | Node worker_threads | 解码跑在工作线程，不阻塞主进程 |
 | 任务调度 | 自研 TaskManager | 单并发队列，支持暂停/继续/强制结束/重试 |
 | 构建工具 | electron-vite + electron-builder | 一键打包 NSIS 安装程序 |
@@ -120,24 +119,15 @@ yarn dev        # 启动开发环境
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
 
-### 可选：安装 sharp 加速缩略图
+### 解码引擎：sharp
 
-缩略图默认由内置的纯 JS 解码器生成（jpeg-js / pngjs / …），零原生依赖、开箱即用。
-但纯 JS 解码必须先把整图铺成 RGBA 位图：一张 15360×8640 的 JPEG 就要 500 MB 以上。
+缩略图解码只有一种实现——[sharp](https://sharp.pixelplumbing.com/)（libvips）。它按需对大图做
+shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图：一张 15360×8640 的 JPEG 按整图解码要 500 MB 以上。
 
-装上 [sharp](https://sharp.pixelplumbing.com/) 后会自动切换到 libvips：
-
-```bash
-yarn add sharp
-```
-
-- **按需缩放解码**：对大图做 shrink-on-load（1/2、1/4、1/8），不铺开整图，内存降一个数量级
+- 是**显式依赖**（`package.json`）：**没有内置解码器，也没有回落**，加载失败会直接报错，不会静默换成慢路径
 - **跨平台**：官方提供 Windows / macOS / Linux（x64 与 arm64）预编译包，且是 N-API 模块，
   在 Electron 里不需要 electron-rebuild
 - 顺带支持 EXIF 方向校正、WebP / AVIF / TIFF
-
-未安装或加载失败时自动回落到内置解码器，功能不受影响。**任务结果里会显示本次实际使用的
-解码引擎**（`解码 sharp` 或 `解码 内置`）。
 
 ### 打包
 
@@ -153,84 +143,14 @@ yarn build
 
 ```
 picture-library-manager/
-├── data/                        # 示例脚本，打包时随附
-│   └── default.js               #   默认脚本（选图 + 角色识别 + 结构识别）
+├── data/            # 示例处理脚本，打包时随附
+├── docs/            # 设计说明、路线图、排障（入口见 docs/README.md）
+├── scripts/         # 仓库自检脚本（文档与 skill）
 ├── src/
-│   ├── main/                    # Electron 主进程
-│   │   ├── index.ts             #   入口：初始化 DB、注册 IPC、创建窗口
-│   │   ├── db.ts                #   数据库层（SQLite CRUD + 批量落盘 + IPC 调度）
-│   │   ├── sql.ts               #   SQL 常量
-│   │   ├── window-manager.ts    #   窗口管理器（创建/获取/关闭）
-│   │   ├── image/               #   图片处理流水线（目录遍历 + 解码）
-│   │   │   ├── walk.ts          #     目录遍历 + 读图片头拿宽高
-│   │   │   ├── thumbnail-pool.ts    #  解码线程池（按内存预算调度）
-│   │   │   ├── thumbnail-worker.ts  #  线程入口
-│   │   │   ├── thumbnail-engine.ts  #  选择解码引擎（sharp / 内置）
-│   │   │   ├── thumbnail-sharp.ts   #  sharp 实现（可选，未装则跳过）
-│   │   │   └── thumbnail-decode.ts  #  内置纯 JS 解码 + 缩放
-│   │   ├── script/              #   处理脚本
-│   │   │   ├── compile.ts       #     源码编译成模块
-│   │   │   └── script-service.ts    #  按 id 调用脚本方法
-│   │   ├── task/                #   后台任务
-│   │   │   ├── manager.ts       #     队列、状态机、事件推送
-│   │   │   ├── task-control.ts  #     暂停 / 取消 / 检查点
-│   │   │   ├── ipc.ts           #     任务的 IPC 注册
-│   │   │   └── runners/         #     三个业务工作流
-│   │   │       ├── scan.ts      #       扫描图库
-│   │   │       ├── process.ts   #       批量选图
-│   │   │       └── export.ts    #       导出图片
-│   │   └── dialogs/             #   辅助窗口与系统对话框
-│   │       ├── index.ts         #     统一注册入口
-│   │       ├── system.ts        #     系统对话框（文件选择器）
-│   │       ├── image-viewer.ts  #     图片查看器
-│   │       ├── scan-config.ts   #     扫描配置
-│   │       ├── batch-process.ts #     批量处理
-│   │       ├── prompt.ts        #     通用输入弹窗
-│   │       ├── confirm.ts       #     原生确认 / 提示弹窗
-│   │       ├── file-viewer.ts   #     文件查看器
-│   │       └── control/         #     原生控件
-│   │           └── dropdown.ts  #        下拉列表浮窗
-│   ├── renderer/                # Vue 渲染进程（不引用任何 Node 内置模块）
-│   │   ├── main.ts              #   入口：路由 + Element Plus
-│   │   ├── App.vue              #   根组件：导航栏
-│   │   ├── db/database.ts       #   数据库 IPC 包装层
-│   │   ├── services/            #   业务服务
-│   │   │   └── task-service.ts  #     任务命令封装
-│   │   ├── composables/         #   组合式函数
-│   │   │   ├── useIpcListener.ts    #  IPC 订阅（组件卸载时自动注销）
-│   │   │   ├── useFilterOrder.ts    #  筛选标签的顺序管理
-│   │   │   └── useTasks.ts          #  任务列表状态与推送
-│   │   ├── components/          #   可复用组件
-│   │   │   ├── CategorySearch.types.ts  #  筛选器类型
-│   │   │   ├── CategorySearch.vue       #  分类筛选器
-│   │   │   └── DropdownControl.vue      #  下拉选择控件
-│   │   ├── views/               #   页面
-│   │   │   ├── main/            #     主窗口页面
-│   │   │   │   ├── GalleryPage.vue    图库管理
-│   │   │   │   ├── CharacterPage.vue  角色确认
-│   │   │   │   ├── ProcessPage.vue    图组确认
-│   │   │   │   ├── LibraryPage.vue    图库导出
-│   │   │   │   ├── TaskPage.vue       任务管理
-│   │   │   │   └── ScriptPage.vue     脚本管理
-│   │   │   ├── image/           #     图片查看器
-│   │   │   │   └── ImageViewer.vue
-│   │   │   └── dialogs/         #     辅助窗口的页面
-│   │   │       ├── ScanConfigDialog.vue
-│   │   │       ├── BatchProcessDialog.vue
-│   │   │       ├── PromptDialog.vue
-│   │   │       ├── ConfirmDialog.vue
-│   │   │       ├── FileViewerDialog.vue
-│   │   │       └── control/Dropdown.vue
-│   │   └── styles/theme.css     #   暗色主题
-│   └── common/                  # 主进程与渲染进程共享的契约
-│       ├── types.ts             #   类型定义
-│       └── ipcChannels.ts       #   IPC 通道常量
-├── docs/                        # 文档（架构 / 脚本 / 疑难排查 / 需求规格）
-├── .github/                     # Issue 与 PR 模板、CI、Dependabot
-├── electron-builder.yml         # 打包配置
-├── electron.vite.config.ts      # Vite 配置
-├── AGENTS.md                    # 给编码代理的开发约定
-└── package.json
+│   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
+│   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
+│   └── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
+└── .agents/skills/  # 编码代理的工作流（文档规范）
 ```
 
 ---

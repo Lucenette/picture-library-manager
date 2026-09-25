@@ -25,7 +25,7 @@ const YIELD_EVERY = 200;
  * 收录进图库的图片扩展名（小写、不含点）。
  *
  * 只决定「哪些文件会被扫描入库」，不等于「哪些格式能生成缩略图」——
- * 后者由 thumbnail-decode.ts 的解码器决定。
+ * 后者取决于 sharp 能否解出这张图，解不出来就计入任务结果的失败张数。
  */
 const IMAGE_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico',
