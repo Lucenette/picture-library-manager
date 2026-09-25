@@ -9,8 +9,8 @@
 ### 新增
 
 - **后台任务系统**：扫描、批量选图、导出统一进入任务队列，同时只允许一个任务执行
-- 缩略图解码支持切换到 **sharp（libvips）**：按需缩放解码，大幅图片的内存与耗时降一个数量级，
-  且跨平台；未安装时自动回落到内置解码器，任务结果中会标明本次使用的引擎
+- 缩略图解码统一由 **sharp（libvips）** 完成，并成为显式依赖：按需缩放解码，大幅图片的内存与耗时降一个数量级，
+  且跨平台；不再有内置纯 JS 解码器与静默回落
 - 任务支持暂停 / 继续、强制结束（需二次确认）、失败重试、排队任务上移 / 下移
 - 新增「任务管理」页面：进度、阶段描述、耗时实时展示；导航栏常驻运行中数量角标
 - 缩略图解码迁移到工作线程（`worker_threads`），扫描期间界面保持可交互
@@ -24,7 +24,7 @@
 - 扫描改为「一个图库一个任务」，且先在内存完成计算、最后一次性入库
 - 渲染进程不再引用任何 Node 内置模块
 - 结构调整：`scanner/` 与 `worker/` 合并为 `image/`；`common/script.ts`、`common/image.ts` 归位到主进程
-- 补齐图像解码器为显式依赖（此前只是 `jimp` 的传递依赖）
+- **存储从 sql.js 换成 Node 内置的 SQLite**（真实文件 + WAL）：不再整库导出与整文件替换，单条写入毫秒级落盘
 
 ### 修复
 
@@ -42,13 +42,13 @@
 - 页面反复挂载导致 IPC 订阅堆积，扫描 / 批量处理被重复触发
 - 文件查看窗口改为按 `image_group_id` 反查图片组，取代路径前缀匹配
 - 角色重命名撞唯一约束时不再静默失败
-- 数据库落盘改为原子替换并保留备份，避免半截文件
+- **关闭主窗口后进程不退出**：常驻的浮窗宿主让「所有窗口都已关闭」永远不成立。现在主窗口关闭时由窗口管理器关掉其余窗口，进程随即退出
 
 ### 安全
 
 - 打包后恢复同源策略与 Chromium 沙箱，安全相关的命令行开关仅在开发态启用
 
-## [1.0.0] - 2026-06-22
+## [0.0.1] - 2026-06-22
 
 首个可用版本。
 
@@ -64,5 +64,5 @@
 - **暗色主题**：IDEA Darcula 风格，Element Plus 全覆盖
 - 本地 SQLite（sql.js）存储，零原生依赖，绿色便携
 
-[未发布]: https://github.com/Lucenette/picture-library-manager/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.0.0
+[未发布]: https://github.com/Lucenette/picture-library-manager/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v0.0.1
