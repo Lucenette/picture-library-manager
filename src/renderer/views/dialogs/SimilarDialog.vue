@@ -52,9 +52,9 @@ const summary = computed(() => {
 });
 
 const emptyText = computed(() => {
-  // 一张哈希都没有时，别让人对着空窗口猜：直接说清要先重扫图库
+  // 一张哈希都没有时，别让人对着空窗口猜：直接说清要先重扫来源
   if (data.value.compared === 0 && data.value.skipped > 0) {
-    return `这 ${data.value.skipped} 张都还没有感知哈希，重新扫描对应图库后再识别`;
+    return `这 ${data.value.skipped} 张都还没有感知哈希，重新扫描对应来源后再识别`;
   }
   return activeTab.value === 'same' ? '没有发现相同的图片' : '没有发现相似的图片';
 });

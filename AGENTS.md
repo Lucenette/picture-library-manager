@@ -17,7 +17,9 @@
 |---|---|---|
 | `yarn dev` | 启动开发环境 | 主进程/preload 由 electron-vite 构建，渲染进程走 Vite |
 | `yarn typecheck` | `tsc`（主进程与 `common`）+ `vue-tsc`（渲染进程，含 `.vue`） | **`.vue` 的类型错误只有 `vue-tsc` 能发现**，只跑 `tsc` 会漏 |
-| `yarn build` | 打包 NSIS 安装程序 | 产物 `dist/PLManager_Setup_<version>.exe` |
+| `yarn icon` | 从 `src/static/icon.png` 生成全平台图标到 `dist/icons` | electron-icon-builder；`build` 已串在它之后 |
+| `yarn build` | 打包**当前平台**（Windows → NSIS，macOS → dmg，Linux → AppImage / deb） | 产物在 `dist/`；指定平台用 `yarn build:win` / `build:mac` / `build:linux` |
+| `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 
 ---
@@ -41,6 +43,7 @@
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
+| `src/static/` | 构建资源：应用图标等供打包工具读取的静态文件（`yarn icon` 生成到 `dist/icons`） | 被代码 `import` 的模块——代码放 `main/`、`renderer/`、`common/` |
 | `docs/` | 设计说明、不变量、排障；**已落地**的子系统说明放 `docs/design/` | 尚未实施的方案——放进 `docs/roadmap/` |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`database` 也只被少数模块用，但它独立存在）。
@@ -207,6 +210,9 @@ function upsertScript(...) {}
 - **`vue-tsc` 已随依赖安装**（当前 5.9.3）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
   只跑 `tsc` 就宣称"类型已检查"是错的——曾经因此漏掉一个缺失的 import，对应按钮一点就报 `ReferenceError`。
 - **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
+- **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
+  （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
+  要清理只点具体产物：`dist/icons`、`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。
 - **`yarn.lock` 被 `.gitignore` 忽略**：CI 无法使用冻结锁文件，依赖版本以 `package.json` 为准。
 - **`?nodeWorker` 是 electron-vite 的虚拟模块**：静态的"导入路径是否存在"检查工具会把它报成无法解析，这是正常的，不是错误。
 - **`ReplaceFileW EIO (Win32 32)`**：`yarn dev` 或 IDE 正在占用该文件，稍后重试即可。

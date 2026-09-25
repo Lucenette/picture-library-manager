@@ -228,23 +228,23 @@ export function endBatch(): void {
 // Gallery
 // ------------------------------------------------------------
 
-/** 新增图库，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
+/** 新增来源，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
 export function addGallery(rootPath: string): Gallery {
   const id = insert(SQL.INSERT_GALLERY, [basename(rootPath), rootPath]);
   return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id])!;
 }
 
-/** 按 id 查询图库 */
+/** 按 id 查询来源 */
 export function getGalleryById(id: number): Gallery | undefined {
   return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id]);
 }
 
-/** 查询全部图库，按创建时间倒序 */
+/** 查询全部来源，按创建时间倒序 */
 export function getAllGalleries(): Gallery[] {
   return queryAll<Gallery>(SQL.SELECT_GALLERY_ALL);
 }
 
-/** 清空图库下的全部扫描数据，保留图库本身，用于重新扫描 */
+/** 清空来源下的全部扫描数据，保留来源本身，用于重新扫描 */
 export function clearGalleryData(galleryId: number): void {
   run(SQL.DELETE_PROCESSED_BY_GALLERY, [galleryId]);
   run(SQL.DELETE_IMAGE_FILES_BY_GALLERY, [galleryId]);
@@ -252,13 +252,13 @@ export function clearGalleryData(galleryId: number): void {
   run(SQL.DELETE_CHARACTERS_BY_GALLERY, [galleryId]);
 }
 
-/** 删除图库及其全部扫描数据 */
+/** 删除来源及其全部扫描数据 */
 export function deleteGallery(galleryId: number): void {
   clearGalleryData(galleryId);
   run(SQL.DELETE_GALLERY, [galleryId]);
 }
 
-/** 记录图库最近一次扫描完成时间 */
+/** 记录来源最近一次扫描完成时间 */
 export function updateGalleryScannedAt(galleryId: number): void {
   run(SQL.UPDATE_GALLERY_SCAN, [galleryId]);
 }
@@ -267,24 +267,24 @@ export function updateGalleryScannedAt(galleryId: number): void {
 // Character
 // ------------------------------------------------------------
 
-/** 写入角色；同图库下同名已存在时忽略并返回既有记录 */
+/** 写入角色；同来源下同名已存在时忽略并返回既有记录 */
 export function insertCharacter(galleryId: number, name: string, sourcePath: string): Character {
   run(SQL.INSERT_CHARACTER, [galleryId, name, sourcePath]);
   return queryOne<Character>(SQL.SELECT_CHARACTER_BY_GALLERY_NAME, [galleryId, name])!;
 }
 
-/** 查询图库下的角色，按名称升序 */
+/** 查询来源下的角色，按名称升序 */
 export function getCharactersByGallery(galleryId: number): Character[] {
   return queryAll<Character>(SQL.SELECT_CHARACTERS_BY_GALLERY, [galleryId]);
 }
 
-/** 重命名角色；与同图库内的角色重名时抛出可读错误 */
+/** 重命名角色；与同来源内的角色重名时抛出可读错误 */
 export function renameCharacter(id: number, name: string): void {
   try {
     run(SQL.RENAME_CHARACTER, [name, id]);
   } catch (error) {
     if (isUniqueViolation(error)) {
-      throw new Error(`角色「${name}」已存在于当前图库`);
+      throw new Error(`角色「${name}」已存在于当前来源`);
     }
     throw error;
   }
@@ -310,7 +310,7 @@ export function insertImageGroup(
   return queryOne<ImageGroup>(SQL.SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
-/** 查询图片组列表，可按状态与图库过滤 */
+/** 查询图片组列表，可按状态与来源过滤 */
 export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number): ImageGroupView[] {
   let sql = SQL.SELECT_IMAGE_GROUPS_VIEW_BASE;
   const params: SqlValue[] = [];
@@ -427,7 +427,7 @@ export function getImageGroupsViewByIds(ids: number[]): ImageGroupView[] {
   );
 }
 
-/** 按文件路径反查所属图片组；文件不在图库中时返回 null */
+/** 按文件路径反查所属图片组；文件不在来源中时返回 null */
 export function getImageGroupIdByFilePath(filePath: string): number | null {
   const row = queryOne<{ imageGroupId: number }>(SQL.SELECT_GROUP_ID_BY_FILE_PATH, [filePath]);
   return row?.imageGroupId ?? null;
@@ -581,7 +581,7 @@ export function upsertProcessedImage(
   return queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
-/** 查询准图库列表，可按图库与角色过滤 */
+/** 查询图库列表，可按来源与角色过滤 */
 export function getAllProcessedImages(galleryId?: number, characterName?: string): ProcessedImageView[] {
   let sql = SQL.SELECT_PROCESSED_VIEW_BASE;
   const params: SqlValue[] = [];
@@ -603,7 +603,7 @@ export interface ProcessedExportRow {
   characterName: string;
 }
 
-/** 按 id 批量查询导出所需的准图库记录 */
+/** 按 id 批量查询导出所需的图库记录 */
 export function getProcessedForExport(ids: number[]): ProcessedExportRow[] {
   if (ids.length === 0) {
     return [];
@@ -616,7 +616,7 @@ export function getProcessedForExport(ids: number[]): ProcessedExportRow[] {
   );
 }
 
-/** 删除准图库记录，并把对应图片组退回未处理 */
+/** 删除图库记录，并把对应图片组退回未处理 */
 export function deleteProcessedImage(id: number): void {
   const row = queryOne<{ imageGroupId: number }>(SQL.SELECT_PROCESSED_BY_ID_GROUP, [id]);
   if (!row) {

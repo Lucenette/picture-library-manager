@@ -7,7 +7,7 @@
         <el-menu :default-active="activeMenu" mode="horizontal" router class="app-menu">
           <el-menu-item index="/">
             <el-icon><FolderOpened /></el-icon>
-            <span>图库管理</span>
+            <span>来源管理</span>
           </el-menu-item>
           <el-menu-item index="/characters">
             <el-icon><User /></el-icon>
@@ -19,7 +19,7 @@
           </el-menu-item>
           <el-menu-item index="/library">
             <el-icon><PictureFilled /></el-icon>
-            <span>图库导出</span>
+            <span>图库</span>
           </el-menu-item>
         </el-menu>
 

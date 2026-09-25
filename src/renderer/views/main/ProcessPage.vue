@@ -22,7 +22,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="galleryName" label="来源" width="140" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="dirName" label="图片组" min-width="140" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="dirPath" label="路径" min-width="360" show-overflow-tooltip sortable="custom" />
@@ -122,7 +122,7 @@ const characterItems = computed(() =>
 const filterSections = computed<FilterSection[]>(() => [
   {
     key: 'gallery',
-    label: '图库',
+    label: '来源',
     value: galleryFilter.value ? String(galleryFilter.value) : '',
     display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
     items: galleryItems.value,

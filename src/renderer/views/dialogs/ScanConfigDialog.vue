@@ -2,8 +2,8 @@
   <div class="scan-config">
     <div class="config-header">扫描配置</div>
     <div class="config-body">
-      <p class="gallery-name">图库：{{ galleryName }}</p>
-      <p v-if="galleryCount > 1" class="gallery-name">共 {{ galleryCount }} 个图库</p>
+      <p class="gallery-name">来源：{{ galleryName }}</p>
+      <p v-if="galleryCount > 1" class="gallery-name">共 {{ galleryCount }} 个来源</p>
 
       <DropdownControl v-model="scriptId" :items="scripts" placeholder="目录结构识别脚本" />
 

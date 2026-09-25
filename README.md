@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🖼 壁纸图库管理器
+# 🖼 角色图库管理器
 
-**多来源二次元壁纸汇总管理工具**
+**把来源各异的角色图片，整理成按角色分组、可直接用于训练的数据集**
 
 [![Electron](https://img.shields.io/badge/Electron-40.x-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -17,7 +17,7 @@
 
 ## 📖 简介
 
-面对来源各异的图库目录——有的按"角色→图片组→设备分类"，有的按"编号→角色→图片"，文件名千奇百怪——**壁纸图库管理器**让你自动扫描、批量整理、一键导出到统一目录。
+面对来源各异的目录——有的按"角色→图片组→设备分类"，有的按"编号→角色→图片"，文件名千奇百怪——**角色图库管理器**让你自动扫描、批量整理、一键导出到统一目录。
 
 核心流程：**添加图库 → 扫描识别 → 脚本选图 → 导出整理**。
 
@@ -31,10 +31,10 @@
 
 ## ✨ 功能
 
-### 图库管理
-- 添加多个图包目录，支持多选批量添加
+### 来源管理
+- 登记多个图包目录作为来源，支持多选批量添加
 - 自定义目录结构识别脚本，适配任意目录规范
-- 批量扫描（提交为后台任务）、清理数据、删除图库
+- 批量扫描（提交为后台任务）、清理数据、删除来源
 
 ### 任务管理
 - 扫描、批量选图、导出统一走任务队列，同时只允许一个任务执行
@@ -74,10 +74,10 @@
 - 底部缩略图导航条，当前图片居中高亮
 - 键盘左右切换；开发态自动打开 DevTools，F12 切换
 
-### 导出整理
-- 按角色分组导出，文件统一重命名（`角色名_0001.png`）
-- 支持勾选导出或全部导出，导出在后台任务中执行
-- 原生文件夹选择器
+### 图库
+- 浏览与筛选每个图片组最终确认下来的那张图（按来源、角色等条件过滤）
+- 可删除记录（不删原始文件，对应图片组自动退回未处理）、标记为可选并识别相似图片
+- 按角色分组导出，文件统一重命名（`角色名_0001.png`）；支持勾选导出或全部导出，导出在后台任务中执行
 
 ### 暗色主题
 - JetBrains IDE 风格暗色 UI
@@ -116,6 +116,7 @@ git clone https://github.com/Lucenette/picture-library-manager.git
 cd picture-library-manager
 yarn install
 yarn dev        # 启动开发环境
+yarn preview    # 构建后预览生产产物（不打包）
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
 
@@ -132,7 +133,10 @@ shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图：一张 15
 ### 打包
 
 ```bash
-yarn build
+yarn build          # 当前平台：Windows 出 NSIS，macOS 出 dmg，Linux 出 AppImage / deb
+yarn build:win      # 指定平台（交叉构建不行，CI 里按平台各跑各的）
+yarn build:mac
+yarn build:linux
 ```
 
 输出 `dist/PLManager_Setup_1.0.0.exe`（NSIS 安装程序，`productName` 为 `PLManager`）。
@@ -149,7 +153,8 @@ picture-library-manager/
 ├── src/
 │   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
-│   └── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
+│   ├── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
+│   └── static/      # 构建资源：应用图标（构建时生成 dist/icons）
 └── .agents/skills/  # 编码代理的工作流（文档规范）
 ```
 
@@ -247,6 +252,6 @@ MIT © Lucenette
 
 <div align="center">
 
-**[⬆ 回到顶部](#-壁纸图库管理器)**
+**[⬆ 回到顶部](#-角色图库管理器)**
 
 </div>

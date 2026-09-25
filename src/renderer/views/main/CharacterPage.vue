@@ -17,7 +17,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="galleryName" label="图库" width="160" sortable="custom" />
+        <el-table-column prop="galleryName" label="来源" width="160" sortable="custom" />
         <el-table-column prop="name" label="角色名" min-width="200" sortable="custom">
           <template #default="{ row }">
             <span class="char-name" @dblclick="openSingleRename(row)">{{ row.name }}</span>
@@ -56,7 +56,7 @@ import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog } from '@/services/dialog-service';
 import { getAllGalleries, getCharactersByGallery, renameCharacter } from '@/db/database';
 
-/** 列表行：角色实体 + 所属图库名 */
+/** 列表行：角色实体 + 所属来源名 */
 type CharacterRow = Character & { galleryName: string };
 
 // ------------------------------------------------------------
@@ -122,7 +122,7 @@ const pagedCharacters = computed(() =>
 const filterSections = computed<FilterSection[]>(() => [
   {
     key: 'gallery',
-    label: '图库',
+    label: '来源',
     value: galleryFilter.value ? String(galleryFilter.value) : '',
     display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
     items: galleryItems.value,
@@ -236,7 +236,7 @@ useIpcListener(IPC.BATCH_RENAME_CONFIRMED, async (result: PromptResult) => {
     return;
   }
 
-  // 名称在同一个图库内唯一，撞名后继续执行只会重复报错，因此遇到失败即停止
+  // 名称在同一个来源内唯一，撞名后继续执行只会重复报错，因此遇到失败即停止
   for (const id of selectedIds.value) {
     try {
       await renameCharacter(id, result.value);

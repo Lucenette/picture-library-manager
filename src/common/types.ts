@@ -6,7 +6,7 @@
 // 实体
 // ------------------------------------------------------------
 
-/** 图库：一个受管理的图包根目录 */
+/** 来源：一个受管理的图包根目录 */
 export interface Gallery {
   id: number;
   name: string;
@@ -16,7 +16,7 @@ export interface Gallery {
   createdAt: string;
 }
 
-/** 角色：图库下按目录归并出的角色 */
+/** 角色：来源下按目录归并出的角色 */
 export interface Character {
   id: number;
   galleryId: number;
@@ -71,7 +71,7 @@ export interface ProcessScript {
   createdAt: string;
 }
 
-/** 准图库记录：某个图片组最终确认下来的那张图 */
+/** 图库记录：某个图片组最终确认下来的那张图 */
 export interface ProcessedImage {
   id: number;
   imageGroupId: number;
@@ -95,7 +95,7 @@ export interface ImageGroupView extends ImageGroup {
   galleryId: number;
 }
 
-/** 页面「图库导出」的准图库行 */
+/** 「图库」页的行 */
 export interface ProcessedImageView extends ProcessedImage {
   characterName: string;
   galleryName: string;
@@ -127,7 +127,7 @@ export interface StructureInput {
 /** identify-structure 脚本的返回值 */
 export interface StructureOutput {
   name: string;
-  /** 相对图库根的图片组路径 */
+  /** 相对来源根的图片组路径 */
   groups: string[];
 }
 
@@ -280,7 +280,7 @@ export type TaskType = 'scan' | 'process' | 'export' | 'similar';
 /** 任务状态；paused 与 running 一样占用队列 */
 export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
 
-/** 扫描任务入参：一次扫描一个图库，便于独立取消与原子提交 */
+/** 扫描任务入参：一次扫描一个来源，便于独立取消与原子提交 */
 export interface ScanTaskPayload {
   galleryId: number;
   scriptId: number;
@@ -292,7 +292,7 @@ export interface ProcessTaskPayload {
   scriptId: number;
 }
 
-/** 导出任务入参：提交时固化的准图库记录快照 */
+/** 导出任务入参：提交时固化的图库记录快照 */
 export interface ExportTaskPayload {
   imageIds: number[];
   targetDir: string;

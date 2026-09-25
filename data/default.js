@@ -42,13 +42,13 @@ const identifyCharacter = dirName => {
 };
 
 /**
- * 目录结构识别 - 将图库目录树映射为角色→图片组结构
+ * 目录结构识别 - 将来源目录树映射为角色→图片组结构
  *
  * 默认行为：第一层子目录是角色，第二层子目录是图片组
- * 对于编号型图库（第一层是"51雷电将军"），由 identifyCharacter 清洗角色名
+ * 对于编号型来源（第一层是"51雷电将军"），由 identifyCharacter 清洗角色名
  *
  * @param {Object}   ctx
- * @param {string}   ctx.rootPath  图库根路径
+ * @param {string}   ctx.rootPath  来源根路径
  * @param {Object[]} ctx.tree      目录树（name/path/children）
  * @returns {Array<{ name: string, groups: string[] }>}
  */

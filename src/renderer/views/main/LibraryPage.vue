@@ -181,7 +181,7 @@ const scriptItems = computed(() =>
 const filterSections = computed<FilterSection[]>(() => [
   {
     key: 'gallery',
-    label: '图库',
+    label: '来源',
     value: galleryFilter.value ? String(galleryFilter.value) : '',
     display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
     items: galleryItems.value,

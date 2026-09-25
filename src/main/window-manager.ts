@@ -70,6 +70,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     height: config.height,
     // 兜底给深色：Electron 默认是白的，漏传就会在文档绘制前闪一下白
     backgroundColor: config.backgroundColor ?? '#1e1f22',
+    icon: devWindowIcon(),
     title: config.title,
     parent,
     modal: Boolean(parent && config.modal),
@@ -324,6 +325,16 @@ function getRouteUrl(route: string, background?: string): string {
   }
   const indexHtml = resolve(__dirname, '../renderer/index.html');
   return `${pathToFileURL(indexHtml).href}${query}#${route}`;
+}
+
+/**
+ * 开发态的窗口与任务栏图标。
+ *
+ * 打包后 Windows 直接取 exe 内嵌的图标，传路径没有意义：`src/` 不在打包白名单里，
+ * 找不到文件反而会让窗口图标变空。
+ */
+function devWindowIcon(): string | undefined {
+  return app.isPackaged ? undefined : resolve(__dirname, '../../src/static/icon.png');
 }
 
 /**

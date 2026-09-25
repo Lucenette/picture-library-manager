@@ -80,6 +80,10 @@ function focusMainWindow(): void {
 
 configureCommandLine();
 
+// Windows 的 AppUserModelID：必须与 electron-builder.yml 的 appId 一致，
+// 任务栏分组 / 固定与通知才会归到应用名下，而不是 electron.exe
+app.setAppUserModelId('com.lucenette.picture-library-manager');
+
 // 数据库是单文件覆盖写，绝不允许多个实例同时持有：拿不到锁的实例直接退出
 if (app.requestSingleInstanceLock()) {
   app.on('second-instance', focusMainWindow);

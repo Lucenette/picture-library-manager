@@ -2,7 +2,7 @@
   <div class="gallery-page">
     <div class="toolbar">
       <el-button type="primary" @click="addGallery">
-        <el-icon><Plus /></el-icon> 添加图库
+        <el-icon><Plus /></el-icon> 添加来源
       </el-button>
       <el-button type="success" :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
         批量扫描 ({{ selectedIds.length }})
@@ -20,7 +20,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="name" label="图库名称" min-width="200" sortable="custom" />
+        <el-table-column prop="name" label="来源名称" min-width="200" sortable="custom" />
         <el-table-column prop="rootPath" label="路径" min-width="350" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="scannedAt" label="最近扫描" width="170" sortable="custom">
           <template #default="{ row }">
@@ -120,7 +120,7 @@ function onSelectionChange(rows: Gallery[]): void {
   selectedIds.value = rows.map((row) => row.id);
 }
 
-/** 通过系统对话框添加图库，支持一次选择多个目录 */
+/** 通过系统对话框添加来源，支持一次选择多个目录 */
 async function addGallery(): Promise<void> {
   const rootPaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR);
   if (!rootPaths?.length) {
@@ -133,7 +133,7 @@ async function addGallery(): Promise<void> {
     } catch (error) {
       // 目录已添加过会命中 root_path 唯一约束，属于预期内的忽略
       if (!(error as Error).message?.includes('UNIQUE')) {
-        console.error(`添加图库失败：${rootPath}`, error);
+        console.error(`添加来源失败：${rootPath}`, error);
       }
     }
   }
@@ -142,8 +142,8 @@ async function addGallery(): Promise<void> {
 
 async function clearData(gallery: Gallery): Promise<void> {
   const confirmed = await confirmDialog({
-    title: '清理图库数据',
-    message: `确定清理图库「${gallery.name}」的所有扫描数据？\n（不会删除原始文件）`,
+    title: '清理来源数据',
+    message: `确定清理来源「${gallery.name}」的所有扫描数据？\n（不会删除原始文件）`,
     confirmText: '清理',
     danger: true,
   });
@@ -156,8 +156,8 @@ async function clearData(gallery: Gallery): Promise<void> {
 
 async function removeGallery(gallery: Gallery): Promise<void> {
   const confirmed = await confirmDialog({
-    title: '删除图库',
-    message: `确定删除图库「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`,
+    title: '删除来源',
+    message: `确定删除来源「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`,
     confirmText: '删除',
     danger: true,
   });
@@ -170,8 +170,8 @@ async function removeGallery(gallery: Gallery): Promise<void> {
 
 async function batchDelete(): Promise<void> {
   const confirmed = await confirmDialog({
-    title: '批量删除图库',
-    message: `确定删除选中的 ${selectedIds.value.length} 个图库及其所有扫描数据？\n（不会删除原始文件）`,
+    title: '批量删除来源',
+    message: `确定删除选中的 ${selectedIds.value.length} 个来源及其所有扫描数据？\n（不会删除原始文件）`,
     confirmText: '删除',
     danger: true,
   });
@@ -211,7 +211,7 @@ useIpcListener(IPC.SCAN_CONFIG_CONFIRMED, (result: ScanConfigResult) => {
   void submitScanTasks(result);
 });
 
-/** 一个图库一个任务：进度独立，可以单独取消、暂停与重试 */
+/** 一个来源一个任务：进度独立，可以单独取消、暂停与重试 */
 async function submitScanTasks(result: ScanConfigResult): Promise<void> {
   for (const galleryId of result.galleryIds) {
     await actions.submit('scan', { galleryId, scriptId: result.scriptId });

@@ -44,7 +44,7 @@ export const SQL = {
   DELETE_GALLERY: 'DELETE FROM gallery WHERE id = ?',
   UPDATE_GALLERY_SCAN: "UPDATE gallery SET scanned_at = datetime('now','localtime') WHERE id = ?",
 
-  // 删除图库时按依赖逆序手工级联清理
+  // 删除来源时按依赖逆序手工级联清理
   DELETE_PROCESSED_BY_GALLERY: 'DELETE FROM processed_image WHERE gallery_id = ?',
   DELETE_IMAGE_FILES_BY_GALLERY: `DELETE FROM image_file WHERE image_group_id IN (
   SELECT id FROM image_group WHERE character_id IN (SELECT id FROM character WHERE gallery_id = ?)
@@ -143,7 +143,7 @@ export const SQL = {
   UPDATE_TASK_QUEUE_ORDER: 'UPDATE task SET queue_order = ? WHERE id = ?',
   DELETE_TASKS_FINISHED: "DELETE FROM task WHERE status IN ('done','failed','cancelled')",
 
-  /** 准图库列表基语句，调用方按需追加 WHERE 与 ORDER BY */
+  /** 图库列表基语句，调用方按需追加 WHERE 与 ORDER BY */
   SELECT_PROCESSED_VIEW_BASE: `SELECT pi.*, c.name AS characterName, g.name AS galleryName,
     ps.name AS scriptName, pi.selected_file AS selectedFileName,
     f.thumbnail AS selectedFileThumbnail, f.width AS selectedFileWidth,

@@ -348,12 +348,12 @@ class TaskManager {
 // 内部工具
 // ------------------------------------------------------------
 
-/** 生成任务标题；图库名这类上下文只有主进程拿得到 */
+/** 生成任务标题；来源名这类上下文只有主进程拿得到 */
 function buildTitle(type: TaskType, payload: TaskPayload): string {
   if (type === 'scan') {
     const { galleryId } = payload as ScanTaskPayload;
     const gallery = getGalleryById(galleryId);
-    return `扫描图库「${gallery?.name ?? galleryId}」`;
+    return `扫描来源「${gallery?.name ?? galleryId}」`;
   }
   if (type === 'process') {
     return `批量选图 ${(payload as ProcessTaskPayload).groupIds.length} 个图片组`;

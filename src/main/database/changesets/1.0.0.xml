@@ -2,7 +2,7 @@
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
 
   <changeSet id="20260924235937452200" author="powerinv">
-    <comment>gallery | 图库表</comment>
+    <comment>gallery | 来源表</comment>
     <sql>
       CREATE TABLE IF NOT EXISTS gallery (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,7 +92,7 @@
   </changeSet>
 
   <changeSet id="20260924235937458242" author="powerinv">
-    <comment>processed_image | 准图库表</comment>
+    <comment>processed_image | 图库表</comment>
     <sql>
       CREATE TABLE IF NOT EXISTS processed_image (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

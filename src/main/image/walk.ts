@@ -1,7 +1,7 @@
 // ============================================================
-// 图库图片处理流水线
+// 来源目录的图片处理流水线
 //
-// 本目录负责「把图库目录变成可入库的图片记录」：
+// 本目录负责「把来源目录变成可入库的图片记录」：
 //   walk.ts             目录遍历（I/O，主进程分片让出）
 //   thumbnail-pool.ts   解码用的线程池
 //   thumbnail-worker.ts 线程入口，只负责收发消息
@@ -22,7 +22,7 @@ const { imageSize } = require('image-size');
 const YIELD_EVERY = 200;
 
 /**
- * 收录进图库的图片扩展名（小写、不含点）。
+ * 会被收录的图片扩展名（小写、不含点）。
  *
  * 只决定「哪些文件会被扫描入库」，不等于「哪些格式能生成缩略图」——
  * 后者取决于 sharp 能否解出这张图，解不出来就计入任务结果的失败张数。
@@ -92,7 +92,7 @@ export async function buildDirTree(rootPath: string): Promise<DirNode[]> {
  * 递归收集目录下的图片文件，只带文件名、路径、大小与扩展名。
  *
  * 宽高与缩略图留空，由工作线程补齐；读不到的目录或文件直接跳过——
- * 图库目录来自外部，权限与并发改动都不可控。
+ * 来源目录来自外部，权限与并发改动都不可控。
  */
 export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]> {
   const files: ScannedFile[] = [];

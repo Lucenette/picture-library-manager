@@ -19,22 +19,22 @@ function call<T>(method: string, ...args: unknown[]): Promise<T> {
 // Gallery
 // ------------------------------------------------------------
 
-/** 新增图库，名称由主进程取目录名 */
+/** 新增来源，名称由主进程取目录名 */
 export function addGallery(rootPath: string): Promise<Gallery> {
   return call('addGallery', rootPath);
 }
 
-/** 查询全部图库 */
+/** 查询全部来源 */
 export function getAllGalleries(): Promise<Gallery[]> {
   return call('getAllGalleries');
 }
 
-/** 清空图库下的扫描数据 */
+/** 清空来源下的扫描数据 */
 export function clearGalleryData(galleryId: number): Promise<void> {
   return call('clearGalleryData', galleryId);
 }
 
-/** 删除图库及其扫描数据 */
+/** 删除来源及其扫描数据 */
 export function deleteGallery(galleryId: number): Promise<void> {
   return call('deleteGallery', galleryId);
 }
@@ -43,7 +43,7 @@ export function deleteGallery(galleryId: number): Promise<void> {
 // Character
 // ------------------------------------------------------------
 
-/** 查询图库下的角色 */
+/** 查询来源下的角色 */
 export function getCharactersByGallery(galleryId: number): Promise<Character[]> {
   return call('getCharactersByGallery', galleryId);
 }
@@ -127,12 +127,12 @@ export function upsertProcessedImage(
   return call('upsertProcessedImage', imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId);
 }
 
-/** 查询准图库列表 */
+/** 查询图库列表 */
 export function getAllProcessedImages(galleryId?: number, characterName?: string): Promise<ProcessedImageView[]> {
   return call('getAllProcessedImages', galleryId, characterName);
 }
 
-/** 删除准图库记录 */
+/** 删除图库记录 */
 export function deleteProcessedImage(id: number): Promise<void> {
   return call('deleteProcessedImage', id);
 }

@@ -5,7 +5,7 @@ import { getProcessedForExport, type ProcessedExportRow } from '@/database/db';
 import type { TaskContext } from '@/task/manager';
 
 /**
- * 把一批准图库记录导出到目标目录。
+ * 把一批图库记录导出到目标目录。
  *
  * 目录结构为 {目标目录}/{角色名}/{角色名}_{0001}.{扩展名}，序号按角色在本轮
  * 导出中的出现顺序递增；失败的文件逐条记录，不中断整轮导出。

@@ -21,9 +21,9 @@ interface StoredGroup extends ScannedGroup {
 type StoredCharacter = Omit<ScannedCharacter, 'groups'> & { groups: StoredGroup[] };
 
 /**
- * 扫描一个图库。
+ * 扫描一个来源。
  *
- * 顺序是既定的：**先清除该图库的既有数据，再把扫描结果写回去**。
+ * 顺序是既定的：**先清除该来源的既有数据，再把扫描结果写回去**。
  * 清除本身立刻提交，之后**每张图各自一条 INSERT**——写完一张就落一张，
  * 扫描中途出错或被取消，已经解出来并写进去的图都留在库里。
  * 目录遍历在主进程但会周期性让出事件循环，图片解码交给工作线程。
@@ -32,7 +32,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   const { galleryId, scriptId } = ctx.payload as ScanTaskPayload;
   const gallery = getGalleryById(galleryId);
   if (!gallery) {
-    throw new Error(`图库不存在（id=${galleryId}）`);
+    throw new Error(`来源不存在（id=${galleryId}）`);
   }
 
   const characters: StoredCharacter[] = [];
@@ -48,7 +48,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     console.error(`写入失败：${what}`, (error as Error).message);
   };
 
-  // 先清除本图库的旧数据，清除立刻提交
+  // 先清除本来源的旧数据，清除立刻提交
   beginBatch();
   try {
     clearGalleryData(galleryId);
@@ -117,7 +117,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   updateGalleryScannedAt(galleryId);
 
   if (failedWrites > 0) {
-    console.error(`扫描写入结束：${failedWrites} 处写入失败，图库数据可能不完整`);
+    console.error(`扫描写入结束：${failedWrites} 处写入失败，来源数据可能不完整`);
   }
 
   const thumbnails = characters.reduce(

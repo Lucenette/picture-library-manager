@@ -5,7 +5,7 @@ import { IPC } from '@common/ipcChannels';
 export function initSystem(): void {
   ipcMain.handle(IPC.DIALOG_OPEN_DIR, async () => {
     const result = await dialog.showOpenDialog({
-      title: '选择图库目录（可多选）',
+      title: '选择来源目录（可多选）',
       properties: ['openDirectory', 'multiSelections'],
     });
     return result.canceled ? [] : result.filePaths;
