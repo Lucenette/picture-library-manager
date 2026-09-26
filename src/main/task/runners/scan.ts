@@ -4,8 +4,8 @@ import type {
   StructureInput, StructureOutput, ThumbnailEngineName,
 } from '@common/types';
 import {
-  beginBatch, clearGalleryData, endBatch, getGalleryById,
-  insertCharacter, insertImageFiles, insertImageGroup, updateGalleryScannedAt,
+  beginBatch, clearSourceData, endBatch, getSourceById,
+  insertCharacter, insertImageFiles, insertImageGroup, updateSourceScannedAt,
 } from '@/database/db';
 import { buildDirTree, collectImageFiles } from '@/image/walk';
 import { executeScript } from '@/script/script-service';
@@ -29,10 +29,10 @@ type StoredCharacter = Omit<ScannedCharacter, 'groups'> & { groups: StoredGroup[
  * 目录遍历在主进程但会周期性让出事件循环，图片解码交给工作线程。
  */
 export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
-  const { galleryId, scriptId } = ctx.payload as ScanTaskPayload;
-  const gallery = getGalleryById(galleryId);
-  if (!gallery) {
-    throw new Error(`来源不存在（id=${galleryId}）`);
+  const { sourceId, scriptId } = ctx.payload as ScanTaskPayload;
+  const source = getSourceById(sourceId);
+  if (!source) {
+    throw new Error(`来源不存在（id=${sourceId}）`);
   }
 
   const characters: StoredCharacter[] = [];
@@ -51,18 +51,18 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   // 先清除本来源的旧数据，清除立刻提交
   beginBatch();
   try {
-    clearGalleryData(galleryId);
+    clearSourceData(sourceId);
   } finally {
     endBatch();
   }
 
   // ---- 1. 结构识别 ----
   ctx.report(2, '读取目录结构');
-  const tree = await buildDirTree(gallery.rootPath);
+  const tree = await buildDirTree(source.rootPath);
   await ctx.checkpoint();
 
   const structure = await executeScript<StructureOutput[]>(scriptId, 'identify-structure', {
-    rootPath: gallery.rootPath,
+    rootPath: source.rootPath,
     tree,
   } satisfies StructureInput);
   await ctx.checkpoint();
@@ -73,7 +73,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   for (const item of structure) {
     let characterRecord: Character;
     try {
-      characterRecord = insertCharacter(galleryId, item.name, gallery.rootPath);
+      characterRecord = insertCharacter(sourceId, item.name, source.rootPath);
     } catch (error) {
       recordWriteFailure(`角色「${item.name}」`, error);
       continue;
@@ -83,7 +83,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     for (const groupRelativePath of item.groups) {
       collectedGroups += 1;
       try {
-        const dirPath = join(gallery.rootPath, groupRelativePath);
+        const dirPath = join(source.rootPath, groupRelativePath);
         const files = await collectImageFiles(dirPath);
         const groupRecord = insertImageGroup(
           characterRecord.id, groupRelativePath, dirPath, files.length,
@@ -99,7 +99,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
       );
       await ctx.checkpoint();
     }
-    characters.push({ name: item.name, sourcePath: gallery.rootPath, groups });
+    characters.push({ name: item.name, sourcePath: source.rootPath, groups });
   }
 
     // ---- 3. 逐张生成缩略图并立刻入库：一张一条 INSERT，写一张落一张 ----
@@ -114,7 +114,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     thumbnailEngine = outcome.engine;
   }
 
-  updateGalleryScannedAt(galleryId);
+  updateSourceScannedAt(sourceId);
 
   if (failedWrites > 0) {
     console.error(`扫描写入结束：${failedWrites} 处写入失败，来源数据可能不完整`);

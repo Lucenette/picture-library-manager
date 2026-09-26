@@ -21,7 +21,7 @@ import LoadingPage from '@/views/startup/LoadingPage.vue';
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', name: 'gallery', component: () => import('@/views/main/GalleryPage.vue') },
+    { path: '/', name: 'source', component: () => import('@/views/main/SourcePage.vue') },
     { path: '/scripts', name: 'scripts', component: () => import('@/views/main/ScriptPage.vue') },
     { path: '/characters', name: 'characters', component: () => import('@/views/main/CharacterPage.vue') },
     { path: '/process', name: 'process', component: () => import('@/views/main/ProcessPage.vue') },

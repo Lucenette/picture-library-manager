@@ -72,6 +72,6 @@ async function selectImageForGroup(group: ImageGroupView, scriptId: number): Pro
   }
 
   upsertProcessedImage(
-    group.id, group.characterId, group.galleryId, group.dirPath, selectedFile, scriptId,
+    group.id, group.characterId, group.sourceId, group.dirPath, selectedFile, scriptId,
   );
 }

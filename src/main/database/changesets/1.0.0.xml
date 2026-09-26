@@ -174,4 +174,30 @@
     </sql>
   </changeSet>
 
+  <changeSet id="20260926075055276522" author="powerinv">
+    <comment>gallery 表改名：gallery → source（来源）</comment>
+    <sql>
+      ALTER TABLE gallery RENAME TO source;
+    </sql>
+</changeSet>
+  <changeSet id="20260926075055277592" author="powerinv">
+    <comment>character、processed_image 的 gallery_id 列改名：→ source_id</comment>
+    <sql>
+      ALTER TABLE character RENAME COLUMN gallery_id TO source_id;
+      ALTER TABLE processed_image RENAME COLUMN gallery_id TO source_id;
+    </sql>
+</changeSet>
+  <changeSet id="20260926075055278812" author="powerinv">
+    <comment>idx_processed_gallery 索引随列改名：→ idx_processed_source</comment>
+    <sql>
+      DROP INDEX IF EXISTS idx_processed_gallery;
+      CREATE INDEX IF NOT EXISTS idx_processed_source ON processed_image(source_id);
+    </sql>
+</changeSet>
+  <changeSet id="20260926075901713568" author="powerinv">
+    <comment>task | 任务表：订正持久化 payload 里的旧键名</comment>
+    <sql>
+      UPDATE task SET payload = replace(payload, '"galleryId"', '"sourceId"') WHERE payload LIKE '%"galleryId"%';
+    </sql>
+  </changeSet>
 </databaseChangeLog>

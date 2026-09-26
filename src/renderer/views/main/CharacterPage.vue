@@ -17,7 +17,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="galleryName" label="来源" width="160" sortable="custom" />
+        <el-table-column prop="sourceName" label="来源" width="160" sortable="custom" />
         <el-table-column prop="name" label="角色名" min-width="200" sortable="custom">
           <template #default="{ row }">
             <span class="char-name" @dblclick="openSingleRename(row)">{{ row.name }}</span>
@@ -48,23 +48,23 @@
 import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import type { Character, Gallery, PromptInitData, PromptResult } from '@common/types';
+import type { Character, Source, PromptInitData, PromptResult } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog } from '@/services/dialog-service';
-import { getAllGalleries, getCharactersByGallery, renameCharacter } from '@/db/database';
+import { getAllSources, getCharactersBySource, renameCharacter } from '@/db/database';
 
 /** 列表行：角色实体 + 所属来源名 */
-type CharacterRow = Character & { galleryName: string };
+type CharacterRow = Character & { sourceName: string };
 
 // ------------------------------------------------------------
 // 状态
 // ------------------------------------------------------------
 
 const characters = ref<CharacterRow[]>([]);
-const galleries = ref<Gallery[]>([]);
+const sources = ref<Source[]>([]);
 const selectedIds = ref<number[]>([]);
 
 const page = ref(1);
@@ -72,7 +72,7 @@ const pageSize = ref(20);
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
-const galleryFilter = ref<number | undefined>(undefined);
+const sourceFilter = ref<number | undefined>(undefined);
 const nameFilter = ref('');
 const pathFilter = ref('');
 
@@ -84,15 +84,15 @@ const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilt
 // 计算属性
 // ------------------------------------------------------------
 
-const galleryItems = computed(() =>
-  galleries.value.map((gallery) => ({ label: gallery.name, value: String(gallery.id) })),
+const sourceItems = computed(() =>
+  sources.value.map((source) => ({ label: source.name, value: String(source.id) })),
 );
 
 const filteredCharacters = computed(() => {
   let list = characters.value;
 
-  if (galleryFilter.value) {
-    list = list.filter((item) => item.galleryId === galleryFilter.value);
+  if (sourceFilter.value) {
+    list = list.filter((item) => item.sourceId === sourceFilter.value);
   }
   if (nameFilter.value) {
     const keyword = nameFilter.value.toLowerCase();
@@ -107,7 +107,7 @@ const filteredCharacters = computed(() => {
   const order = sortOrder.value;
   if (!prop || !order) {
     return [...list].sort(
-      (a, b) => a.galleryName.localeCompare(b.galleryName) || a.name.localeCompare(b.name),
+      (a, b) => a.sourceName.localeCompare(b.sourceName) || a.name.localeCompare(b.name),
     );
   }
 
@@ -121,18 +121,18 @@ const pagedCharacters = computed(() =>
 
 const filterSections = computed<FilterSection[]>(() => [
   {
-    key: 'gallery',
+    key: 'source',
     label: '来源',
-    value: galleryFilter.value ? String(galleryFilter.value) : '',
-    display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
-    items: galleryItems.value,
+    value: sourceFilter.value ? String(sourceFilter.value) : '',
+    display: sources.value.find((source) => source.id === sourceFilter.value)?.name ?? '',
+    items: sourceItems.value,
     onSelect: (value: string) => {
-      galleryFilter.value = Number(value);
-      activateFilter('gallery');
+      sourceFilter.value = Number(value);
+      activateFilter('source');
     },
     onClear: () => {
-      galleryFilter.value = undefined;
-      deactivateFilter('gallery');
+      sourceFilter.value = undefined;
+      deactivateFilter('source');
     },
   },
   {
@@ -172,13 +172,13 @@ const filterSections = computed<FilterSection[]>(() => [
 // ------------------------------------------------------------
 
 async function loadData(): Promise<void> {
-  galleries.value = await getAllGalleries();
+  sources.value = await getAllSources();
 
   const rows: CharacterRow[] = [];
-  for (const gallery of galleries.value) {
-    const galleryCharacters = await getCharactersByGallery(gallery.id);
-    for (const character of galleryCharacters) {
-      rows.push({ ...character, galleryName: gallery.name });
+  for (const source of sources.value) {
+    const sourceCharacters = await getCharactersBySource(source.id);
+    for (const character of sourceCharacters) {
+      rows.push({ ...character, sourceName: source.name });
     }
   }
   characters.value = rows;

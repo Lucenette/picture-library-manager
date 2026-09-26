@@ -1,7 +1,7 @@
 <template>
-  <div class="gallery-page">
+  <div class="source-page">
     <div class="toolbar">
-      <el-button type="primary" @click="addGallery">
+      <el-button type="primary" @click="addSource">
         <el-icon><Plus /></el-icon> 添加来源
       </el-button>
       <el-button type="success" :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
@@ -14,7 +14,7 @@
 
     <div class="table-wrap">
       <el-table
-        :data="pagedGalleries"
+        :data="pagedSources"
         row-key="id"
         @sort-change="onSortChange"
         @selection-change="onSelectionChange"
@@ -31,7 +31,7 @@
           <template #default="{ row }">
             <el-button size="small" text type="primary" @click="openScanConfig(row)">扫描</el-button>
             <el-button size="small" text type="warning" @click="clearData(row)">清理数据</el-button>
-            <el-button size="small" text type="danger" @click="removeGallery(row)">删除</el-button>
+            <el-button size="small" text type="danger" @click="removeSource(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -42,7 +42,7 @@
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
-        :total="sortedGalleries.length"
+        :total="sortedSources.length"
         layout="total, sizes, prev, pager, next, jumper"
       />
     </div>
@@ -55,11 +55,11 @@ import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
-import type { Gallery, ProcessScript, ScanConfigInitData, ScanConfigResult } from '@common/types';
+import type { Source, ProcessScript, ScanConfigInitData, ScanConfigResult } from '@common/types';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import {
-  addGallery as dbAddGallery, clearGalleryData, deleteGallery, getAllGalleries, getScriptsByType,
+  addSource as dbAddSource, clearSourceData, deleteSource, getAllSources, getScriptsByType,
 } from '@/db/database';
 import { confirmDialog } from '@/services/dialog-service';
 
@@ -67,7 +67,7 @@ import { confirmDialog } from '@/services/dialog-service';
 // 状态
 // ------------------------------------------------------------
 
-const galleries = ref<Gallery[]>([]);
+const sources = ref<Source[]>([]);
 const structScripts = ref<ProcessScript[]>([]);
 const selectedIds = ref<number[]>([]);
 
@@ -82,32 +82,32 @@ const { actions } = useTasks();
 // 计算属性
 // ------------------------------------------------------------
 
-const sortedGalleries = computed(() => {
+const sortedSources = computed(() => {
   const prop = sortProp.value;
   const order = sortOrder.value;
   if (!prop || !order) {
-    return [...galleries.value].sort((a, b) => a.name.localeCompare(b.name));
+    return [...sources.value].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   const direction = order === 'ascending' ? 1 : -1;
-  return [...galleries.value].sort((a, b) => {
+  return [...sources.value].sort((a, b) => {
     const left = String((a as Record<string, unknown>)[prop] ?? '');
     const right = String((b as Record<string, unknown>)[prop] ?? '');
     return left.localeCompare(right) * direction;
   });
 });
 
-const pagedGalleries = computed(() => {
+const pagedSources = computed(() => {
   const start = (page.value - 1) * pageSize.value;
-  return sortedGalleries.value.slice(start, start + pageSize.value);
+  return sortedSources.value.slice(start, start + pageSize.value);
 });
 
 // ------------------------------------------------------------
 // 列表操作
 // ------------------------------------------------------------
 
-async function loadGalleries(): Promise<void> {
-  galleries.value = await getAllGalleries();
+async function loadSources(): Promise<void> {
+  sources.value = await getAllSources();
   structScripts.value = await getScriptsByType('identify-structure');
 }
 
@@ -116,12 +116,12 @@ function onSortChange({ prop, order }: { prop: string | null; order: string | nu
   sortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
-function onSelectionChange(rows: Gallery[]): void {
+function onSelectionChange(rows: Source[]): void {
   selectedIds.value = rows.map((row) => row.id);
 }
 
 /** 通过系统对话框添加来源，支持一次选择多个目录 */
-async function addGallery(): Promise<void> {
+async function addSource(): Promise<void> {
   const rootPaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR);
   if (!rootPaths?.length) {
     return;
@@ -129,7 +129,7 @@ async function addGallery(): Promise<void> {
 
   for (const rootPath of rootPaths) {
     try {
-      await dbAddGallery(rootPath);
+      await dbAddSource(rootPath);
     } catch (error) {
       // 目录已添加过会命中 root_path 唯一约束，属于预期内的忽略
       if (!(error as Error).message?.includes('UNIQUE')) {
@@ -137,35 +137,35 @@ async function addGallery(): Promise<void> {
       }
     }
   }
-  await loadGalleries();
+  await loadSources();
 }
 
-async function clearData(gallery: Gallery): Promise<void> {
+async function clearData(source: Source): Promise<void> {
   const confirmed = await confirmDialog({
     title: '清理来源数据',
-    message: `确定清理来源「${gallery.name}」的所有扫描数据？\n（不会删除原始文件）`,
+    message: `确定清理来源「${source.name}」的所有扫描数据？\n（不会删除原始文件）`,
     confirmText: '清理',
     danger: true,
   });
   if (!confirmed) {
     return;
   }
-  await clearGalleryData(gallery.id);
-  await loadGalleries();
+  await clearSourceData(source.id);
+  await loadSources();
 }
 
-async function removeGallery(gallery: Gallery): Promise<void> {
+async function removeSource(source: Source): Promise<void> {
   const confirmed = await confirmDialog({
     title: '删除来源',
-    message: `确定删除来源「${gallery.name}」及其所有扫描数据？\n（不会删除原始文件）`,
+    message: `确定删除来源「${source.name}」及其所有扫描数据？\n（不会删除原始文件）`,
     confirmText: '删除',
     danger: true,
   });
   if (!confirmed) {
     return;
   }
-  await deleteGallery(gallery.id);
-  await loadGalleries();
+  await deleteSource(source.id);
+  await loadSources();
 }
 
 async function batchDelete(): Promise<void> {
@@ -179,31 +179,31 @@ async function batchDelete(): Promise<void> {
     return;
   }
   for (const id of selectedIds.value) {
-    await deleteGallery(id);
+    await deleteSource(id);
   }
-  await loadGalleries();
+  await loadSources();
 }
 
 // ------------------------------------------------------------
 // 扫描
 // ------------------------------------------------------------
 
-function openScanConfig(gallery: Gallery): void {
-  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([gallery]));
+function openScanConfig(source: Source): void {
+  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([source]));
 }
 
 function openScanConfigForSelection(): void {
-  const targets = galleries.value.filter((gallery) => selectedIds.value.includes(gallery.id));
+  const targets = sources.value.filter((source) => selectedIds.value.includes(source.id));
   ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload(targets));
 }
 
 /** 组装扫描配置窗口的初始化数据 */
-function buildScanConfigPayload(targets: Gallery[]): ScanConfigInitData {
+function buildScanConfigPayload(targets: Source[]): ScanConfigInitData {
   return {
     scripts: structScripts.value.map((script) => ({ id: script.id, name: script.name })),
-    galleryIds: targets.map((gallery) => gallery.id),
-    galleryName: targets.length === 1 ? targets[0].name : '',
-    galleryCount: targets.length,
+    sourceIds: targets.map((source) => source.id),
+    sourceName: targets.length === 1 ? targets[0].name : '',
+    sourceCount: targets.length,
   };
 }
 
@@ -213,17 +213,17 @@ useIpcListener(IPC.SCAN_CONFIG_CONFIRMED, (result: ScanConfigResult) => {
 
 /** 一个来源一个任务：进度独立，可以单独取消、暂停与重试 */
 async function submitScanTasks(result: ScanConfigResult): Promise<void> {
-  for (const galleryId of result.galleryIds) {
-    await actions.submit('scan', { galleryId, scriptId: result.scriptId });
+  for (const sourceId of result.sourceIds) {
+    await actions.submit('scan', { sourceId, scriptId: result.scriptId });
   }
-  ElMessage.success(`已提交 ${result.galleryIds.length} 个扫描任务，可在「任务」页查看进度`);
+  ElMessage.success(`已提交 ${result.sourceIds.length} 个扫描任务，可在「任务」页查看进度`);
 }
 
-onMounted(loadGalleries);
+onMounted(loadSources);
 </script>
 
 <style scoped>
-.gallery-page {
+.source-page {
   padding: 0 24px;
   height: 100%;
   display: flex;

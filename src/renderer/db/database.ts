@@ -1,7 +1,7 @@
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, Gallery, ImageFile, ImageGroupStatus, ImageGroupView,
+  Character, Source, ImageFile, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScriptType,
 } from '@common/types';
 
@@ -16,27 +16,27 @@ function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 
 // ------------------------------------------------------------
-// Gallery
+// Source
 // ------------------------------------------------------------
 
 /** 新增来源，名称由主进程取目录名 */
-export function addGallery(rootPath: string): Promise<Gallery> {
-  return call('addGallery', rootPath);
+export function addSource(rootPath: string): Promise<Source> {
+  return call('addSource', rootPath);
 }
 
 /** 查询全部来源 */
-export function getAllGalleries(): Promise<Gallery[]> {
-  return call('getAllGalleries');
+export function getAllSources(): Promise<Source[]> {
+  return call('getAllSources');
 }
 
 /** 清空来源下的扫描数据 */
-export function clearGalleryData(galleryId: number): Promise<void> {
-  return call('clearGalleryData', galleryId);
+export function clearSourceData(sourceId: number): Promise<void> {
+  return call('clearSourceData', sourceId);
 }
 
 /** 删除来源及其扫描数据 */
-export function deleteGallery(galleryId: number): Promise<void> {
-  return call('deleteGallery', galleryId);
+export function deleteSource(sourceId: number): Promise<void> {
+  return call('deleteSource', sourceId);
 }
 
 // ------------------------------------------------------------
@@ -44,8 +44,8 @@ export function deleteGallery(galleryId: number): Promise<void> {
 // ------------------------------------------------------------
 
 /** 查询来源下的角色 */
-export function getCharactersByGallery(galleryId: number): Promise<Character[]> {
-  return call('getCharactersByGallery', galleryId);
+export function getCharactersBySource(sourceId: number): Promise<Character[]> {
+  return call('getCharactersBySource', sourceId);
 }
 
 /** 重命名角色 */
@@ -58,8 +58,8 @@ export function renameCharacter(id: number, name: string): Promise<void> {
 // ------------------------------------------------------------
 
 /** 查询图片组列表 */
-export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number): Promise<ImageGroupView[]> {
-  return call('getImageGroupsView', status, galleryId);
+export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): Promise<ImageGroupView[]> {
+  return call('getImageGroupsView', status, sourceId);
 }
 
 /** 更新图片组状态 */
@@ -119,17 +119,17 @@ export function deleteScript(id: number): Promise<void> {
 export function upsertProcessedImage(
   imageGroupId: number,
   characterId: number,
-  galleryId: number,
+  sourceId: number,
   originalPath: string,
   selectedFile: string,
   scriptId: number | null,
 ): Promise<ProcessedImage> {
-  return call('upsertProcessedImage', imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId);
+  return call('upsertProcessedImage', imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId);
 }
 
 /** 查询图库列表 */
-export function getAllProcessedImages(galleryId?: number, characterName?: string): Promise<ProcessedImageView[]> {
-  return call('getAllProcessedImages', galleryId, characterName);
+export function getAllProcessedImages(sourceId?: number, characterName?: string): Promise<ProcessedImageView[]> {
+  return call('getAllProcessedImages', sourceId, characterName);
 }
 
 /** 删除图库记录 */

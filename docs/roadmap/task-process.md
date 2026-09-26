@@ -18,7 +18,7 @@
    接近 0、网络占用饱和、内存不变。同一图库在「写入图片」阶段由工作线程读取文件时界面流畅，
    表明瓶颈不在 I/O 总量，而在同步 I/O 占用了主线程。
 3. **任务中断后只能从零重跑。** 暂停中的任务在正常退出时被标记为 `cancelled`，强制结束进程或断电后由
-   `restore()` 标记为 `failed`；唯一补救手段是重试，而扫描的重试会先执行 `clearGalleryData`，
+   `restore()` 标记为 `failed`；唯一补救手段是重试，而扫描的重试会先执行 `clearSourceData`，
    已写入的结果被清除。
 
 ## 2. 目标与非目标
@@ -127,10 +127,10 @@ ack 或超时。
 - 仅暴露任务所需的窄接口，不提供「可调用任意数据库方法」的能力：
 
 ```
-taskDb.clearGallery(galleryId)
+taskDb.clearSource(sourceId)
 taskDb.insertCharacter / insertGroup / insertFileRow
 taskDb.updateFileMedia(filePath, thumbnail, phash, width, height)
-taskDb.listFilesMissingMedia(galleryId)      // 续跑与补做大图共用
+taskDb.listFilesMissingMedia(sourceId)      // 续跑与补做大图共用
 taskDb.listSelectedFiles()                   // similar 的输入
 taskDb.upsertProcessedImage(...) / listGroupsMissingResult(payload)
 taskDb.listExportTargets(imageIds)

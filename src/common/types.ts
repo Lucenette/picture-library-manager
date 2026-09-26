@@ -7,7 +7,7 @@
 // ------------------------------------------------------------
 
 /** 来源：一个受管理的图包根目录 */
-export interface Gallery {
+export interface Source {
   id: number;
   name: string;
   rootPath: string;
@@ -19,7 +19,7 @@ export interface Gallery {
 /** 角色：来源下按目录归并出的角色 */
 export interface Character {
   id: number;
-  galleryId: number;
+  sourceId: number;
   name: string;
   sourcePath: string;
   createdAt: string;
@@ -76,7 +76,7 @@ export interface ProcessedImage {
   id: number;
   imageGroupId: number;
   characterId: number;
-  galleryId: number;
+  sourceId: number;
   originalPath: string;
   selectedFile: string;
   scriptId: number | null;
@@ -91,14 +91,14 @@ export interface ProcessedImage {
 /** 页面「图组确认」的图片组行 */
 export interface ImageGroupView extends ImageGroup {
   characterName: string;
-  galleryName: string;
-  galleryId: number;
+  sourceName: string;
+  sourceId: number;
 }
 
 /** 「图库」页的行 */
 export interface ProcessedImageView extends ProcessedImage {
   characterName: string;
-  galleryName: string;
+  sourceName: string;
   scriptName: string | null;
   selectedFileName: string;
   selectedFileThumbnail: string | null;
@@ -189,14 +189,14 @@ export interface ViewerPayload {
 /** 扫描配置窗口初始化数据 */
 export interface ScanConfigInitData {
   scripts: ScriptOption[];
-  galleryIds: number[];
-  galleryName: string;
-  galleryCount: number;
+  sourceIds: number[];
+  sourceName: string;
+  sourceCount: number;
 }
 
 /** 扫描配置窗口的确认结果 */
 export interface ScanConfigResult {
-  galleryIds: number[];
+  sourceIds: number[];
   scriptId: number;
 }
 
@@ -282,7 +282,7 @@ export type TaskStatus = 'pending' | 'running' | 'paused' | 'done' | 'failed' | 
 
 /** 扫描任务入参：一次扫描一个来源，便于独立取消与原子提交 */
 export interface ScanTaskPayload {
-  galleryId: number;
+  sourceId: number;
   scriptId: number;
 }
 

@@ -2,8 +2,8 @@
   <div class="scan-config">
     <div class="config-header">扫描配置</div>
     <div class="config-body">
-      <p class="gallery-name">来源：{{ galleryName }}</p>
-      <p v-if="galleryCount > 1" class="gallery-name">共 {{ galleryCount }} 个来源</p>
+      <p class="source-name">来源：{{ sourceName }}</p>
+      <p v-if="sourceCount > 1" class="source-name">共 {{ sourceCount }} 个来源</p>
 
       <DropdownControl v-model="scriptId" :items="scripts" placeholder="目录结构识别脚本" />
 
@@ -23,9 +23,9 @@ import DropdownControl from '@/components/DropdownControl.vue';
 
 const scriptId = ref<number | null>(null);
 const scripts = ref<ScriptOption[]>([]);
-const galleryName = ref('');
-const galleryCount = ref(1);
-const galleryIds = ref<number[]>([]);
+const sourceName = ref('');
+const sourceCount = ref(1);
+const sourceIds = ref<number[]>([]);
 
 /** 进窗口后自己去主进程取初始化数据 */
 async function loadInitData(): Promise<void> {
@@ -34,9 +34,9 @@ async function loadInitData(): Promise<void> {
     return;
   }
   scripts.value = data.scripts;
-  galleryName.value = data.galleryName;
-  galleryCount.value = data.galleryCount;
-  galleryIds.value = data.galleryIds;
+  sourceName.value = data.sourceName;
+  sourceCount.value = data.sourceCount;
+  sourceIds.value = data.sourceIds;
 }
 
 async function confirm(): Promise<void> {
@@ -45,7 +45,7 @@ async function confirm(): Promise<void> {
   }
 
   const result: ScanConfigResult = {
-    galleryIds: [...galleryIds.value],
+    sourceIds: [...sourceIds.value],
     scriptId: Number(scriptId.value),
   };
   await ipcRenderer.invoke(IPC.SCAN_CONFIG_CONFIRM, result);
@@ -92,7 +92,7 @@ onMounted(loadInitData);
   -webkit-app-region: no-drag;
 }
 
-.gallery-name {
+.source-name {
   margin-bottom: 16px;
   font-size: 13px;
   color: #b4b6ba;

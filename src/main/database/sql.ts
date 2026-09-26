@@ -35,32 +35,32 @@ export const SQL = {
   JOIN image_file f ON f.file_path = pi.selected_file`,
 
   // ----------------------------------------------------------
-  // Gallery
+  // Source
   // ----------------------------------------------------------
 
-  INSERT_GALLERY: 'INSERT INTO gallery (name, root_path) VALUES (?, ?)',
-  SELECT_GALLERY_ALL: 'SELECT * FROM gallery ORDER BY created_at DESC',
-  SELECT_GALLERY_BY_ID: 'SELECT * FROM gallery WHERE id = ?',
-  DELETE_GALLERY: 'DELETE FROM gallery WHERE id = ?',
-  UPDATE_GALLERY_SCAN: "UPDATE gallery SET scanned_at = datetime('now','localtime') WHERE id = ?",
+  INSERT_SOURCE: 'INSERT INTO source (name, root_path) VALUES (?, ?)',
+  SELECT_SOURCE_ALL: 'SELECT * FROM source ORDER BY created_at DESC',
+  SELECT_SOURCE_BY_ID: 'SELECT * FROM source WHERE id = ?',
+  DELETE_SOURCE: 'DELETE FROM source WHERE id = ?',
+  UPDATE_SOURCE_SCAN: "UPDATE source SET scanned_at = datetime('now','localtime') WHERE id = ?",
 
   // 删除来源时按依赖逆序手工级联清理
-  DELETE_PROCESSED_BY_GALLERY: 'DELETE FROM processed_image WHERE gallery_id = ?',
-  DELETE_IMAGE_FILES_BY_GALLERY: `DELETE FROM image_file WHERE image_group_id IN (
-  SELECT id FROM image_group WHERE character_id IN (SELECT id FROM character WHERE gallery_id = ?)
+  DELETE_PROCESSED_BY_SOURCE: 'DELETE FROM processed_image WHERE source_id = ?',
+  DELETE_IMAGE_FILES_BY_SOURCE: `DELETE FROM image_file WHERE image_group_id IN (
+  SELECT id FROM image_group WHERE character_id IN (SELECT id FROM character WHERE source_id = ?)
 )`,
-  DELETE_IMAGE_GROUPS_BY_GALLERY: `DELETE FROM image_group WHERE character_id IN (
-  SELECT id FROM character WHERE gallery_id = ?
+  DELETE_IMAGE_GROUPS_BY_SOURCE: `DELETE FROM image_group WHERE character_id IN (
+  SELECT id FROM character WHERE source_id = ?
 )`,
-  DELETE_CHARACTERS_BY_GALLERY: 'DELETE FROM character WHERE gallery_id = ?',
+  DELETE_CHARACTERS_BY_SOURCE: 'DELETE FROM character WHERE source_id = ?',
 
   // ----------------------------------------------------------
   // Character
   // ----------------------------------------------------------
 
-  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (gallery_id, name, source_path) VALUES (?, ?, ?)',
-  SELECT_CHARACTER_BY_GALLERY_NAME: 'SELECT * FROM character WHERE gallery_id = ? AND name = ?',
-  SELECT_CHARACTERS_BY_GALLERY: 'SELECT * FROM character WHERE gallery_id = ? ORDER BY name',
+  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (source_id, name, source_path) VALUES (?, ?, ?)',
+  SELECT_CHARACTER_BY_SOURCE_NAME: 'SELECT * FROM character WHERE source_id = ? AND name = ?',
+  SELECT_CHARACTERS_BY_SOURCE: 'SELECT * FROM character WHERE source_id = ? ORDER BY name',
   RENAME_CHARACTER: 'UPDATE character SET name = ? WHERE id = ?',
 
   // ----------------------------------------------------------
@@ -74,10 +74,10 @@ export const SQL = {
   UPDATE_IMAGE_GROUP_PENDING: "UPDATE image_group SET status = 'pending' WHERE id = ?",
 
   /** 图片组列表基语句，调用方按需追加 WHERE 与 ORDER BY */
-  SELECT_IMAGE_GROUPS_VIEW_BASE: `SELECT ig.*, c.name AS characterName, g.name AS galleryName, g.id AS galleryId
+  SELECT_IMAGE_GROUPS_VIEW_BASE: `SELECT ig.*, c.name AS characterName, g.name AS sourceName, g.id AS sourceId
   FROM image_group ig
   JOIN character c ON ig.character_id = c.id
-  JOIN gallery g ON c.gallery_id = g.id
+  JOIN source g ON c.source_id = g.id
   WHERE 1 = 1`,
 
   // ----------------------------------------------------------
@@ -113,7 +113,7 @@ export const SQL = {
   // ProcessedImage
   // ----------------------------------------------------------
 
-  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, gallery_id, original_path, selected_file, script_id, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
   SELECT_PROCESSED_BY_GROUP: 'SELECT * FROM processed_image WHERE image_group_id = ?',
   SELECT_PROCESSED_BY_ID_GROUP: 'SELECT image_group_id FROM processed_image WHERE id = ?',
   UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
@@ -144,13 +144,13 @@ export const SQL = {
   DELETE_TASKS_FINISHED: "DELETE FROM task WHERE status IN ('done','failed','cancelled')",
 
   /** 图库列表基语句，调用方按需追加 WHERE 与 ORDER BY */
-  SELECT_PROCESSED_VIEW_BASE: `SELECT pi.*, c.name AS characterName, g.name AS galleryName,
+  SELECT_PROCESSED_VIEW_BASE: `SELECT pi.*, c.name AS characterName, g.name AS sourceName,
     ps.name AS scriptName, pi.selected_file AS selectedFileName,
     f.thumbnail AS selectedFileThumbnail, f.width AS selectedFileWidth,
     f.height AS selectedFileHeight, f.file_size AS selectedFileSize
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
-  JOIN gallery g ON pi.gallery_id = g.id
+  JOIN source g ON pi.source_id = g.id
   LEFT JOIN process_script ps ON pi.script_id = ps.id
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,

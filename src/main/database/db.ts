@@ -5,7 +5,7 @@ import { app, ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import { compileScriptModule } from '@/script/compile';
 import type {
-  Character, Gallery, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
+  Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
   MigrationProgress, SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
@@ -225,42 +225,42 @@ export function endBatch(): void {
 }
 
 // ------------------------------------------------------------
-// Gallery
+// Source
 // ------------------------------------------------------------
 
 /** 新增来源，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
-export function addGallery(rootPath: string): Gallery {
-  const id = insert(SQL.INSERT_GALLERY, [basename(rootPath), rootPath]);
-  return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id])!;
+export function addSource(rootPath: string): Source {
+  const id = insert(SQL.INSERT_SOURCE, [basename(rootPath), rootPath]);
+  return queryOne<Source>(SQL.SELECT_SOURCE_BY_ID, [id])!;
 }
 
 /** 按 id 查询来源 */
-export function getGalleryById(id: number): Gallery | undefined {
-  return queryOne<Gallery>(SQL.SELECT_GALLERY_BY_ID, [id]);
+export function getSourceById(id: number): Source | undefined {
+  return queryOne<Source>(SQL.SELECT_SOURCE_BY_ID, [id]);
 }
 
 /** 查询全部来源，按创建时间倒序 */
-export function getAllGalleries(): Gallery[] {
-  return queryAll<Gallery>(SQL.SELECT_GALLERY_ALL);
+export function getAllSources(): Source[] {
+  return queryAll<Source>(SQL.SELECT_SOURCE_ALL);
 }
 
 /** 清空来源下的全部扫描数据，保留来源本身，用于重新扫描 */
-export function clearGalleryData(galleryId: number): void {
-  run(SQL.DELETE_PROCESSED_BY_GALLERY, [galleryId]);
-  run(SQL.DELETE_IMAGE_FILES_BY_GALLERY, [galleryId]);
-  run(SQL.DELETE_IMAGE_GROUPS_BY_GALLERY, [galleryId]);
-  run(SQL.DELETE_CHARACTERS_BY_GALLERY, [galleryId]);
+export function clearSourceData(sourceId: number): void {
+  run(SQL.DELETE_PROCESSED_BY_SOURCE, [sourceId]);
+  run(SQL.DELETE_IMAGE_FILES_BY_SOURCE, [sourceId]);
+  run(SQL.DELETE_IMAGE_GROUPS_BY_SOURCE, [sourceId]);
+  run(SQL.DELETE_CHARACTERS_BY_SOURCE, [sourceId]);
 }
 
 /** 删除来源及其全部扫描数据 */
-export function deleteGallery(galleryId: number): void {
-  clearGalleryData(galleryId);
-  run(SQL.DELETE_GALLERY, [galleryId]);
+export function deleteSource(sourceId: number): void {
+  clearSourceData(sourceId);
+  run(SQL.DELETE_SOURCE, [sourceId]);
 }
 
 /** 记录来源最近一次扫描完成时间 */
-export function updateGalleryScannedAt(galleryId: number): void {
-  run(SQL.UPDATE_GALLERY_SCAN, [galleryId]);
+export function updateSourceScannedAt(sourceId: number): void {
+  run(SQL.UPDATE_SOURCE_SCAN, [sourceId]);
 }
 
 // ------------------------------------------------------------
@@ -268,14 +268,14 @@ export function updateGalleryScannedAt(galleryId: number): void {
 // ------------------------------------------------------------
 
 /** 写入角色；同来源下同名已存在时忽略并返回既有记录 */
-export function insertCharacter(galleryId: number, name: string, sourcePath: string): Character {
-  run(SQL.INSERT_CHARACTER, [galleryId, name, sourcePath]);
-  return queryOne<Character>(SQL.SELECT_CHARACTER_BY_GALLERY_NAME, [galleryId, name])!;
+export function insertCharacter(sourceId: number, name: string, sourcePath: string): Character {
+  run(SQL.INSERT_CHARACTER, [sourceId, name, sourcePath]);
+  return queryOne<Character>(SQL.SELECT_CHARACTER_BY_SOURCE_NAME, [sourceId, name])!;
 }
 
 /** 查询来源下的角色，按名称升序 */
-export function getCharactersByGallery(galleryId: number): Character[] {
-  return queryAll<Character>(SQL.SELECT_CHARACTERS_BY_GALLERY, [galleryId]);
+export function getCharactersBySource(sourceId: number): Character[] {
+  return queryAll<Character>(SQL.SELECT_CHARACTERS_BY_SOURCE, [sourceId]);
 }
 
 /** 重命名角色；与同来源内的角色重名时抛出可读错误 */
@@ -311,16 +311,16 @@ export function insertImageGroup(
 }
 
 /** 查询图片组列表，可按状态与来源过滤 */
-export function getImageGroupsView(status?: ImageGroupStatus, galleryId?: number): ImageGroupView[] {
+export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): ImageGroupView[] {
   let sql = SQL.SELECT_IMAGE_GROUPS_VIEW_BASE;
   const params: SqlValue[] = [];
   if (status) {
     sql += ' AND ig.status = ?';
     params.push(status);
   }
-  if (galleryId) {
+  if (sourceId) {
     sql += ' AND g.id = ?';
-    params.push(galleryId);
+    params.push(sourceId);
   }
   return queryAll<ImageGroupView>(`${sql} ORDER BY g.name, c.name, ig.dir_name`, params);
 }
@@ -564,7 +564,7 @@ export function deleteScript(id: number): void {
 export function upsertProcessedImage(
   imageGroupId: number,
   characterId: number,
-  galleryId: number,
+  sourceId: number,
   originalPath: string,
   selectedFile: string,
   scriptId: number | null,
@@ -574,7 +574,7 @@ export function upsertProcessedImage(
     run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, imageGroupId]);
   } else {
     run(SQL.INSERT_PROCESSED, [
-      imageGroupId, characterId, galleryId, originalPath, selectedFile, scriptId,
+      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId,
     ]);
   }
   run(SQL.UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
@@ -582,12 +582,12 @@ export function upsertProcessedImage(
 }
 
 /** 查询图库列表，可按来源与角色过滤 */
-export function getAllProcessedImages(galleryId?: number, characterName?: string): ProcessedImageView[] {
+export function getAllProcessedImages(sourceId?: number, characterName?: string): ProcessedImageView[] {
   let sql = SQL.SELECT_PROCESSED_VIEW_BASE;
   const params: SqlValue[] = [];
-  if (galleryId) {
-    sql += ' AND pi.gallery_id = ?';
-    params.push(galleryId);
+  if (sourceId) {
+    sql += ' AND pi.source_id = ?';
+    params.push(sourceId);
   }
   if (characterName) {
     sql += ' AND c.name = ?';
@@ -702,12 +702,12 @@ type DbMethod = (...args: any[]) => unknown;
 
 /** 暴露给渲染进程的数据库方法 */
 const DB_METHODS: Record<string, DbMethod> = {
-  addGallery,
-  getAllGalleries,
-  clearGalleryData,
-  deleteGallery,
+  addSource,
+  getAllSources,
+  clearSourceData,
+  deleteSource,
 
-  getCharactersByGallery,
+  getCharactersBySource,
   renameCharacter,
 
   getImageGroupsView,

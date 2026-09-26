@@ -67,7 +67,7 @@
 
 | 类型 | 形式 | 例子 |
 |---|---|---|
-| 数据库调度 | 单通道 `db` + 方法名 | `ipcRenderer.invoke('db', 'getAllGalleries')` |
+| 数据库调度 | 单通道 `db` + 方法名 | `ipcRenderer.invoke('db', 'getAllSources')` |
 | 任务命令 | `task:*` 若干 invoke | `task:submit` / `task:pause` / `task:forceStop` |
 | 主进程推送 | `*:changed` / `*:progress` | `task:changed` / `task:progress` |
 
@@ -151,7 +151,7 @@ RGBA 位图——一张 15360×8640 的 JPEG 按整图解码要 530 MB。**没�
 ## 一次扫描的完整数据流
 
 ```
-渲染进程  点「扫描」→ 选结构脚本 → actions.submit('scan', {galleryId, scriptId})
+渲染进程  点「扫描」→ 选结构脚本 → actions.submit('scan', {sourceId, scriptId})
    ↓ task:submit
 主进程    TaskManager.submit()：写 task 表(pending) → 入队 → 渲染进程收到 task:changed
    ↓ tick()
@@ -163,9 +163,9 @@ RGBA 位图——一张 15360×8640 的 JPEG 按整图解码要 530 MB。**没�
    ④  ThumbnailPool.analyze()   每批 pool.concurrency 张，派给工作线程
                                 线程内：sharp 解码 + 缩放到 100×100 + 出 WebP 字节
    ⑤  beginBatch()
-          clearGalleryData()    到这里才允许动数据库
+          clearSourceData()    到这里才允许动数据库
           insertCharacter / insertImageGroup / insertImageFiles
-          updateGalleryScannedAt
+          updateSourceScannedAt
        endBatch()               一次性落盘
    ↓
           task 表转 done，推送 task:changed

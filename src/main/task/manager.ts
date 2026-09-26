@@ -5,7 +5,7 @@ import type {
   TaskMoveDirection, TaskPayload, TaskProgressEvent, TaskResult, TaskRow, TaskStatus, TaskType, TaskView,
 } from '@common/types';
 import {
-  deleteFinishedTasks, finishTask, getAllTasks, getGalleryById, getMaxQueueOrder, getTaskRow,
+  deleteFinishedTasks, finishTask, getAllTasks, getSourceById, getMaxQueueOrder, getTaskRow,
   insertTask, markTaskPaused, markTaskRunning, resumeTask, updateTaskProgress, updateTaskQueueOrder,
 } from '@/database/db';
 import { TaskCancelledError, TaskControl } from '@/task/task-control';
@@ -351,9 +351,9 @@ class TaskManager {
 /** 生成任务标题；来源名这类上下文只有主进程拿得到 */
 function buildTitle(type: TaskType, payload: TaskPayload): string {
   if (type === 'scan') {
-    const { galleryId } = payload as ScanTaskPayload;
-    const gallery = getGalleryById(galleryId);
-    return `扫描来源「${gallery?.name ?? galleryId}」`;
+    const { sourceId } = payload as ScanTaskPayload;
+    const source = sourceId === undefined ? undefined : getSourceById(sourceId);
+    return `扫描来源「${source?.name ?? sourceId ?? '未知'}」`;
   }
   if (type === 'process') {
     return `批量选图 ${(payload as ProcessTaskPayload).groupIds.length} 个图片组`;

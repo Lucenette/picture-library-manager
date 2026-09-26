@@ -68,13 +68,13 @@ import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
-import type { Gallery, ProcessedImageView, TaskView, ViewerPayload } from '@common/types';
+import type { Source, ProcessedImageView, TaskView, ViewerPayload } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
-import { deleteProcessedImage, getAllGalleries, getAllProcessedImages } from '@/db/database';
+import { deleteProcessedImage, getAllSources, getAllProcessedImages } from '@/db/database';
 import { confirmDialog } from '@/services/dialog-service';
 
 // ------------------------------------------------------------
@@ -82,7 +82,7 @@ import { confirmDialog } from '@/services/dialog-service';
 // ------------------------------------------------------------
 
 const processedImages = ref<ProcessedImageView[]>([]);
-const galleries = ref<Gallery[]>([]);
+const sources = ref<Source[]>([]);
 const selectedIds = ref<number[]>([]);
 
 const page = ref(1);
@@ -90,7 +90,7 @@ const pageSize = ref(20);
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
-const galleryFilter = ref<number | undefined>(undefined);
+const sourceFilter = ref<number | undefined>(undefined);
 const characterFilter = ref('');
 const fileNameFilter = ref('');
 const scriptFilter = ref('');
@@ -162,8 +162,8 @@ function toFilterItems(values: string[]): FilterItem[] {
   return [...new Set(values)].sort().map((value) => ({ label: value, value }));
 }
 
-const galleryItems = computed(() =>
-  galleries.value.map((gallery) => ({ label: gallery.name, value: String(gallery.id) })),
+const sourceItems = computed(() =>
+  sources.value.map((source) => ({ label: source.name, value: String(source.id) })),
 );
 
 const characterItems = computed(() =>
@@ -180,18 +180,18 @@ const scriptItems = computed(() =>
 
 const filterSections = computed<FilterSection[]>(() => [
   {
-    key: 'gallery',
+    key: 'source',
     label: '来源',
-    value: galleryFilter.value ? String(galleryFilter.value) : '',
-    display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
-    items: galleryItems.value,
+    value: sourceFilter.value ? String(sourceFilter.value) : '',
+    display: sources.value.find((source) => source.id === sourceFilter.value)?.name ?? '',
+    items: sourceItems.value,
     onSelect: (value: string) => {
-      galleryFilter.value = Number(value);
-      activateFilter('gallery');
+      sourceFilter.value = Number(value);
+      activateFilter('source');
     },
     onClear: () => {
-      galleryFilter.value = undefined;
-      deactivateFilter('gallery');
+      sourceFilter.value = undefined;
+      deactivateFilter('source');
     },
   },
   {
@@ -244,8 +244,8 @@ const filterSections = computed<FilterSection[]>(() => [
 const filteredImages = computed(() => {
   let list = processedImages.value;
 
-  if (galleryFilter.value) {
-    list = list.filter((image) => image.galleryId === galleryFilter.value);
+  if (sourceFilter.value) {
+    list = list.filter((image) => image.sourceId === sourceFilter.value);
   }
   if (characterFilter.value) {
     list = list.filter((image) => image.characterName === characterFilter.value);
@@ -286,7 +286,7 @@ const pagedImages = computed(() =>
 
 async function loadData(): Promise<void> {
   processedImages.value = await getAllProcessedImages();
-  galleries.value = await getAllGalleries();
+  sources.value = await getAllSources();
 }
 
 function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {

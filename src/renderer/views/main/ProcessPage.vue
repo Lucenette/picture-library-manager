@@ -22,7 +22,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="galleryName" label="来源" width="140" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="sourceName" label="来源" width="140" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="dirName" label="图片组" min-width="140" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="dirPath" label="路径" min-width="360" show-overflow-tooltip sortable="custom" />
@@ -60,7 +60,7 @@ import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
 import type {
-  BatchProcessInitData, FileViewerInitData, Gallery, ImageGroupStatus, ImageGroupView, ProcessScript, TaskView,
+  BatchProcessInitData, FileViewerInitData, Source, ImageGroupStatus, ImageGroupView, ProcessScript, TaskView,
 } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
@@ -69,7 +69,7 @@ import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import { alertDialog } from '@/services/dialog-service';
 import {
-  getAllGalleries, getImageFilesByGroup, getImageGroupIdByFilePath, getImageGroupsView,
+  getAllSources, getImageFilesByGroup, getImageGroupIdByFilePath, getImageGroupsView,
   getScriptsByType, updateImageGroupStatus, upsertProcessedImage,
 } from '@/db/database';
 
@@ -86,7 +86,7 @@ const STATUS_ITEMS: FilterItem[] = [
 
 const groups = ref<ImageGroupView[]>([]);
 const scripts = ref<ProcessScript[]>([]);
-const galleries = ref<Gallery[]>([]);
+const sources = ref<Source[]>([]);
 const selectedIds = ref<number[]>([]);
 
 const page = ref(1);
@@ -94,7 +94,7 @@ const pageSize = ref(20);
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
-const galleryFilter = ref<number | undefined>(undefined);
+const sourceFilter = ref<number | undefined>(undefined);
 const characterFilter = ref('');
 const pathFilter = ref('');
 const statusFilter = ref('');
@@ -109,8 +109,8 @@ const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilt
 // 计算属性
 // ------------------------------------------------------------
 
-const galleryItems = computed(() =>
-  galleries.value.map((gallery) => ({ label: gallery.name, value: String(gallery.id) })),
+const sourceItems = computed(() =>
+  sources.value.map((source) => ({ label: source.name, value: String(source.id) })),
 );
 
 const characterItems = computed(() =>
@@ -121,18 +121,18 @@ const characterItems = computed(() =>
 
 const filterSections = computed<FilterSection[]>(() => [
   {
-    key: 'gallery',
+    key: 'source',
     label: '来源',
-    value: galleryFilter.value ? String(galleryFilter.value) : '',
-    display: galleries.value.find((gallery) => gallery.id === galleryFilter.value)?.name ?? '',
-    items: galleryItems.value,
+    value: sourceFilter.value ? String(sourceFilter.value) : '',
+    display: sources.value.find((source) => source.id === sourceFilter.value)?.name ?? '',
+    items: sourceItems.value,
     onSelect: (value: string) => {
-      galleryFilter.value = Number(value);
-      activateFilter('gallery');
+      sourceFilter.value = Number(value);
+      activateFilter('source');
     },
     onClear: () => {
-      galleryFilter.value = undefined;
-      deactivateFilter('gallery');
+      sourceFilter.value = undefined;
+      deactivateFilter('source');
     },
   },
   {
@@ -188,8 +188,8 @@ const filteredGroups = computed(() => {
   if (statusFilter.value) {
     list = list.filter((group) => group.status === statusFilter.value);
   }
-  if (galleryFilter.value) {
-    list = list.filter((group) => group.galleryId === galleryFilter.value);
+  if (sourceFilter.value) {
+    list = list.filter((group) => group.sourceId === sourceFilter.value);
   }
   if (characterFilter.value) {
     list = list.filter((group) => group.characterName === characterFilter.value);
@@ -203,7 +203,7 @@ const filteredGroups = computed(() => {
   const order = sortOrder.value;
   if (!prop || !order) {
     return [...list].sort((a, b) =>
-      a.galleryName.localeCompare(b.galleryName)
+      a.sourceName.localeCompare(b.sourceName)
       || a.characterName.localeCompare(b.characterName)
       || a.dirName.localeCompare(b.dirName));
   }
@@ -230,7 +230,7 @@ const pagedGroups = computed(() =>
 async function loadData(): Promise<void> {
   groups.value = await getImageGroupsView();
   scripts.value = await getScriptsByType('select-image');
-  galleries.value = await getAllGalleries();
+  sources.value = await getAllSources();
 }
 
 function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
@@ -308,7 +308,7 @@ async function confirmSelectedFile(filePath: string): Promise<void> {
   }
 
   try {
-    await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, filePath, null);
+    await upsertProcessedImage(group.id, group.characterId, group.sourceId, group.dirPath, filePath, null);
     await loadData();
   } catch (error) {
     await alertDialog({ title: '确认失败', message: (error as Error).message, danger: true });

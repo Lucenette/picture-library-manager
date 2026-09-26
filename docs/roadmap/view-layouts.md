@@ -28,7 +28,7 @@
 ### 3.1 视图切换
 
 - 工具条右侧增加图标切换（列表 / 平铺），沿用 Element Plus 图标；
-- 选择写入 `localStorage`（键如 `view-mode:gallery`、`view-mode:character`）。
+- 选择写入 `localStorage`（键如 `view-mode:source`、`view-mode:character`）。
   该偏好属于纯界面状态，不写入数据库；若将来需要多窗口共享再考虑设置表。
 
 ### 3.2 平铺项的内容
@@ -67,7 +67,7 @@
 | 位置 | 改动 |
 |---|---|
 | `src/renderer/components/` | 新增平铺容器组件（封面、标题、附加信息、选中态、悬停操作） |
-| `GalleryPage.vue` / `CharacterPage.vue` | 视图切换、平铺渲染、选中状态与现有工具栏联动 |
+| `SourcePage.vue` / `CharacterPage.vue` | 视图切换、平铺渲染、选中状态与现有工具栏联动 |
 | `src/main/database/`（`db.ts` + `sql.ts` + `changesets/`）` | 新增「按图库或角色取代表缩略图」的查询 |
 | `common/types.ts` | 按需补充返回行类型 |
 
