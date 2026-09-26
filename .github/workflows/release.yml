@@ -1,0 +1,112 @@
+# 只有 master 上的 tag 会发布：tag 也能打在 develop 上，那种情况会被 guard 拦下并报错。
+name: 发布
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_BRANCH: master
+
+jobs:
+  guard:
+    name: 校验 tag 分支
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: tag 必须指向 ${{ env.RELEASE_BRANCH }} 上的提交
+        run: |
+          git fetch --no-tags origin "$RELEASE_BRANCH"
+          if git merge-base --is-ancestor "$GITHUB_SHA" "origin/$RELEASE_BRANCH"; then
+            echo "tag $GITHUB_REF_NAME 指向的提交在 $RELEASE_BRANCH 上，继续"
+          else
+            echo "::error::tag $GITHUB_REF_NAME 指向的提交不在 $RELEASE_BRANCH 上，拒绝发布"
+            exit 1
+          fi
+      - name: 文档与 skill 检查
+        # 零依赖，放在装依赖之前：文档问题不必等 yarn install
+        run: node scripts/check-docs.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装依赖
+        run: yarn install --network-timeout 600000
+      - name: 类型检查
+        run: yarn typecheck
+
+  build:
+    name: 打包 ${{ matrix.platform }}
+    needs: guard
+    strategy:
+      # 一个平台失败也让其它平台跑完，便于一次看清全部问题
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+            platform: windows
+          - os: macos-latest
+            script: build:mac
+            platform: macos
+          - os: ubuntu-latest
+            script: build:linux
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装依赖
+        run: yarn install --network-timeout 600000
+      - name: 打包（yarn icon 已串在 build:* 里）
+        env:
+          # 没有签名证书：不去自动发现身份，省掉一轮等待与告警
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: yarn ${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+
+  release:
+    name: 建 Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 取上一个 tag 需要完整历史，发布说明里有对比链接
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: 生成发布说明
+        run: node scripts/release-notes.mjs > RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          # 带 - 的 tag（如 v1.0.0-beta.1）自动标为预发布
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: artifacts/**/*

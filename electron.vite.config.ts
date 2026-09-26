@@ -1,27 +1,28 @@
+import { resolve } from 'path';
 import { defineConfig } from 'electron-vite';
 import vue from '@vitejs/plugin-vue';
 import renderer from 'vite-plugin-electron-renderer';
-import { resolve } from 'path';
+
+/** 主进程与渲染进程共用的路径别名 */
+const aliases = {
+  '@common': resolve(__dirname, 'src/common'),
+};
 
 export default defineConfig({
   main: {
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common'),
+        ...aliases,
         '@': resolve(__dirname, 'src/main'),
-      },
-    },
-    build: {
-      rollupOptions: {
-        external: ['sql.js'],
       },
     },
   },
   renderer: {
+    // 渲染进程需要直接使用 fs/crypto 等 Node 能力
     plugins: [vue(), renderer()],
     resolve: {
       alias: {
-        '@common': resolve(__dirname, 'src/common'),
+        ...aliases,
         '@': resolve(__dirname, 'src/renderer'),
       },
     },

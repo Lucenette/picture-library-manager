@@ -231,10 +231,24 @@ body {
   border-color: #3e4044;
   color: #b4b6ba;
 }
-.el-tag:not(.el-tag--success):not(.el-tag--warning):not(.el-tag--danger):not(.el-tag--info) {
+/* 兜底：没单独定义过的标签类型一律走灰，避免 Element Plus 的浅色在暗色背景上刺眼。
+   注意别把有名字的类型（primary 等）也吃掉——那样「扫描」会和「识图」长得一模一样 */
+.el-tag:not(.el-tag--primary):not(.el-tag--success):not(.el-tag--warning):not(.el-tag--danger):not(.el-tag--info) {
   background: #2e3034;
   border-color: #3e4044;
   color: #b4b6ba;
+}
+/* 主色标签：跟随主题的 --el-color-primary */
+.el-tag--primary {
+  background: #182a4d;
+  border-color: #2a4a85;
+  color: #6ea8ff;
+}
+/* 任务类型「识图」：青色，跟「扫描」的蓝分得开 */
+.type-tag--similar {
+  background: #12333f;
+  border-color: #1d5566;
+  color: #4cc8e8;
 }
 
 /* ======== 输入框/选择框 ======== */

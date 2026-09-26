@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 疑难排查
+    url: https://github.com/Lucenette/picture-library-manager/blob/develop/docs/TROUBLESHOOTING.md
+    about: 常见现象、日志位置、数据库路径、脚本调试，多半这里已有答案
+  - name: 安全漏洞
+    url: https://github.com/Lucenette/picture-library-manager/security/advisories/new
+    about: 请勿开公开 Issue，走私密报告通道
+  - name: 编写脚本
+    url: https://github.com/Lucenette/picture-library-manager/blob/develop/docs/SCRIPTING.md
+    about: 脚本接口、示例与调试方式

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
+
+  <changeSet id="20260924235937452200" author="powerinv">
+    <comment>gallery | 来源表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS gallery (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        root_path TEXT NOT NULL UNIQUE,
+        scanned_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937453207" author="powerinv">
+    <comment>character | 角色表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS character (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        gallery_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        source_path TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        UNIQUE(gallery_id, name)
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937454214" author="powerinv">
+    <comment>image_group | 图片组表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS image_group (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        dir_name TEXT NOT NULL,
+        dir_path TEXT NOT NULL UNIQUE,
+        file_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','processed','excluded')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937455221" author="powerinv">
+    <comment>image_file | 图片文件表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS image_file (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_group_id INTEGER NOT NULL,
+        file_name TEXT NOT NULL,
+        file_path TEXT NOT NULL UNIQUE,
+        file_size INTEGER,
+        width INTEGER,
+        height INTEGER,
+        extension TEXT NOT NULL,
+        thumbnail BLOB,
+        phash BLOB,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_image_file_group ON image_file(image_group_id);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937456228" author="powerinv">
+    <comment>process_script | 处理脚本表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS process_script (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        file_path TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL,
+        brief TEXT NOT NULL DEFAULT '',
+        loaded_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937457235" author="powerinv">
+    <comment>script_type | 脚本类型表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS script_type (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        script_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        UNIQUE(script_id, type)
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937458242" author="powerinv">
+    <comment>processed_image | 图库表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS processed_image (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_group_id INTEGER NOT NULL UNIQUE,
+        character_id INTEGER NOT NULL,
+        gallery_id INTEGER NOT NULL,
+        original_path TEXT NOT NULL,
+        selected_file TEXT NOT NULL,
+        script_id INTEGER,
+        confirmed_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_processed_character ON processed_image(character_id);
+      CREATE INDEX IF NOT EXISTS idx_processed_gallery ON processed_image(gallery_id);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937459249" author="powerinv">
+    <comment>similar_run | 相似识别运行表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS similar_run (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        compared INTEGER NOT NULL,
+        skipped INTEGER NOT NULL
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937460256" author="powerinv">
+    <comment>similar_group | 相似识别分组表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS similar_group (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        size INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_similar_group_run ON similar_group(run_id);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937461263" author="powerinv">
+    <comment>similar_member | 相似识别成员表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS similar_member (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        file_path TEXT NOT NULL,
+        distance INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_similar_member_group ON similar_member(group_id);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260924235937462270" author="powerinv">
+    <comment>task | 任务表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS task (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','paused','done','failed','cancelled')),
+        queue_order INTEGER NOT NULL DEFAULT 0,
+        progress INTEGER NOT NULL DEFAULT 0,
+        message TEXT NOT NULL DEFAULT '',
+        payload TEXT NOT NULL DEFAULT '{}',
+        result TEXT NOT NULL DEFAULT '',
+        error TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        started_at TEXT,
+        finished_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_task_status ON task(status);
+      CREATE INDEX IF NOT EXISTS idx_task_queue_order ON task(queue_order);
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260926075055276522" author="powerinv">
+    <comment>gallery 表改名：gallery → source（来源）</comment>
+    <sql>
+      ALTER TABLE gallery RENAME TO source;
+    </sql>
+</changeSet>
+  <changeSet id="20260926075055277592" author="powerinv">
+    <comment>character、processed_image 的 gallery_id 列改名：→ source_id</comment>
+    <sql>
+      ALTER TABLE character RENAME COLUMN gallery_id TO source_id;
+      ALTER TABLE processed_image RENAME COLUMN gallery_id TO source_id;
+    </sql>
+</changeSet>
+  <changeSet id="20260926075055278812" author="powerinv">
+    <comment>idx_processed_gallery 索引随列改名：→ idx_processed_source</comment>
+    <sql>
+      DROP INDEX IF EXISTS idx_processed_gallery;
+      CREATE INDEX IF NOT EXISTS idx_processed_source ON processed_image(source_id);
+    </sql>
+</changeSet>
+  <changeSet id="20260926075901713568" author="powerinv">
+    <comment>task | 任务表：订正持久化 payload 里的旧键名</comment>
+    <sql>
+      UPDATE task SET payload = replace(payload, '"galleryId"', '"sourceId"') WHERE payload LIKE '%"galleryId"%';
+    </sql>
+  </changeSet>
+</databaseChangeLog>

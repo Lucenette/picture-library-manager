@@ -1,54 +1,46 @@
 <template>
   <div class="process-page">
-    <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <CategorySearch :sections="filterCats" :order="filterOrder" />
+        <CategorySearch :sections="filterSections" :order="filterOrder" />
       </div>
       <div class="toolbar-right">
         <el-button type="primary" @click="openBatchDialog">
           批量处理 ({{ selectedIds.length || filteredGroups.length }})
         </el-button>
-        <el-button @click="excludeSelected" :disabled="selectedIds.length === 0">
-          标记排除
-        </el-button>
-        <el-button @click="unexcludeSelected" :disabled="selectedIds.length === 0">
-          取消排除
-        </el-button>
+        <el-button :disabled="selectedIds.length === 0" @click="excludeSelected">标记排除</el-button>
+        <el-button :disabled="selectedIds.length === 0" @click="unexcludeSelected">取消排除</el-button>
       </div>
     </div>
 
     <div class="table-wrap">
-    <el-table
-      :data="pagedGroups"
-      style="width: 100%"
-      @selection-change="onSelectionChange"
-      @sort-change="onSortChange"
-      v-loading="processing"
-      row-key="id"
-    >
-      <el-table-column type="selection" width="45" />
-      <el-table-column prop="galleryName" label="图库" width="140" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="dirName" label="图片组" min-width="140" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="dirPath" label="路径" min-width="360" show-overflow-tooltip sortable="custom" />
-      <el-table-column prop="fileCount" label="文件数" width="90" align="center" sortable="custom" />
-      <el-table-column label="状态" width="100" align="center" sortable="custom" prop="status">
-        <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">
-            {{ statusLabel(row.status) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" text type="primary" @click="viewFiles(row)">查看文件</el-button>
-          <el-button size="small" text type="danger" @click="toggleExclude(row)">
-            {{ row.status === 'excluded' ? '恢复' : '排除' }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      <el-table
+        :data="pagedGroups"
+        row-key="id"
+        style="width: 100%"
+        @sort-change="onSortChange"
+        @selection-change="onSelectionChange"
+      >
+        <el-table-column type="selection" width="45" />
+        <el-table-column prop="sourceName" label="来源" width="140" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="characterName" label="角色" width="160" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="dirName" label="图片组" min-width="140" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="dirPath" label="路径" min-width="360" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="fileCount" label="文件数" width="90" align="center" sortable="custom" />
+        <el-table-column prop="status" label="状态" width="100" align="center" sortable="custom">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="viewFiles(row)">查看文件</el-button>
+            <el-button size="small" text type="danger" @click="toggleExclude(row)">
+              {{ row.status === 'excluded' ? '恢复' : '排除' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <el-pagination
@@ -59,241 +51,223 @@
       layout="total, sizes, prev, pager, next, jumper"
       class="pager"
     />
-
-    <!-- 处理进度 -->
-    <el-dialog v-model="processProgressVisible" title="处理进度" width="400px" :close-on-click-modal="false">
-      <el-progress :percentage="processPercent" />
-      <p style="margin-top: 12px">
-        已处理 {{ processedCount }} / {{ totalCount }}，错误 {{ errorCount }}
-      </p>
-      <template #footer>
-        <el-button @click="processProgressVisible = false" :disabled="processing">关闭</el-button>
-      </template>
-    </el-dialog>
-
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
+import { ipcRenderer } from 'electron';
+import { ElMessage } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
-import { ref, computed, onMounted } from 'vue';
+import type {
+  BatchProcessInitData, FileViewerInitData, Source, ImageGroupStatus, ImageGroupView, ProcessScript, TaskView,
+} from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
-import type { FilterSection } from '@/components/CategorySearch.types';
+import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
+import { useFilterOrder } from '@/composables/useFilterOrder';
+import { useIpcListener } from '@/composables/useIpcListener';
+import { useTasks } from '@/composables/useTasks';
+import { alertDialog } from '@/services/dialog-service';
 import {
-  getImageGroupsView,
-  updateImageGroupStatus,
-  getImageFilesByGroup,
-  upsertProcessedImage,
-  getScriptsByType,
-  getAllGalleries,
+  getAllSources, getImageFilesByGroup, getImageGroupIdByFilePath, getImageGroupsView,
+  getScriptsByType, updateImageGroupStatus, upsertProcessedImage,
 } from '@/db/database';
-import { executeScript } from '@/services/script-runner';
-import type {ImageGroupView, ImageGroupStatus, ImageFile, Gallery, ProcessScript} from '@common/types';
 
-// ============================================================
-// 数据
-// ============================================================
-
-const filterOrder = ref<string[]>([]); // 记录添加顺序
-const pathFilter = ref<string>('');
-const statusFilter = ref<string>('');
-const galleryFilter = ref<number | undefined>(undefined);
-const characterFilter = ref<string>('');
-
-const galleryItems = computed(() => galleries.value.map(g => ({ label: g.name, value: String(g.id) })));
-const characterItems = computed(() => [...new Set(allGroups.value.map(g => g.characterName))].sort().map(n => ({ label: n, value: n })));
-const statusItems = [
+/** 状态筛选项 */
+const STATUS_ITEMS: FilterItem[] = [
   { label: '未处理', value: 'pending' },
   { label: '已处理', value: 'processed' },
   { label: '已排除', value: 'excluded' },
 ];
 
-const filterCats = computed<FilterSection[]>(() => [
-  {
-    key: 'gallery', label: '图库',
-    value: galleryFilter.value ? String(galleryFilter.value) : '',
-    display: galleryFilter.value ? galleries.value.find(g => g.id === galleryFilter.value)?.name || '' : '',
-    items: galleryItems.value,
-    onSelect: (v: string) => { galleryFilter.value = Number(v); onGalleryFilterChange(); page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'gallery'), 'gallery']; },
-    onClear: () => { galleryFilter.value = undefined; onGalleryFilterChange(); page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'gallery'); },
-  },
-  {
-    key: 'character', label: '角色',
-    value: characterFilter.value,
-    display: characterFilter.value || '',
-    items: characterItems.value,
-    onSelect: (v: string) => { characterFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'character'), 'character']; },
-    onClear: () => { characterFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'character'); },
-  },
-  {
-    key: 'path', label: '路径',
-    value: pathFilter.value,
-    display: pathFilter.value || '',
-    items: [],
-    onSelect: (v: string) => { pathFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'path'), 'path']; },
-    onClear: () => { pathFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'path'); },
-  },
-  {
-    key: 'status', label: '状态',
-    value: statusFilter.value,
-    display: statusItems.find(s => s.value === statusFilter.value)?.label || '',
-    items: statusItems,
-    onSelect: (v: string) => { statusFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'status'), 'status']; },
-    onClear: () => { statusFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'status'); },
-  },
-]);
-const selectedScriptId = ref<number | null>(null);
-const selectedIds = ref<number[]>([]);
-const allGroups = ref<ImageGroupView[]>([]);
-const scripts = ref<ProcessScript[]>([]);
-const galleries = ref<Gallery[]>([]);
-const processing = ref(false);
-const processProgressVisible = ref(false);
-const processPercent = ref(0);
-const processedCount = ref(0);
-const totalCount = ref(0);
-const errorCount = ref(0);
+// ------------------------------------------------------------
+// 状态
+// ------------------------------------------------------------
 
-/** 分页 */
+const groups = ref<ImageGroupView[]>([]);
+const scripts = ref<ProcessScript[]>([]);
+const sources = ref<Source[]>([]);
+const selectedIds = ref<number[]>([]);
+
 const page = ref(1);
 const pageSize = ref(20);
-
-/** 排序 */
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
-/** 文件查看弹窗 */
+const sourceFilter = ref<number | undefined>(undefined);
+const characterFilter = ref('');
+const pathFilter = ref('');
+const statusFilter = ref('');
 
+const { actions } = useTasks();
 
-// ============================================================
-// 计算
-// ============================================================
+const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilter } = useFilterOrder(() => {
+  page.value = 1;
+});
 
+// ------------------------------------------------------------
+// 计算属性
+// ------------------------------------------------------------
+
+const sourceItems = computed(() =>
+  sources.value.map((source) => ({ label: source.name, value: String(source.id) })),
+);
+
+const characterItems = computed(() =>
+  [...new Set(groups.value.map((group) => group.characterName))]
+    .sort()
+    .map((name) => ({ label: name, value: name })),
+);
+
+const filterSections = computed<FilterSection[]>(() => [
+  {
+    key: 'source',
+    label: '来源',
+    value: sourceFilter.value ? String(sourceFilter.value) : '',
+    display: sources.value.find((source) => source.id === sourceFilter.value)?.name ?? '',
+    items: sourceItems.value,
+    onSelect: (value: string) => {
+      sourceFilter.value = Number(value);
+      activateFilter('source');
+    },
+    onClear: () => {
+      sourceFilter.value = undefined;
+      deactivateFilter('source');
+    },
+  },
+  {
+    key: 'character',
+    label: '角色',
+    value: characterFilter.value,
+    display: characterFilter.value,
+    items: characterItems.value,
+    onSelect: (value: string) => {
+      characterFilter.value = value;
+      activateFilter('character');
+    },
+    onClear: () => {
+      characterFilter.value = '';
+      deactivateFilter('character');
+    },
+  },
+  {
+    key: 'path',
+    label: '路径',
+    value: pathFilter.value,
+    display: pathFilter.value,
+    items: [],
+    onSelect: (value: string) => {
+      pathFilter.value = value;
+      activateFilter('path');
+    },
+    onClear: () => {
+      pathFilter.value = '';
+      deactivateFilter('path');
+    },
+  },
+  {
+    key: 'status',
+    label: '状态',
+    value: statusFilter.value,
+    display: STATUS_ITEMS.find((item) => item.value === statusFilter.value)?.label ?? '',
+    items: STATUS_ITEMS,
+    onSelect: (value: string) => {
+      statusFilter.value = value;
+      activateFilter('status');
+    },
+    onClear: () => {
+      statusFilter.value = '';
+      deactivateFilter('status');
+    },
+  },
+]);
 
 const filteredGroups = computed(() => {
-  let list = allGroups.value;
+  let list = groups.value;
 
   if (statusFilter.value) {
-    list = list.filter(g => g.status === statusFilter.value);
+    list = list.filter((group) => group.status === statusFilter.value);
   }
-  if (galleryFilter.value) {
-    list = list.filter(g => g.galleryId === galleryFilter.value);
+  if (sourceFilter.value) {
+    list = list.filter((group) => group.sourceId === sourceFilter.value);
   }
   if (characterFilter.value) {
-    list = list.filter(g => g.characterName === characterFilter.value);
+    list = list.filter((group) => group.characterName === characterFilter.value);
   }
   if (pathFilter.value) {
-    const kw = pathFilter.value.toLowerCase();
-    list = list.filter(g => g.dirPath.toLowerCase().includes(kw));
+    const keyword = pathFilter.value.toLowerCase();
+    list = list.filter((group) => group.dirPath.toLowerCase().includes(keyword));
   }
 
-  // 排序
   const prop = sortProp.value as keyof ImageGroupView | null;
   const order = sortOrder.value;
   if (!prop || !order) {
-    // 默认：图库名 → 角色名 → 图片组
-    list = [...list].sort((a, b) => {
-      let cmp = a.galleryName.localeCompare(b.galleryName);
-      if (cmp !== 0) return cmp;
-      cmp = a.characterName.localeCompare(b.characterName);
-      return cmp !== 0 ? cmp : a.dirName.localeCompare(b.dirName);
-    });
-  } else {
-    const dir = order === 'ascending' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      const va = a[prop] ?? '';
-      const vb = b[prop] ?? '';
-      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
-      return String(va).localeCompare(String(vb)) * dir;
-    });
+    return [...list].sort((a, b) =>
+      a.sourceName.localeCompare(b.sourceName)
+      || a.characterName.localeCompare(b.characterName)
+      || a.dirName.localeCompare(b.dirName));
   }
 
-  return list;
+  const direction = order === 'ascending' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const left = a[prop] ?? '';
+    const right = b[prop] ?? '';
+    if (typeof left === 'number' && typeof right === 'number') {
+      return (left - right) * direction;
+    }
+    return String(left).localeCompare(String(right)) * direction;
+  });
 });
 
-const pagedGroups = computed(() => {
-  const start = (page.value - 1) * pageSize.value;
-  return filteredGroups.value.slice(start, start + pageSize.value);
-});
+const pagedGroups = computed(() =>
+  filteredGroups.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+);
 
-// ============================================================
-// 方法
-// ============================================================
+// ------------------------------------------------------------
+// 列表操作
+// ------------------------------------------------------------
 
 async function loadData(): Promise<void> {
-  allGroups.value = await getImageGroupsView();
+  groups.value = await getImageGroupsView();
   scripts.value = await getScriptsByType('select-image');
-  galleries.value = await getAllGalleries();
+  sources.value = await getAllSources();
 }
-
-/** 图库筛选变化时清角色筛选 */
-function onGalleryFilterChange(): void {}
 
 function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
   sortProp.value = prop;
   sortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
+function onSelectionChange(rows: ImageGroupView[]): void {
+  selectedIds.value = rows.map((row) => row.id);
+}
+
 function statusTagType(status: ImageGroupStatus): 'info' | 'success' | 'danger' {
-  if (status === 'processed') return 'success';
-  if (status === 'excluded') return 'danger';
+  if (status === 'processed') {
+    return 'success';
+  }
+  if (status === 'excluded') {
+    return 'danger';
+  }
   return 'info';
 }
 
 function statusLabel(status: ImageGroupStatus): string {
-  if (status === 'processed') return '已处理';
-  if (status === 'excluded') return '已排除';
+  if (status === 'processed') {
+    return '已处理';
+  }
+  if (status === 'excluded') {
+    return '已排除';
+  }
   return '未处理';
 }
 
-function onSelectionChange(rows: ImageGroupView[]): void {
-  selectedIds.value = rows.map((r) => r.id);
-}
-
-async function openViewer(fileList: ImageFile[], target: ImageFile): Promise<void> {
-  const { ipcRenderer } = require('electron');
-  const idx = fileList.indexOf(target);
-  const files = fileList.map(f => ({
-    filePath: f.filePath,
-    fileName: f.fileName,
-    relativePath: f.fileName,
-    fileSize: f.fileSize,
-    width: f.width,
-    height: f.height,
-    thumbnail: f.thumbnail,
-  }));
-  await ipcRenderer.invoke(IPC.VIEWER_OPEN, { files, index: idx >= 0 ? idx : 0 });
-}
-
-function formatSize(bytes: number | null): string {
-  if (bytes === null) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-async function viewFiles(group: ImageGroupView): Promise<void> {
-  const files = await getImageFilesByGroup(group.id);
-  require('electron').ipcRenderer.invoke(IPC.FILE_VIEWER_OPEN, {
-    files, groupName: group.dirName, groupDirPath: group.dirPath,
-  });
-}
-
-onMounted(() => {
-  require('electron').ipcRenderer.on(IPC.FILE_VIEWER_SELECTED, (_e: any, filePath: string) => {
-    const g = allGroups.value.find(x => filePath.startsWith(x.dirPath));
-    if (g) upsertProcessedImage(g.id, g.characterId, g.galleryId, g.dirPath, filePath, null).then(() => loadData()).catch((e: any) => alert(`确认失败: ${e.message}`));
-  });
-});
-
-/** 排除/恢复 */
 async function toggleExclude(group: ImageGroupView): Promise<void> {
-  const newStatus: ImageGroupStatus = group.status === 'excluded' ? 'pending' : 'excluded';
-  await updateImageGroupStatus(group.id, newStatus);
+  const nextStatus: ImageGroupStatus = group.status === 'excluded' ? 'pending' : 'excluded';
+  await updateImageGroupStatus(group.id, nextStatus);
   await loadData();
 }
 
-/** 批量标记排除 */
 async function excludeSelected(): Promise<void> {
   for (const id of selectedIds.value) {
     await updateImageGroupStatus(id, 'excluded');
@@ -301,7 +275,6 @@ async function excludeSelected(): Promise<void> {
   await loadData();
 }
 
-/** 批量取消排除 */
 async function unexcludeSelected(): Promise<void> {
   for (const id of selectedIds.value) {
     await updateImageGroupStatus(id, 'pending');
@@ -309,67 +282,92 @@ async function unexcludeSelected(): Promise<void> {
   await loadData();
 }
 
-/** 批量处理 */
-function openBatchDialog(): void {
-  const { ipcRenderer } = require('electron');
-  const targets = selectedIds.value.length > 0
-    ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
-    : filteredGroups.value.filter(g => g.status !== 'excluded');
-  if (targets.length === 0) { alert('选中的图片组都被排除'); return; }
-  ipcRenderer.invoke(IPC.BATCH_PROCESS_OPEN, {
-    scripts: scripts.value.map((s: any) => ({ id: s.id, name: s.name })),
-    count: targets.length,
-  });
+async function viewFiles(group: ImageGroupView): Promise<void> {
+  const payload: FileViewerInitData = {
+    files: await getImageFilesByGroup(group.id),
+    groupName: group.dirName,
+    groupDirPath: group.dirPath,
+  };
+  ipcRenderer.invoke(IPC.FILE_VIEWER_OPEN, payload);
 }
 
-async function doBatchProcess(): Promise<void> {
-  if (!selectedScriptId.value) return;
-  const targets = selectedIds.value.length > 0
-    ? allGroups.value.filter(g => selectedIds.value.includes(g.id) && g.status !== 'excluded')
-    : filteredGroups.value.filter(g => g.status !== 'excluded');
-  if (targets.length === 0) { alert('选中的图片组都已被排除'); return; }
+// ------------------------------------------------------------
+// 手动确认
+// ------------------------------------------------------------
 
-  processing.value = true;
-  processProgressVisible.value = true;
-  processedCount.value = 0;
-  totalCount.value = targets.length;
-  errorCount.value = 0;
-  processPercent.value = 0;
-
-  let i = 0;
-  async function next(): Promise<void> {
-    if (i >= targets.length) { processing.value = false; await loadData(); return; }
-    const group = targets[i]; i++;
-    try {
-      const files = await getImageFilesByGroup(group.id);
-      const uuidMap = new Map<string, string>();
-      const crypto = require('crypto');
-      const scriptFiles = files.map(f => {
-        const uuid = crypto.randomUUID();
-        uuidMap.set(uuid, f.filePath);
-        return { uuid, fileName: f.fileName, filePath: f.filePath, width: f.width, height: f.height, fileSize: f.fileSize || 0, ext: f.extension };
-      });
-      const resultUuid = await executeScript(selectedScriptId.value!, 'select-image', { characterName: group.characterName, groupDirPath: group.dirPath, files: scriptFiles });
-      const selectedFile = uuidMap.get(resultUuid);
-      if (selectedFile) {
-        await upsertProcessedImage(group.id, group.characterId, group.galleryId, group.dirPath, selectedFile, selectedScriptId.value);
-      } else { errorCount.value++; }
-    } catch { errorCount.value++; }
-
-    processedCount.value = i;
-    processPercent.value = Math.round((i / targets.length) * 100);
-    setTimeout(next, 50);
-  }
-  setTimeout(next, 50);
-}
-
-onMounted(() => {
-  loadData();
-  require('electron').ipcRenderer.on(IPC.BATCH_PROCESS_CONFIRMED, (_e: any, scriptId: number) => {
-    selectedScriptId.value = scriptId;
-    doBatchProcess();
-  });
+useIpcListener(IPC.FILE_VIEWER_SELECTED, (filePath: string) => {
+  void confirmSelectedFile(filePath);
 });
+
+/** 在文件查看窗口中选定某张图后，把它记为所属图片组的处理结果 */
+async function confirmSelectedFile(filePath: string): Promise<void> {
+  const groupId = await getImageGroupIdByFilePath(filePath);
+  const group = groupId === null ? undefined : groups.value.find((item) => item.id === groupId);
+  if (!group) {
+    return;
+  }
+
+  try {
+    await upsertProcessedImage(group.id, group.characterId, group.sourceId, group.dirPath, filePath, null);
+    await loadData();
+  } catch (error) {
+    await alertDialog({ title: '确认失败', message: (error as Error).message, danger: true });
+  }
+}
+
+// ------------------------------------------------------------
+// 批量选图
+// ------------------------------------------------------------
+
+useIpcListener(IPC.BATCH_PROCESS_CONFIRMED, (scriptId: number) => {
+  void submitProcessTask(scriptId);
+});
+
+/** 选图任务结束后刷新列表，让处理状态立刻反映出来 */
+useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => {
+  if (task.type !== 'process') {
+    return;
+  }
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
+    void loadData();
+  }
+});
+
+function openBatchDialog(): void {
+  const targets = resolveTargets();
+  if (targets.length === 0) {
+    ElMessage.warning('选中的图片组都被排除');
+    return;
+  }
+
+  const payload: BatchProcessInitData = {
+    scripts: scripts.value.map((script) => ({ id: script.id, name: script.name })),
+    count: targets.length,
+  };
+  ipcRenderer.invoke(IPC.BATCH_PROCESS_OPEN, payload);
+}
+
+/** 待处理的图片组：优先取勾选项，未勾选时取当前筛选结果，两者都排除已排除项 */
+function resolveTargets(): ImageGroupView[] {
+  const candidates = selectedIds.value.length > 0
+    ? groups.value.filter((group) => selectedIds.value.includes(group.id))
+    : filteredGroups.value;
+  return candidates.filter((group) => group.status !== 'excluded');
+}
+
+/** 提交时把目标固化成 id 快照，执行期间筛选或数据变化都不影响本次任务 */
+async function submitProcessTask(scriptId: number): Promise<void> {
+  const targets = resolveTargets();
+  if (targets.length === 0) {
+    ElMessage.warning('选中的图片组都已被排除');
+    return;
+  }
+
+  await actions.submit('process', { groupIds: targets.map((group) => group.id), scriptId });
+  ElMessage.success(`已提交 ${targets.length} 个图片组的选图任务，可在「任务」页查看进度`);
+}
+
+onMounted(loadData);
 </script>
 
 <style scoped>
@@ -389,11 +387,17 @@ onMounted(() => {
   gap: 10px;
   flex-shrink: 0;
 }
-.toolbar-left { display: flex; align-items: center; flex: 1; }
-.toolbar-right { display: flex; align-items: center; gap: 10px; }
 
-.file-dialog :deep(.el-dialog__body) {
-  padding: 12px 16px;
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .table-wrap {

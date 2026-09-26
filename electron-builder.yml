@@ -16,11 +16,13 @@ extraFiles:
 npmRebuild: false
 asar: false
 
+# 各平台图标由 `yarn icon`（electron-icon-builder）从 src/static/icon.png 生成到 dist/icons，
+# 因此打包前必须先跑它——package.json 里的 build 脚本已经串好顺序。
 win:
   target:
     - target: nsis
       arch: [x64]
-  icon: null
+  icon: dist/icons/win/icon.ico
   sign: null
 
 nsis:
@@ -28,3 +30,18 @@ nsis:
   allowToChangeInstallationDirectory: true
   artifactName: ${productName}_Setup_${version}.${ext}
 
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: dist/icons/mac/icon.icns
+  category: public.app-category.graphics-design
+
+linux:
+  target:
+    - AppImage
+    - deb
+  # 这个目录里的 NxN.png 命名正好是 electron-builder 要求的格式
+  icon: dist/icons/png
+  category: Graphics
+  maintainer: Lucenette

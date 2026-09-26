@@ -1,0 +1,44 @@
+# push / PR 到 master 与 develop：类型检查 + 三目标构建（不发布）。
+# 发布走另一个工作流：release.yml（只有 master 上的 tag 会触发）。
+name: 校验
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 类型检查与构建
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          # 注意：未启用 setup-node 的 yarn 缓存，因为仓库当前未跟踪 yarn.lock
+
+      - name: 文档与 skill 检查
+        # 零依赖，放在安装依赖之前：文档问题不必等依赖装完才暴露
+        run: node scripts/check-docs.mjs
+
+      - name: 安装依赖
+        # yarn.lock 目前被 .gitignore 忽略，因此不能用 --frozen-lockfile
+        run: yarn install --network-timeout 600000
+
+      - name: 类型检查
+        run: yarn typecheck
+
+      - name: 构建三个目标
+        # 覆盖 main / preload / renderer，包含 ?nodeWorker 产出的 worker chunk
+        # 只验证能否打包，不产出安装程序（NSIS 打包请在发布流程里手动执行）
+        run: npx electron-vite build

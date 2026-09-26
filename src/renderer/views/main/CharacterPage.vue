@@ -4,18 +4,23 @@
       <div class="toolbar-left">
         <CategorySearch :sections="filterSections" :order="filterOrder" />
       </div>
-      <el-button type="primary" @click="openBatchRename" :disabled="selectedIds.length === 0">
+      <el-button type="primary" :disabled="selectedIds.length === 0" @click="openBatchRename">
         批量重命名 ({{ selectedIds.length }})
       </el-button>
     </div>
 
     <div class="table-wrap">
-      <el-table :data="pagedChars" row-key="id" @sort-change="onSortChange" @selection-change="onSelectionChange">
+      <el-table
+        :data="pagedCharacters"
+        row-key="id"
+        @sort-change="onSortChange"
+        @selection-change="onSelectionChange"
+      >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="galleryName" label="图库" width="160" sortable="custom" />
+        <el-table-column prop="sourceName" label="来源" width="160" sortable="custom" />
         <el-table-column prop="name" label="角色名" min-width="200" sortable="custom">
           <template #default="{ row }">
-            <span @dblclick="openSingleRename(row)" class="char-name">{{ row.name }}</span>
+            <span class="char-name" @dblclick="openSingleRename(row)">{{ row.name }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="sourcePath" label="源路径" min-width="300" show-overflow-tooltip />
@@ -32,7 +37,7 @@
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
-        :total="filteredChars.length"
+        :total="filteredCharacters.length"
         layout="total, sizes, prev, pager, next, jumper"
       />
     </div>
@@ -40,109 +45,257 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
+import type { Character, Source, PromptInitData, PromptResult } from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterSection } from '@/components/CategorySearch.types';
-import { getAllGalleries, getCharactersByGallery, renameCharacter } from '@/db/database';
-import type { Character, Gallery } from '@common/types';
+import { useFilterOrder } from '@/composables/useFilterOrder';
+import { useIpcListener } from '@/composables/useIpcListener';
+import { alertDialog } from '@/services/dialog-service';
+import { getAllSources, getCharactersBySource, renameCharacter } from '@/db/database';
 
-const chars = ref<(Character & { galleryName: string })[]>([]);
-const galleries = ref<Gallery[]>([]);
+/** 列表行：角色实体 + 所属来源名 */
+type CharacterRow = Character & { sourceName: string };
+
+// ------------------------------------------------------------
+// 状态
+// ------------------------------------------------------------
+
+const characters = ref<CharacterRow[]>([]);
+const sources = ref<Source[]>([]);
+const selectedIds = ref<number[]>([]);
+
 const page = ref(1);
 const pageSize = ref(20);
-const filterOrder = ref<string[]>([]);
-const galleryFilter = ref<number | undefined>(undefined);
-const nameFilter = ref<string>('');
-const pathFilter = ref<string>('');
-
-// 排序
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
 
+const sourceFilter = ref<number | undefined>(undefined);
+const nameFilter = ref('');
+const pathFilter = ref('');
+
+const { order: filterOrder, activate: activateFilter, deactivate: deactivateFilter } = useFilterOrder(() => {
+  page.value = 1;
+});
+
+// ------------------------------------------------------------
+// 计算属性
+// ------------------------------------------------------------
+
+const sourceItems = computed(() =>
+  sources.value.map((source) => ({ label: source.name, value: String(source.id) })),
+);
+
+const filteredCharacters = computed(() => {
+  let list = characters.value;
+
+  if (sourceFilter.value) {
+    list = list.filter((item) => item.sourceId === sourceFilter.value);
+  }
+  if (nameFilter.value) {
+    const keyword = nameFilter.value.toLowerCase();
+    list = list.filter((item) => item.name.toLowerCase().includes(keyword));
+  }
+  if (pathFilter.value) {
+    const keyword = pathFilter.value.toLowerCase();
+    list = list.filter((item) => item.sourcePath.toLowerCase().includes(keyword));
+  }
+
+  const prop = sortProp.value as keyof CharacterRow | null;
+  const order = sortOrder.value;
+  if (!prop || !order) {
+    return [...list].sort(
+      (a, b) => a.sourceName.localeCompare(b.sourceName) || a.name.localeCompare(b.name),
+    );
+  }
+
+  const direction = order === 'ascending' ? 1 : -1;
+  return [...list].sort((a, b) => String(a[prop] ?? '').localeCompare(String(b[prop] ?? '')) * direction);
+});
+
+const pagedCharacters = computed(() =>
+  filteredCharacters.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+);
+
+const filterSections = computed<FilterSection[]>(() => [
+  {
+    key: 'source',
+    label: '来源',
+    value: sourceFilter.value ? String(sourceFilter.value) : '',
+    display: sources.value.find((source) => source.id === sourceFilter.value)?.name ?? '',
+    items: sourceItems.value,
+    onSelect: (value: string) => {
+      sourceFilter.value = Number(value);
+      activateFilter('source');
+    },
+    onClear: () => {
+      sourceFilter.value = undefined;
+      deactivateFilter('source');
+    },
+  },
+  {
+    key: 'name',
+    label: '角色名',
+    value: nameFilter.value,
+    display: nameFilter.value,
+    items: [],
+    onSelect: (value: string) => {
+      nameFilter.value = value;
+      activateFilter('name');
+    },
+    onClear: () => {
+      nameFilter.value = '';
+      deactivateFilter('name');
+    },
+  },
+  {
+    key: 'path',
+    label: '源路径',
+    value: pathFilter.value,
+    display: pathFilter.value,
+    items: [],
+    onSelect: (value: string) => {
+      pathFilter.value = value;
+      activateFilter('path');
+    },
+    onClear: () => {
+      pathFilter.value = '';
+      deactivateFilter('path');
+    },
+  },
+]);
+
+// ------------------------------------------------------------
+// 列表操作
+// ------------------------------------------------------------
+
+async function loadData(): Promise<void> {
+  sources.value = await getAllSources();
+
+  const rows: CharacterRow[] = [];
+  for (const source of sources.value) {
+    const sourceCharacters = await getCharactersBySource(source.id);
+    for (const character of sourceCharacters) {
+      rows.push({ ...character, sourceName: source.name });
+    }
+  }
+  characters.value = rows;
+}
+
 function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
-  sortProp.value = prop; sortOrder.value = order as 'ascending' | 'descending' | null;
+  sortProp.value = prop;
+  sortOrder.value = order as 'ascending' | 'descending' | null;
 }
 
-const selectedIds = ref<number[]>([]);
-
-function onSelectionChange(rows: any[]): void {
-  selectedIds.value = rows.map(r => r.id);
+function onSelectionChange(rows: CharacterRow[]): void {
+  selectedIds.value = rows.map((row) => row.id);
 }
 
-function openSingleRename(row: Character & { galleryName: string }): void {
-  require('electron').ipcRenderer.invoke(IPC.PROMPT_OPEN, {
-    title: '重命名角色', placeholder: '新名称', value: row.name, channel: IPC.SINGLE_RENAME_CONFIRMED,
+// ------------------------------------------------------------
+// 重命名
+// ------------------------------------------------------------
+
+function openSingleRename(row: CharacterRow): void {
+  const payload: PromptInitData = {
+    title: '重命名角色',
+    placeholder: '新名称',
+    value: row.name,
+    channel: IPC.SINGLE_RENAME_CONFIRMED,
     rowId: row.id,
-  });
+  };
+  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
 }
 
 function openBatchRename(): void {
-  const first = chars.value.find(c => selectedIds.value.includes(c.id));
-  require('electron').ipcRenderer.invoke(IPC.PROMPT_OPEN, {
-    title: '批量重命名', placeholder: '输入新角色名', value: first?.name || '', channel: IPC.BATCH_RENAME_CONFIRMED,
-  });
+  const first = characters.value.find((character) => selectedIds.value.includes(character.id));
+  const payload: PromptInitData = {
+    title: '批量重命名',
+    placeholder: '输入新角色名',
+    value: first?.name ?? '',
+    channel: IPC.BATCH_RENAME_CONFIRMED,
+  };
+  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
 }
 
-// 筛选
-const filteredChars = computed(() => {
-  let list = chars.value;
-  if (galleryFilter.value) list = list.filter(c => c.galleryId === galleryFilter.value);
-  if (nameFilter.value) { const kw = nameFilter.value.toLowerCase(); list = list.filter(c => c.name.toLowerCase().includes(kw)); }
-  if (pathFilter.value) { const kw = pathFilter.value.toLowerCase(); list = list.filter(c => c.sourcePath.toLowerCase().includes(kw)); }
-  const prop = sortProp.value as keyof typeof list[0] | null;
-  const order = sortOrder.value;
-  if (prop && order) {
-    const dir = order === 'ascending' ? 1 : -1;
-    list = [...list].sort((a, b) => String(a[prop] ?? '').localeCompare(String(b[prop] ?? '')) * dir);
-  } else {
-    list = [...list].sort((a, b) => a.galleryName.localeCompare(b.galleryName) || a.name.localeCompare(b.name));
+useIpcListener(IPC.SINGLE_RENAME_CONFIRMED, async (result: PromptResult) => {
+  if (!result.value || !result.rowId) {
+    return;
   }
-  return list;
-});
-
-const pagedChars = computed(() => filteredChars.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value));
-
-const galleryItems = computed(() => galleries.value.map(g => ({ label: g.name, value: String(g.id) })));
-const filterSections = computed<FilterSection[]>(() => [
-  { key: 'gallery', label: '图库', value: galleryFilter.value ? String(galleryFilter.value) : '', display: galleryFilter.value ? galleries.value.find(g => g.id === galleryFilter.value)?.name || '' : '', items: galleryItems.value, onSelect: (v: string) => { galleryFilter.value = Number(v); page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'gallery'), 'gallery']; }, onClear: () => { galleryFilter.value = undefined; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'gallery'); } },
-  { key: 'name', label: '角色名', value: nameFilter.value, display: nameFilter.value || '', items: [], onSelect: (v: string) => { nameFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'name'), 'name']; }, onClear: () => { nameFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'name'); } },
-  { key: 'path', label: '源路径', value: pathFilter.value, display: pathFilter.value || '', items: [], onSelect: (v: string) => { pathFilter.value = v; page.value = 1; filterOrder.value = [...filterOrder.value.filter(k => k !== 'path'), 'path']; }, onClear: () => { pathFilter.value = ''; page.value = 1; filterOrder.value = filterOrder.value.filter(k => k !== 'path'); } },
-]);
-
-onMounted(() => {
-  require('electron').ipcRenderer.on(IPC.BATCH_RENAME_CONFIRMED, async (_e: any, data: any) => {
-    if (!data.value) return;
-    for (const id of selectedIds.value) await renameCharacter(id, data.value);
-    selectedIds.value = []; await loadData();
-  });
-  require('electron').ipcRenderer.on(IPC.SINGLE_RENAME_CONFIRMED, async (_e: any, data: any) => {
-    if (!data.value || !data.rowId) return;
-    await renameCharacter(data.rowId, data.value);
+  try {
+    await renameCharacter(result.rowId, result.value);
     await loadData();
-  });
+  } catch (error) {
+    await alertDialog({ title: '重命名失败', message: (error as Error).message, danger: true });
+  }
 });
 
-async function loadData(): Promise<void> {
-  galleries.value = await getAllGalleries();
-  const all: (Character & { galleryName: string })[] = [];
-  for (const g of galleries.value) {
-    const gChars = await getCharactersByGallery(g.id);
-    for (const c of gChars) all.push({ ...c, galleryName: g.name });
+useIpcListener(IPC.BATCH_RENAME_CONFIRMED, async (result: PromptResult) => {
+  if (!result.value) {
+    return;
   }
-  chars.value = all;
-}
+
+  // 名称在同一个来源内唯一，撞名后继续执行只会重复报错，因此遇到失败即停止
+  for (const id of selectedIds.value) {
+    try {
+      await renameCharacter(id, result.value);
+    } catch (error) {
+      await alertDialog({ title: '重命名失败', message: (error as Error).message, danger: true });
+      break;
+    }
+  }
+  selectedIds.value = [];
+  await loadData();
+});
 
 onMounted(loadData);
 </script>
 
 <style scoped>
-.character-page { padding: 0 24px; height: 100%; display: flex; flex-direction: column; }
-.toolbar { display: flex; margin-bottom: 12px; flex-shrink: 0; gap: 10px; align-items: center; }
-.toolbar-left { display: flex; align-items: center; flex: 1; }
-.table-wrap { flex: 1; overflow: hidden; }
-.table-wrap :deep(.el-table) { height: 100%; }
-.char-name { cursor: pointer; }
-.char-name:hover { color: #3871e1; text-decoration: underline; }
-.pager { display: flex; justify-content: flex-end; padding: 12px 0 16px 0; flex-shrink: 0; }
+.character-page {
+  padding: 0 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.table-wrap :deep(.el-table) {
+  height: 100%;
+}
+
+.char-name {
+  cursor: pointer;
+}
+
+.char-name:hover {
+  color: #3871e1;
+  text-decoration: underline;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 16px 0;
+  flex-shrink: 0;
+}
 </style>

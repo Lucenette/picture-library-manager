@@ -1,6 +1,10 @@
-# 二次元壁纸图库管理器 - 需求文档
+# 角色图库管理器 - 需求文档
 
-> **状态：已确认，待开工**
+> **状态：最初的需求规格，部分细节已被实现取代。**
+>
+> 当前行为请以 [README](../README.md)、[ARCHITECTURE](./ARCHITECTURE.md) 与 [SCRIPTING](./SCRIPTING.md) 为准。
+> 其中最典型的一处演进是脚本接口：本文描述的 `module.exports = function(groupDirPath)`
+> 已被「导出多个具名函数」的形式取代，详见 [SCRIPTING](./SCRIPTING.md)。
 
 ## 项目概述
 
@@ -8,12 +12,12 @@
 
 ---
 
-## 真实目录结构（依据示例图库）
+## 真实目录结构（依据示例来源）
 
-### 图库一：三端壁纸（规范型）
+### 来源一：三端壁纸（规范型）
 
 ```
-三端壁纸（示例图库一）/
+三端壁纸（示例来源一）/
 └── A-阿波尼亚/                    ← 角色目录
     ├── A-阿波尼亚-01/              ← 图片组（一层子目录）
     │   ├── 无损原图/               ← 子分类目录
@@ -34,10 +38,10 @@
 
 特点：角色下多个图片组，图片组内有子分类目录（无损原图/高清压缩），文件名包含设备标识。
 
-### 图库二：动漫游戏人物（非规范型）
+### 来源二：动漫游戏人物（非规范型）
 
 ```
-动漫游戏人物（示例图库二）/
+动漫游戏人物（示例来源二）/
 └── A-阿尼亚/
     └── 01 阿尼亚 转存后再下载 防丢失/   ← 图片组（长名称，角色下只有一个）
         ├── 平板.jpeg
@@ -64,7 +68,7 @@
 
 ### 关键结论
 
-- 角色目录 = 图库根目录下的第一层子目录
+- 角色目录 = 来源根目录下的第一层子目录
 - 图片组 = 角色目录下的第一层子目录
 - **虚拟组**：如果角色目录下有直接散放的图片文件（不属于任何子目录），自动归入一个名为 `(未分类)` 的虚拟图片组
 - 扫描时按图片扩展名白名单过滤（见下文），`Thumbs.db` 等非图片文件不收录
@@ -74,13 +78,13 @@
 
 ## 三大页面
 
-### 页面一：图库管理
+### 页面一：来源管理
 
 **功能：**
-- 添加图库目录（Electron dialog 选择文件夹）
-- 查看已添加的图库列表（名称、路径、扫描时间）
+- 添加来源目录（Electron dialog 选择文件夹）
+- 查看已添加的来源列表（名称、路径、扫描时间）
 - 点击"扫描"按钮，后台扫描目录：
-  - 识别角色列表（图库根目录 → 第一层子目录 = 角色）
+  - 识别角色列表（来源根目录 → 第一层子目录 = 角色）
   - 识别每个角色下的图片组（角色目录 → 第一层子目录 = 图片组；散放图片 → 虚拟组）
   - 递归收集每个图片组下的图片文件（按白名单过滤扩展名）
   - 读取图片元信息（分辨率、文件大小）
@@ -88,7 +92,7 @@
 - 显示扫描进度（角色数 / 图片组数 / 文件数）
 
 **数据产生：**
-- `gallery` 表：图库基本信息
+- `source` 表：来源基本信息
 - `character` 表：角色列表
 - `image_group` 表：图片组列表（含虚拟组）
 - `image_file` 表：每个图片组下的所有图片文件及元信息
@@ -102,11 +106,11 @@
 **详细功能：**
 
 1. **列表展示**
-   - 树形展示：图库 → 角色 → 图片组
+   - 树形展示：来源 → 角色 → 图片组
    - 每个图片组显示：目录名、文件数、处理状态标记
    - 三种状态：**未处理**（默认）/ **已处理** / **已排除**
    - 支持按状态过滤（全部 / 未处理 / 已处理 / 已排除）
-   - 支持按图库过滤
+   - 支持按来源过滤
 
 2. **脚本管理**
    - 用户在本机编写 `.js` 脚本文件
@@ -157,7 +161,7 @@
 
 ---
 
-### 页面三：准图库
+### 页面三：图库
 
 **功能概述：** 展示所有已处理确认的图片，支持过滤、删除和导出。
 
@@ -165,8 +169,8 @@
 
 1. **列表展示**
    - 所有已处理图片的列表（来自 `processed_image` 表）
-   - 每张图片显示：角色名、图库名、原始图片组路径、选中文件路径、确认时间、处理脚本名
-   - 支持按图库、角色过滤
+   - 每张图片显示：角色名、来源名、原始图片组路径、选中文件路径、确认时间、处理脚本名
+   - 支持按来源、角色过滤
    - 支持图片预览（缩略图）
 
 2. **删除管理**
@@ -201,26 +205,26 @@
 
 ```sql
 -- ============================================================
--- 图库：每一家卖家的图包对应一条记录
+-- 来源：每一家卖家的图包对应一条记录
 -- ============================================================
-CREATE TABLE IF NOT EXISTS gallery (
+CREATE TABLE IF NOT EXISTS source (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,   -- 自增主键
-    name        TEXT    NOT NULL,                     -- 图库名称（取根目录名）
-    root_path   TEXT    NOT NULL UNIQUE,              -- 图库根目录绝对路径，唯一约束防重复添加
+    name        TEXT    NOT NULL,                     -- 来源名称（取根目录名）
+    root_path   TEXT    NOT NULL UNIQUE,              -- 来源根目录绝对路径，唯一约束防重复添加
     scanned_at  TEXT,                                 -- 最近一次扫描时间 ISO8601
     created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 -- ============================================================
--- 角色：图库根目录下的第一层子目录
+-- 角色：来源根目录下的第一层子目录
 -- ============================================================
 CREATE TABLE IF NOT EXISTS character (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    gallery_id  INTEGER NOT NULL REFERENCES gallery(id) ON DELETE CASCADE,
+    source_id  INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE,
     name        TEXT    NOT NULL,                     -- 角色名（目录名，如 "A-阿波尼亚"）
     source_path TEXT    NOT NULL,                     -- 角色目录绝对路径
     created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    UNIQUE(gallery_id, name)                         -- 同一图库下角色名不可重复
+    UNIQUE(source_id, name)                         -- 同一来源下角色名不可重复
 );
 
 -- ============================================================
@@ -269,14 +273,14 @@ CREATE TABLE IF NOT EXISTS process_script (
 );
 
 -- ============================================================
--- 已处理图片（准图库）：每个图片组经脚本处理或手动确认后产生一条记录
+-- 已处理图片（图库）：每个图片组经脚本处理或手动确认后产生一条记录
 -- 一个图片组最多一条记录（UNIQUE(image_group_id)）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS processed_image (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     image_group_id  INTEGER NOT NULL UNIQUE REFERENCES image_group(id) ON DELETE CASCADE,
     character_id    INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
-    gallery_id      INTEGER NOT NULL REFERENCES gallery(id) ON DELETE CASCADE,
+    source_id      INTEGER NOT NULL REFERENCES source(id) ON DELETE CASCADE,
     original_path   TEXT    NOT NULL,                 -- 原始图片组目录绝对路径（冗余，方便查询）
     selected_file   TEXT    NOT NULL,                 -- 最终选中的图片文件绝对路径
     script_id       INTEGER REFERENCES process_script(id) ON DELETE SET NULL,  -- 使用的脚本（手动确认为 NULL）
@@ -284,9 +288,9 @@ CREATE TABLE IF NOT EXISTS processed_image (
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
--- 索引：按角色/图库过滤查询
+-- 索引：按角色/来源过滤查询
 CREATE INDEX IF NOT EXISTS idx_processed_character ON processed_image(character_id);
-CREATE INDEX IF NOT EXISTS idx_processed_gallery   ON processed_image(gallery_id);
+CREATE INDEX IF NOT EXISTS idx_processed_source   ON processed_image(source_id);
 ```
 
 ---
@@ -335,7 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_processed_gallery   ON processed_image(gallery_id
 - [x] 脚本无沙箱，直接 `require()` 执行
 - [x] 脚本从本机文件加载/重载，内容存入 DB
 - [x] 已处理图片组可重新处理（覆盖旧结果）
-- [x] 准图库支持删除记录（不删文件），删除后页面二自动恢复未处理
+- [x] 图库支持删除记录（不删文件），删除后页面二自动恢复未处理
 - [x] 扫描时记录图片分辨率（宽高）
 - [x] 所有安全功能砍掉（nodeIntegration、contextIsolation 全开）
 - [x] 图片组三种状态：未处理 / 已处理 / 已排除

@@ -1,0 +1,92 @@
+name: Bug 反馈
+description: 报告一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量把信息填全——图库扫描类问题**没有日志基本无法定位**。
+        提交前建议先翻一遍疑难排查文档（docs/TROUBLESHOOTING.md）。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么？期望的行为是什么？
+      placeholder: 点击扫描后……
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 添加图库「…」
+        2. 选择脚本「…」，点击扫描
+        3. 观察任务管理页
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及模块
+      multiple: true
+      options:
+        - 来源管理 / 扫描
+        - 角色确认
+        - 图组确认 / 批量选图
+        - 图库
+        - 任务管理
+        - 脚本系统
+        - 图片查看器
+        - 界面 / 主题
+        - 构建 / 打包
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      description: 界面上取不到就写安装包文件名，或对应 commit
+      placeholder: 1.0.0 / PLManager_Setup_1.0.0.exe
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志与错误信息
+      description: 主进程控制台（运行 yarn dev 的终端）的输出；任务管理页里该任务的错误栏内容；界面 DevTools（F12）的报错。
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 直接拖进来即可，尤其是界面异常与任务进度异常
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已确认这是最新版本上的问题
+          required: true
+        - label: 我已搜索过现有 Issue，没有重复
+          required: true
