@@ -102,7 +102,7 @@ jobs:
           path: artifacts
       - name: 生成发布说明
         run: node scripts/release-notes.mjs > RELEASE_NOTES.md
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
