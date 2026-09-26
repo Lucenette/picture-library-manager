@@ -8,7 +8,7 @@
     "dev": "electron-vite dev",
     "preview": "electron-vite preview",
     "icon": "electron-icon-builder --input=src/static/icon.png --output=dist",
-    "build": "yarn icon && electron-vite build && electron-builder",
+    "build": "yarn icon && electron-vite build && electron-builder --publish never",
     "build:win": "yarn build --win",
     "build:mac": "yarn build --mac",
     "build:linux": "yarn build --linux",
