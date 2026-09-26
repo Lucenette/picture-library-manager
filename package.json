@@ -1,6 +1,6 @@
 {
   "name": "picture-library-manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "角色图库管理器",
   "main": "out/main/index.js",
