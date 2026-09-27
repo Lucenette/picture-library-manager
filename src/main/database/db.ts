@@ -1,20 +1,16 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { DatabaseSync } from 'node:sqlite';
-import { basename, dirname, join } from 'path';
-import { app, ipcMain } from 'electron';
+import { basename, join } from 'path';
+import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import { compileScriptModule } from '@/script/compile';
 import type {
   Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
-  MigrationProgress, SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
+  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
+  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
-import { runChangesets } from '@/database/changeset';
-import type { MigrationOutcome } from '@/database/changeset';
-import { initChangesetIpc } from '@/database/changeset-ipc';
-import { CHANGELOG_FILES } from '@/database/changesets';
 import { SQL } from '@/database/sql';
+import { getDataDir } from '@/paths';
 
 // ------------------------------------------------------------
 // 常量
@@ -23,17 +19,11 @@ import { SQL } from '@/database/sql';
 /** 数据库文件名 */
 const DB_FILE_NAME = 'picture-lib.db';
 
-/** 脚本类型全集，用于检测脚本导出了哪些方法 */
-const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
-
 /** 备份最小间隔：避免每次写入都复制整个数据库文件 */
 const BACKUP_INTERVAL_MS = 30_000;
 
 /** 可以绑定到语句上的值 */
 type SqlValue = null | number | bigint | string | Uint8Array;
-
-/** 脚本摘要长度 */
-const BRIEF_MAX_LENGTH = 120;
 
 // ------------------------------------------------------------
 // 状态
@@ -42,7 +32,14 @@ const BRIEF_MAX_LENGTH = 120;
 let db: DatabaseSync | null = null;
 let dbPath = '';
 
-/** 事务嵌套深度，大于 0 表示正处于一次事务中 */
+/**
+ * 事务嵌套深度：大于 0 表示正处在一次事务里。
+ *
+ * **它是「当前有没有事务」的唯一状态**：`beginBatch()` / `endBatch()` 与
+ * `runInMigrationTransaction()` 都先占住它，所以后者套前者（或反过来）会像 Spring 的
+ * `PROPAGATION_REQUIRED` 那样并入外层，而不是再发一个 `BEGIN`（SQLite 会直接拒绝）。
+ * 新增任何事务入口都必须先经过这个计数器，否则就会绕开它、重现「事务里开事务」。
+ */
 let batchDepth = 0;
 
 /** 上次写入备份的时间戳 */
@@ -142,13 +139,6 @@ function backupDatabase(): void {
 // 生命周期
 // ------------------------------------------------------------
 
-/** 数据库目录：打包后位于 exe 同级的 data/，开发时位于项目 dist/data/ */
-function getDataDir(): string {
-  return app.isPackaged
-    ? join(dirname(app.getPath('exe')), 'data')
-    : join(process.cwd(), 'dist', 'data');
-}
-
 /**
  * 打开（必要时创建）数据库文件。
  *
@@ -157,27 +147,25 @@ function getDataDir(): string {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  mkdirSync(dataDir, { recursive: true });
+  console.log('[db] 数据目录：', dataDir);
+
+  try {
+    mkdirSync(dataDir, { recursive: true });
+  } catch (error) {
+    throw new Error(`数据目录不可用：${dataDir}（${error instanceof Error ? error.message : String(error)}）`);
+  }
   dbPath = join(dataDir, DB_FILE_NAME);
 
-  db = new DatabaseSync(dbPath);
+  try {
+    db = new DatabaseSync(dbPath);
+  } catch (error) {
+    throw new Error(`打不开数据库：${dbPath}（${error instanceof Error ? error.message : String(error)}）`);
+  }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
-}
 
-/** 执行待处理的 changeset，并在动库之前留一份备份 */
-export function runMigrations(
-  onProgress: (progress: MigrationProgress) => void,
-  shouldAbort?: () => boolean,
-): Promise<MigrationOutcome> {
-  return runChangesets({
-    db: db!,
-    dbPath,
-    backupsDir: join(getDataDir(), 'backups'),
-    files: CHANGELOG_FILES,
-    onProgress,
-    shouldAbort,
-  });
+  // 数据库相关的初始化只在这一个函数里：开库 + 注册 DB 通道
+  registerDbIpc();
 }
 
 /** 关闭数据库，供退出前调用；WAL 会在关闭时合并回主文件 */
@@ -191,6 +179,87 @@ export function closeDatabase(): void {
     console.error('[db] 关闭数据库失败：', error);
   }
   db = null;
+}
+
+// ------------------------------------------------------------
+// 升级模块的接口
+// ------------------------------------------------------------
+
+/** 账本里的一行 */
+export interface MigrationLedgerRow {
+  author: string;
+  id: string;
+  filename: string;
+  exectype: string;
+  /** 全局执行序号，用来算下一个序号 */
+  orderExecuted: number;
+}
+
+/** 要写进账本的一行 */
+export interface MigrationLedgerEntry {
+  author: string;
+  id: string;
+  filename: string;
+  title: string;
+  exectype: 'executed' | 'failed';
+  order: number;
+  executionMs: number;
+}
+
+/** 库文件路径：升级模块备份时要用 */
+export function getDbPath(): string {
+  return dbPath;
+}
+
+/** 在库上执行一段 SQL：升级模块用它跑迁移 SQL、建账本、做 checkpoint */
+export function execSql(sql: string): void {
+  db!.exec(sql);
+}
+
+/**
+ * 把一段回调包进一个事务：要么全做、要么全不做。
+ *
+ * 与 beginBatch / endBatch 不是一回事：那条路径不接受回滚，这里要的是失败时整体回滚。
+ * 回调可以是异步的（升级脚本就是异步的）。
+ */
+export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
+  if (batchDepth > 0) {
+    // 迁移只应该是最外层（它在启动阶段跑，那时还没有任何任务）；跑在别的批里说明用错了地方
+    throw new Error('迁移事务不能嵌套在别的事务里：先结束那次批处理再升级');
+  }
+
+  const handle = db!;
+  handle.exec('BEGIN');
+  // 也占住嵌套计数器：升级脚本里若调到 beginBatch()/endBatch()（例如 renameScript），
+  // 那一次就该退化成「嵌套」而不是再发一个 BEGIN——SQLite 不允许事务里再开事务
+  batchDepth += 1;
+  try {
+    const result = await fn();
+    batchDepth -= 1;
+    handle.exec('COMMIT');
+    return result;
+  } catch (error) {
+    batchDepth -= 1;
+    handle.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/** 读账本：「跑过没有」由升级模块按身份判断 */
+export function readMigrationLedger(): MigrationLedgerRow[] {
+  return queryAll<MigrationLedgerRow>(SQL.SELECT_MIGRATION_LEDGER);
+}
+
+/**
+ * 写一条账本记录。
+ *
+ * 不走 run()：那条路径会按 BACKUP_INTERVAL_MS 触发一次整库复制，升级过程中不需要再来一次
+ * ——升级自己已经在开始前备份过。
+ */
+export function writeMigrationLedger(entry: MigrationLedgerEntry): void {
+  db!
+    .prepare(SQL.WRITE_MIGRATION_LEDGER)
+    .run(entry.author, entry.id, entry.filename, entry.title, entry.exectype, entry.order, entry.executionMs);
 }
 
 // ------------------------------------------------------------
@@ -354,7 +423,7 @@ interface SimilarRow {
   distance: number;
 }
 
-/** 第四页签的图片（每个图片组选定的那一张）及其感知哈希 */
+/** 「图库」页的图片（每个图片组选定的那一张）及其感知哈希 */
 export function getSimilarInputRows(): SimilarInputRow[] {
   return queryAll<SimilarInputRow>(SQL.SELECT_SIMILAR_INPUT);
 }
@@ -451,24 +520,8 @@ export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
 // ProcessScript
 // ------------------------------------------------------------
 
-/** 生成脚本列表展示用的代码摘要 */
-function makeBrief(code: string): string {
-  const brief = code.replace(/\n/g, '\\n').slice(0, BRIEF_MAX_LENGTH);
-  return brief.length >= BRIEF_MAX_LENGTH ? `${brief}…` : brief;
-}
-
-/** 检测脚本导出了哪些可识别的方法 */
-function detectScriptTypes(code: string): ScriptType[] {
-  try {
-    const scriptExports = compileScriptModule(code);
-    return ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function');
-  } catch {
-    return [];
-  }
-}
-
-/** 覆盖脚本的类型关联 */
-function replaceScriptTypes(scriptId: number, types: ScriptType[]): void {
+/** 覆盖脚本的类型关联；类型由上层（script/library.ts）编译检测后传进来 */
+export function setScriptTypes(scriptId: number, types: ScriptType[]): void {
   run(SQL.DELETE_SCRIPT_TYPES, [scriptId]);
   for (const type of types) {
     run(SQL.INSERT_SCRIPT_TYPE, [scriptId, type]);
@@ -480,81 +533,177 @@ function getScriptTypes(scriptId: number): ScriptType[] {
   return queryAll<{ type: ScriptType }>(SQL.SELECT_SCRIPT_TYPES, [scriptId]).map((row) => row.type);
 }
 
-/** 补齐脚本记录上的类型字段 */
-function enrichScript(script: ProcessScript): ProcessScript {
-  return { ...script, types: getScriptTypes(script.id) };
+/** 行原始形态：SQLite 把 builtin 存成 0/1，视图要的是 boolean */
+interface ScriptRow {
+  id: number;
+  name: string;
+  filePath: string;
+  builtin: number;
+  /** NULL = 「未分组」 */
+  groupId: number | null;
+  loadedAt: string;
+  createdAt: string;
 }
 
-/** 按文件路径查询脚本并补齐类型 */
-function getScriptByPath(filePath: string): ProcessScript {
-  return enrichScript(queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath])!);
-}
-
-/**
- * 新增或更新脚本，按文件路径去重。
- *
- * @param types 显式指定类型；省略时自动检测
- */
-function upsertScript(name: string, filePath: string, code: string, types?: ScriptType[]): ProcessScript {
-  const resolvedTypes = types ?? detectScriptTypes(code);
-  const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
-
-  if (existing) {
-    run(SQL.UPDATE_SCRIPT, [name, code, makeBrief(code), filePath]);
-    replaceScriptTypes(existing.id, resolvedTypes);
-  } else {
-    const id = insert(SQL.INSERT_SCRIPT, [name, filePath, code, makeBrief(code)]);
-    replaceScriptTypes(id, resolvedTypes);
-  }
-  return getScriptByPath(filePath);
-}
-
-/** 用新源码覆盖已入库的脚本，并重新检测类型 */
-function reloadScript(filePath: string, code: string): ProcessScript {
-  const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
-  run(SQL.RELOAD_SCRIPT, [code, makeBrief(code), filePath]);
-  if (existing) {
-    replaceScriptTypes(existing.id, detectScriptTypes(code));
-  }
-  return getScriptByPath(filePath);
-}
-
-/** 从磁盘导入脚本：主进程读取源码并入库，名称取文件名 */
-export function importScript(filePath: string): ProcessScript {
-  return upsertScript(basename(filePath), filePath, readFileSync(filePath, 'utf-8'));
-}
-
-/** 用磁盘上的最新内容重新载入已入库的脚本 */
-export function reloadScriptFromFile(filePath: string): ProcessScript {
-  return reloadScript(filePath, readFileSync(filePath, 'utf-8'));
+/** 补齐脚本记录上的派生字段：类型关联与内置标记 */
+function enrichScript(row: ScriptRow): ProcessScript {
+  return { ...row, builtin: row.builtin === 1, types: getScriptTypes(row.id) };
 }
 
 /** 查询全部脚本，按名称升序 */
 export function getAllScripts(): ProcessScript[] {
-  return queryAll<ProcessScript>(SQL.SELECT_SCRIPTS_ALL).map(enrichScript);
+  return queryAll<ScriptRow>(SQL.SELECT_SCRIPTS_ALL).map(enrichScript);
 }
 
 /** 按 id 查询脚本 */
 export function getScriptById(id: number): ProcessScript | undefined {
-  const script = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_ID, [id]);
-  return script ? enrichScript(script) : undefined;
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BY_ID, [id]);
+  return row ? enrichScript(row) : undefined;
 }
 
-/** 查询能处理指定类型的脚本，按名称升序 */
+/** 按文件路径查询脚本；升级脚本用它判断「这一条是不是已经在了」 */
+export function getScriptByPath(filePath: string): ProcessScript | undefined {
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
+  return row ? enrichScript(row) : undefined;
+}
+
+/** 查询内置脚本；「恢复默认」与内置落盘都靠它 */
+export function getBuiltinScript(): ProcessScript | undefined {
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BUILTIN);
+  return row ? enrichScript(row) : undefined;
+}
+
+/** 按类型查询脚本，按名称升序 */
 export function getScriptsByType(type: ScriptType): ProcessScript[] {
-  return queryAll<ProcessScript>(SQL.SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
+  return queryAll<ScriptRow>(SQL.SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
 }
 
-/** 重命名脚本 */
+/**
+ * 插入一个脚本行；正文不进库，所以这里只收名称、文件路径与归属。
+ *
+ * `groupId` 传 `null` 就是「未分组」——内置脚本与升级带进来的行都落在那里。
+ */
+export function insertScript(
+  name: string,
+  filePath: string,
+  builtin: boolean,
+  groupId: number | null,
+): ProcessScript {
+  const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0, groupId]);
+  return getScriptById(id)!;
+}
+
+/**
+ * 改名。
+ *
+ * 同一个事务里把图库里的名字副本一起改掉：那一列存的是「这个脚本叫什么」，
+ * 改名后图库必须跟着显示新名字（删除时则不动，名字成为最后一份记录）。
+ */
 export function renameScript(id: number, name: string): void {
-  run(SQL.RENAME_SCRIPT, [name, id]);
+  beginBatch();
+  try {
+    run(SQL.RENAME_SCRIPT, [name, id]);
+    run(SQL.RENAME_PROCESSED_SCRIPT_NAME, [name, id]);
+  } finally {
+    endBatch();
+  }
 }
 
-/** 删除脚本及其类型关联 */
-export function deleteScript(id: number): void {
+/** 回填脚本文件路径：接管旧脚本与内置脚本落盘用 */
+export function setScriptFilePath(id: number, filePath: string): void {
+  run(SQL.SET_SCRIPT_FILE_PATH, [filePath, id]);
+}
+
+/** 只更新时间戳：用同一份文件重新载入时用 */
+export function touchScriptLoadedAt(id: number): void {
+  run(SQL.TOUCH_SCRIPT_LOADED_AT, [id]);
+}
+
+/** 图库里有几条记录来自这个脚本 */
+export function countProcessedByScript(id: number): number {
+  return queryOne<{ processed: number }>(SQL.COUNT_PROCESSED_BY_SCRIPT, [id])?.processed ?? 0;
+}
+
+/** 删脚本行与它的类型关联；内置能不能删由上层判断——那是编排，不归这里 */
+export function deleteScriptRows(id: number): void {
   run(SQL.DELETE_SCRIPT_TYPES, [id]);
   run(SQL.DELETE_SCRIPT, [id]);
 }
+
+/** 老库接管：库里还有没有 code 列——这一列的存在本身就是「还没接管」的标记 */
+export function hasScriptCodeColumn(): boolean {
+  const columns = queryAll<{ name: string }>('PRAGMA table_info(process_script)');
+  return columns.some((column) => column.name === 'code');
+}
+
+/** 老库接管：把每一条的旧源码读出来 */
+export function listLegacyScriptSources(): { id: number; name: string; filePath: string; code: string }[] {
+  return queryAll<{ id: number; name: string; filePath: string; code: string }>(SQL.SELECT_LEGACY_SCRIPTS);
+}
+
+
+// ------------------------------------------------------------
+// ScriptGroup
+// ------------------------------------------------------------
+
+/** 行原始形态：SQLite 把 collapsed 存成 0/1，视图要的是 boolean */
+interface ScriptGroupRow {
+  id: number;
+  name: string;
+  collapsed: number;
+}
+
+function enrichScriptGroup(row: ScriptGroupRow): ScriptGroup {
+  return { id: row.id, name: row.name, collapsed: row.collapsed === 1 };
+}
+
+/** 列出全部分组。顺序交给界面（中文要按拼音，SQL 给不了），这里只保证顺序稳定 */
+export function getAllScriptGroups(): ScriptGroup[] {
+  return queryAll<ScriptGroupRow>(SQL.SELECT_SCRIPT_GROUPS).map(enrichScriptGroup);
+}
+
+/** 这个分组还在不在：界面手里的 id 可能是别处刚删掉的 */
+export function scriptGroupExists(id: number): boolean {
+  return queryOne<{ id: number }>(SQL.SELECT_SCRIPT_GROUP_BY_ID, [id]) !== undefined;
+}
+
+/** 建一个分组；名字允许重复，所以这里不做任何查重 */
+export function insertScriptGroup(name: string): ScriptGroup {
+  const id = insert(SQL.INSERT_SCRIPT_GROUP, [name]);
+  return { id, name, collapsed: false };
+}
+
+/** 改分组名：只动名字，成员的归属不受影响 */
+export function renameScriptGroup(id: number, name: string): void {
+  run(SQL.RENAME_SCRIPT_GROUP, [name, id]);
+}
+
+/** 记下折叠状态；「未分组」不占行，所以这里不会拿到 null */
+export function setScriptGroupCollapsed(id: number, collapsed: boolean): void {
+  run(SQL.SET_SCRIPT_GROUP_COLLAPSED, [collapsed ? 1 : 0, id]);
+}
+
+/**
+ * 删一个分组：成员回到「未分组」（`group_id = NULL`），脚本本身一行都不动。
+ *
+ * 两步必须一起成败——只删行会留下指向不存在分组的 `group_id`，界面上看不出来（会被兜回
+ * 「未分组」），但库里的数据已经悬空了。
+ */
+export function deleteScriptGroup(id: number): void {
+  beginBatch();
+  try {
+    run(SQL.CLEAR_SCRIPT_GROUP_MEMBERS, [id]);
+    run(SQL.DELETE_SCRIPT_GROUP, [id]);
+  } finally {
+    endBatch();
+  }
+}
+
+/** 改一个脚本的归属；`null` 就是放回「未分组」 */
+export function setScriptGroup(scriptId: number, groupId: number | null): void {
+  run(SQL.SET_SCRIPT_GROUP, [groupId, scriptId]);
+}
+
 
 // ------------------------------------------------------------
 // ProcessedImage
@@ -571,10 +720,10 @@ export function upsertProcessedImage(
 ): ProcessedImage {
   const existing = queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId]);
   if (existing) {
-    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, imageGroupId]);
+    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptId, imageGroupId]);
   } else {
     run(SQL.INSERT_PROCESSED, [
-      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId,
+      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptId,
     ]);
   }
   run(SQL.UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
@@ -715,22 +864,20 @@ const DB_METHODS: Record<string, DbMethod> = {
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
 
-  importScript,
-  reloadScriptFromFile,
-  getAllScripts,
   getScriptsByType,
-  renameScript,
-  deleteScript,
 
   upsertProcessedImage,
   getAllProcessedImages,
   deleteProcessedImage,
 };
 
-/** 注册数据库相关的全部 IPC 通道，含加载页用的那三条 changelog 通道 */
-export function initDbIpc(): void {
-  initChangesetIpc();
-
+/**
+ * 注册数据库通道。
+ *
+ * 加载页那几条通道不在这里：它们归加载服务（见 loading/progress.ts），由 initLoadingIpc() 注册。
+ * 本函数由 initDatabase() 调用——数据库的初始化只有那一个入口。
+ */
+function registerDbIpc(): void {
   ipcMain.handle(IPC.DB, (_event, method: string, ...args: unknown[]) => {
     const handler = DB_METHODS[method];
     if (!handler) {

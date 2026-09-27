@@ -7,9 +7,9 @@
 ## 项目速览
 
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
-- **技术栈**：Electron 40 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
+- **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在 exe 同级的 `data/` 下。
+- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<你>\.plmanager`），里面分三份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
@@ -39,11 +39,15 @@
 | `src/common/` | **主进程与渲染进程都在用**的契约（类型、IPC 通道名） | 只被单进程使用的模块——放回该进程目录 |
 | `src/main/image/` | 图片处理流水线：目录遍历 + 解码线程池 | 业务语义（任务、进度、图库概念） |
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
-| `src/main/database/` | 开库、CRUD、changelog 迁移与账本、DB 的 IPC 调度 | 业务编排；建表语句——结构写在 `changesets/*.xml` 里 |
+| `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎；作为加载服务的一项任务运行，调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
+| `src/main/loading/` | **加载服务**：启动阶段任务的登记与调度（谁阻塞、谁可以预热、跑在哪个进程）、加载页状态与跨进程下发 | 具体任务本身——升级在 `ups/`、预热在渲染进程入口；把业务逻辑写进调度 |
+| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
-| `src/main/script/` | 处理脚本的编译与调用 | |
+| `src/main/script/` | 脚本文件与草稿的落盘（用户目录的 `scripts/`、`temp/scripts/`）、编译与调用 | SQL 与表结构——那是 `database/` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
-| `src/static/` | 构建资源：应用图标等供打包工具读取的静态文件（`yarn icon` 生成到 `dist/icons`） | 被代码 `import` 的模块——代码放 `main/`、`renderer/`、`common/` |
+| `src/renderer/loading/` | 加载服务的渲染进程侧：状态引用、按 id 认领任务、回执、报告就绪 | 任务清单与调度——那在主进程 |
+| `src/renderer/entries/` | **每个窗口类的入口**（`main` / `dialogs` / `viewer` / `popup`）；共用引导在 `entries/shell/`：`page.ts`（`mountPage`，只依赖 `vue`）、`window-chrome.ts`（平台类 + 失焦标记）、`element-plus.ts`（唯一引组件库的地方）、`first-paint.ts`（构建期片段） | 入口自己 import 组件库或 `App.vue`；`shell/page.ts` 不许引 Element Plus，否则小入口又背上整个组件库 |
+| `src/static/` | 构建资源：应用图标、内置默认脚本源码等**只当资源用**的静态文件（图标由 `yarn icon` 生成到 `dist/icons`） | 可执行的主进程 / 渲染进程模块——代码放 `main/`、`renderer/`、`common/`；这里的文件只能以 `?raw` 这类资源方式引入 |
 | `docs/` | 设计说明、不变量、排障；**已落地**的子系统说明放 `docs/design/` | 尚未实施的方案——放进 `docs/roadmap/` |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`database` 也只被少数模块用，但它独立存在）。
@@ -162,7 +166,7 @@ function upsertScript(...) {}
 ### 4. 新增 IPC 的归属
 
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
-- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts`），在 `src/main/index.ts` 里与 `initDbIpc()` 并列注册。
+- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见第 8 节）。
 
 ### 5. 弹窗一律用原生窗口
 
@@ -190,17 +194,53 @@ function upsertScript(...) {}
 - 进度写库节流到不低于 1 秒；任务成功结束时进度记为 100%。
 - 新增一种任务照 `docs/ARCHITECTURE.md` 末尾的五步配方；runner 只在单元边界调用 `ctx.checkpoint()`。
 
-### 8. 数据库结构由 changelog 演进
+### 8. 升级模块与版本目录
 
-- 建表语句不进代码，写进 `src/main/database/changesets/<package.json 的版本号>.xml` 的 `<changeSet>` 里；
-  一条 changeset 用 `<comment>` 说明它做了什么。
-- **已发布的版本文件冻结**：新的结构变更写进新版本的文件。改一条已经执行过的 changeset 不会生效——
-  它会被账本判定为已跑过而跳过，而且没有任何校验会告诉你这件事。
-- 一条 changeset 的身份是 `(author, id, filename)`，`id` 用 20 位定长数字时间戳；账本表
-  `schema_migration` 记着哪些跑过了。**账本表由 `changeset.ts` 用代码创建，不要写进 changelog**：
-  账本不存在时，没有任何地方能记录「创建账本」这件事。
-- 结构与数据订正都写在这里；需要图片解码或文件 IO 的补数据仍归任务系统，不要塞进 changeset。
+- 升级独立成 `src/main/ups/`，`src/main/database/` 是它的下层：升级模块调用数据库模块跑 SQL、读写账本，
+  **`database/` 里不出现 `@/ups`**。
+- 一个版本 = `src/main/ups/changesets/<package.json 的版本号>/` 一个目录，最多三件东西：
+  `preups.ts`（SQL 之前跑）、`dbups.xml`（`<changeSet>`）、`postups.ts`（SQL 之后跑），缺哪个就跳过哪个。
+  目录里的 `index.ts` 写死 `VERSION` 并导出 `changelog`——**版本号以代码里的常量为准，目录名只给人看**；
+  外层 `changesets/index.ts` 只 import 各版本目录的 `index.ts`。清单里出现相同版本号直接抛错。
+- 建表语句不进代码，写进 `dbups.xml` 的 `<changeSet>` 里，一条用 `<comment>` 说明它做了什么。
+- **账本按身份记账、执行过的不再执行**：changeSet 是 `(author, id, filename)`（`id` 用 20 位定长数字时间戳），
+  脚本是 `(script, 'preups' | 'postups', 版本号)`。**已发布版本的目录冻结**：改一条已执行的 changeset 或脚本
+  都不会生效，要重跑得先删掉 `schema_migration` 里那一行。账本表由引擎用代码创建，不要写进 changelog。
+- 升级脚本是普通模块（可以 import 任何东西），但：一律异步 IO；不要自己写 `BEGIN` / `COMMIT`；
+  不要吞异常（抛错才回滚，脚本写进库的东西随事务一起不留）；**文件操作不受事务保护**，
+  要改或删已有文件就自己先备份，并保证重复执行是安全的。
+- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ 升级 → 其余初始化。三者都是**加载服务**
+  （`src/main/loading/`，见 [docs/design/loading.md](docs/design/loading.md)）里的任务：升级与其余初始化
+  都是 `essential`，按登记顺序串行。加载服务的终态在所有 `essential` 任务之后才公布，因此
+  「加载页收到终态时通道必然已经注册好了」是登记表的结论，不再需要额外的时序约定。
+- 启动阶段的活一律 `registerLoadTask()` 登记，不要写在 `startLoading()` 之后。`essential` 跑完才进主界面、
+  失败即整轮失败；`warmup` 与必须的任务并行、跑完不放行、失败只记日志。渲染进程的预热用
+  `target: 'renderer'` 登记，id 加在 `common/ipcChannels.ts` 的 `LOAD_TASK` 里，实现写在渲染进程入口。
+- **破坏性结构变更（删列、删表、改名）之前，先在 preups 里把要保留的数据落成文件并自校验**：列一旦丢掉，
+  除了升级前的库备份之外没有第二份副本，而备份是整库回滚、不能只捞回一个字段。落盘放在 SQL 之前、校验放在同一段脚本末尾，
+  任一步失败就中止整轮升级——那时列还在。
 - 转义由写的人负责：`<sql>` 里出现 `<` 写成 `&lt;`（漏写可能被 XML 当成标签吞掉），`&` 写成 `&amp;`。
+- 需要图片解码的补数据仍归任务系统，不要塞进 changeSet。
+
+### 9. 自绘标题栏
+
+主窗口没有系统标题栏，**单独一条 `.title-bar`（40px）就是它**，导航是它下面**左侧**那条 40px 竖栏（`.app-rail`）；**系统窗口按钮保留**：
+Windows / Linux 靠 `titleBarOverlay`（Window Controls Overlay），macOS 靠原生红绿灯。
+Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不画这个槽**（左端归红绿灯，只留标题文字）。
+改这条栏时几条一起看：
+
+- 主窗口骨架（`.app-container` / `.title-bar` / `.app-body` / `.app-rail` / `.app-main`）一律用普通 `div`，
+  **不要用 `el-container` / `el-main`**：Element Plus 的 `.el-container{flex-direction:row}` 与 `.app-container` 同权重，
+  胜负只看样式表注入顺序，一旦它排在后面整页就横过来（标题栏缩成左侧一条、导航栏跑到窗口中间）。
+- `.title-bar` 是拖拽区，左侧导航栏不是；要在标题栏里放可点元素就得补 `no-drag`，否则表现为「点不动」。
+- `--title-bar-height`（CSS）与 `createMain()` 的 `titleBar.height` 必须相等；
+  `titleBar.color` 要与 `.title-bar` 的底色一致。
+- 系统按钮占的位置由 `env(titlebar-area-*)` 让出；macOS 没有 WCO，靠 `html.platform-mac` 补左内边距。
+- **失焦时整条 chrome 要一起压暗**（标题栏的图标与文字、左侧导航栏的图标）：渲染进程挂
+  `html.window-blurred`（DOM focus / blur），主进程换 `setTitleBarOverlay` 的字形色——
+  两端都挂在同一个窗口焦点事件上，别只改一边。
+
+细节与取舍见 [docs/design/window-management.md](docs/design/window-management.md)。
 
 ---
 
@@ -209,6 +249,10 @@ function upsertScript(...) {}
 - **`yarn build` 可能无法在受限沙箱里跑完**：esbuild 需要 `spawn` 子进程并用命名管道通信，沙箱会以 `spawn EPERM` 拒绝。遇到时如实说明"构建未验证"，不要假装通过，也不要绕过沙箱。
 - **`vue-tsc` 已随依赖安装**（当前 5.9.3）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
   只跑 `tsc` 就宣称"类型已检查"是错的——曾经因此漏掉一个缺失的 import，对应按钮一点就报 `ReferenceError`。
+- **Electron ≥ 42 不再在 install 时下载二进制**：官方的 `postinstall` 没了，改成首次运行 `electron .` 时按需拉取。
+  本仓库在 `package.json` 的 `postinstall` 里显式跑 `node node_modules/electron/install.js`（幂等，装过就跳过），
+  让 `yarn install` 之后直接就能开发。GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指镜像——
+  别再往 `.npmrc` 写 `electron_mirror`，npm 已警告这类未知配置下个大版本会失效。
 - **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
 - **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
@@ -228,7 +272,8 @@ function upsertScript(...) {}
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
 3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
 4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
-5. 导入解析：确认所有 `@/` 与 `@common/` 路径都能落到真实文件（`?nodeWorker` 除外）。
+5. 导入解析：确认所有 `@/`、`@common/` 与相对路径都能落到真实文件（`?nodeWorker`、`?raw` 除外——
+   它们由 electron-vite / Vite 接管）。
 6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
 7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
 
@@ -240,7 +285,7 @@ function upsertScript(...) {}
 
 - 不要擅自 `git commit` / `git push`，除非明确要求。
 - 不要顺手改动目录结构或文件位置（见开头"动手前的边界"）。
-- 不要改动 `data/` 下示例脚本的语义。
+- 不要改动 `src/static/default-script.js`（内置默认脚本）的语义：它随应用发布，改了等于改所有新库的默认行为。
 - **不要改动 `package.json`、不要自行安装或卸载依赖**（包括 `yarn add`）：需要新依赖时说明理由与命令，等使用者执行。
 - **不要结束进程、不要改系统状态**（杀他人的进程、改环境变量、动用户目录）：只报告现象，由使用者决定。
 - 不要把"静默降级"当作容错：功能性失败要能被看见（写进任务错误、日志或界面提示），而不是悄悄退回慢路径。

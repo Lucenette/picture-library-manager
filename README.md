@@ -43,7 +43,7 @@
 - 失败或已取消的任务可一键重试，已结束的任务可批量清理
 - 进度、阶段描述与耗时实时展示，导航栏常驻运行中数量角标
 
-### 角色确认
+### 角色管理
 - 扫描后统一查看和校对所有角色名称
 - 支持双击/按钮重命名单个角色，批量重命名
 - 按图库、角色名、源路径模糊筛选
@@ -51,10 +51,11 @@
 ### 脚本系统
 - JavaScript 脚本引擎，支持自定义选图/识别逻辑
 - 自动检测导出函数类型（`select-image` / `identify-character` / `identify-structure`）
-- 脚本代码安全存储于数据库，源文件丢失仍可执行
-- 支持重命名、重载、批量管理
+- 脚本正文是**用户目录 `scripts/` 下的一份 `.js` 文件**，库里只留索引；那份文件就是唯一副本，丢了这条脚本就不能执行
+- 支持分组：新建 / 重命名 / 删除分组，把脚本拖进分组；分组只影响脚本管理页，扫描与选图选脚本仍是平铺列表
+- 重命名、放弃修改、删除、恢复默认都走原生右键菜单
 
-### 图片组确认
+### 图组管理
 - 表格展示所有图片组，支持按图库/角色/路径/状态筛选与分页
 - 批量选择脚本处理（基于文件元数据选图，不重复扫描）
 - 标记排除/取消排除，已处理/未处理状态跟踪
@@ -90,7 +91,7 @@
 
 | 层 | 技术 | 说明 |
 |---|---|---|
-| 桌面壳 | Electron 40 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
+| 桌面壳 | Electron 44 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
 | 前端 | Vue 3 + Vite 6 + TypeScript 5 | Composition API + `<script setup>` |
 | UI 组件 | Element Plus 2 | 暗色主题全覆盖 |
 | 数据库 | SQLite (node:sqlite) | Electron 内置，真实文件 + WAL，单条写入毫秒级落盘 |
@@ -105,7 +106,7 @@
 
 ### 环境要求
 
-- Node.js ≥ 22.12（Electron 40 的要求）
+- Node.js ≥ 22.12（Electron 44 的要求）
 - Yarn（推荐）或 npm
 - Windows 10/11
 
@@ -119,6 +120,10 @@ yarn dev        # 启动开发环境
 yarn preview    # 构建后预览生产产物（不打包）
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
+
+> Electron 42 起官方不再在 `install` 阶段下载二进制（改成首次运行 `electron .` 时按需拉取）。
+> 本项目在 `postinstall` 里显式把它装好，所以 `yarn install` 之后可以直接 `yarn dev`；
+> GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指定镜像。
 
 ### 解码引擎：sharp
 
@@ -147,22 +152,25 @@ yarn build:linux
 
 ```
 picture-library-manager/
-├── data/            # 示例处理脚本，打包时随附
 ├── docs/            # 设计说明、路线图、排障（入口见 docs/README.md）
 ├── scripts/         # 仓库自检脚本（文档与 skill）
 ├── src/
 │   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
-│   ├── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
-│   └── static/      # 构建资源：应用图标（构建时生成 dist/icons）
-└── .agents/skills/  # 编码代理的工作流（文档规范）
+│   ├── renderer/    # 渲染进程：Vue 3 界面，每类窗口一个入口（见 entries/）
+│   └── static/      # 构建资源：应用图标、内置默认脚本源码（图标构建时生成 dist/icons）
+└── .agents/skills/  # 编码代理的工作流（文档、提交信息、数据库、发布）
 ```
 
 ---
 
 ## 📝 脚本系统
 
-脚本以 CommonJS 源码字符串存储在数据库中，**在主进程执行**：录入时自动检测导出了哪些方法，执行时按需编译。因此源文件丢失也不影响已入库的脚本。
+脚本是一份 CommonJS 的 `.js` 文件，正文放在**用户目录的 `scripts/` 下**（打包态 `~/.plmanager/scripts/`，开发态 `dist/scripts/`），库里只留索引：名称、文件路径、内置标记、类型关联与所属分组。「加载文件」只是把选中的文件**复制**一份进 `scripts/`，原文件此后不再被读写——所以复制出来的那一份就是脚本唯一的副本，删掉就没了。
+
+脚本**在主进程执行**：打开或保存时检测导出了哪些方法，每次调用前重新读盘并编译。因此用外部编辑器改完文件，下一次扫描 / 选图就会用新内容，不需要在应用里点任何按钮。
+
+新库自带一份**内置默认脚本**（名为「默认」），装完即可直接扫描；它不能删除，右键的「恢复默认」会用随应用发布的源码覆盖回出厂版本（文件被删也能借此重建）。
 
 ### 脚本格式
 
@@ -189,7 +197,7 @@ module.exports = {
 | `select-image` | `(ctx) => uuid` | 从图片组文件列表中选一张 | 批量选图任务 |
 | `identify-character` | `(dirName) => string` | 从目录名提取角色名称 | 结构脚本内部自行调用 |
 
-> `identify-character` 目前不作为独立脚本被框架调用：它的逻辑通常由结构脚本在映射目录时自己调用（见 `data/default.js`）。
+> `identify-character` 目前不作为独立脚本被框架调用：它的逻辑通常由结构脚本在映射目录时自己调用（见内置默认脚本 `src/static/default-script.js`）。
 
 ### 选图上下文
 

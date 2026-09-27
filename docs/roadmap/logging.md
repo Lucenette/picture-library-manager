@@ -33,7 +33,7 @@
 ### 3.1 落点与格式
 
 - 目录：`data/logs/`，与数据库同级（复用现有的 `getDataDir()`，开发态为 `dist/data/logs`，
-  打包后为 exe 同级的 `data/logs`）；
+  打包后为用户主目录下的 `~/.plmanager/data/logs`）；
 - 文件：`app-YYYY-MM-DD.log`，UTF-8 无 BOM，LF 换行；
 - 行格式（字段顺序固定，便于检索）：
 

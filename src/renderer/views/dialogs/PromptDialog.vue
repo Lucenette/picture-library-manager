@@ -19,7 +19,7 @@ import type { PromptInitData } from '@common/types';
 const title = ref('');
 const placeholder = ref('');
 const value = ref('');
-const inputEl = ref<{ focus: () => void } | null>(null);
+const inputEl = ref<{ focus: () => void; select: () => void } | null>(null);
 
 /** 主进程下发的完整初始化数据，确认时要原样带回，用于区分调用方 */
 let initData: PromptInitData | null = null;
@@ -34,7 +34,13 @@ async function loadInitData(): Promise<void> {
   placeholder.value = data.placeholder ?? '';
   value.value = data.value ?? '';
   initData = data;
-  nextTick(() => inputEl.value?.focus());
+  nextTick(() => {
+    inputEl.value?.focus();
+    if (data.selectAll) {
+      // 预填的名字全选：回车用默认名，直接打字就把它覆盖掉
+      inputEl.value?.select();
+    }
+  });
 }
 
 function confirm(): void {

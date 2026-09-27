@@ -3,6 +3,9 @@
  *
  * 运行：node .agents/skills/db-maintenance/scripts/verify-migration.mjs
  * 依赖 node:sqlite（Node 22+ 内置）与 @xmldom/xmldom（本仓库的显式依赖）。
+ *
+ * 只重放各版本目录里的 dbups.xml：preups.ts / postups.ts 是编译进主进程包的 TS，
+ * 没法在纯 Node 里跑，所以脚本会打印哪些版本带脚本、需要另外在库副本上手工冒烟。
  */
 
 import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -13,39 +16,66 @@ import { DatabaseSync } from 'node:sqlite';
 import { DOMParser } from '@xmldom/xmldom';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const DIR = join(ROOT, 'src/main/database/changesets');
+const DIR = join(ROOT, 'src/main/ups/changesets');
 const DEV_DB = join(ROOT, 'dist/data/picture-lib.db');
 const LEDGER = 'schema_migration';
+/** 约定文件里除了 dbups.xml 之外的两段脚本，只用来提示「没被预演」 */
+const SCRIPT_FILES = ['preups.ts', 'postups.ts'];
 
-/** 读 changelog：按文件名排序（与版本号递增一致），逐个取身份与 SQL */
-function readChangesets() {
-  const files = readdirSync(DIR).filter((name) => name.endsWith('.xml')).sort();
-  const all = [];
-  for (const file of files) {
-    const filename = file.replace(/\.xml$/, '');
-    const source = readFileSync(join(DIR, file), 'utf8');
-    const errors = [];
-    const doc = new DOMParser({
-      onError: (level, message) => {
-        errors.push(level + ': ' + message);
-      },
-    }).parseFromString(source, 'text/xml');
-    if (errors.length > 0) {
-      console.log('  ' + file + ' 解析报错：' + errors.join(' | '));
-    }
-    for (const set of Array.from(doc.getElementsByTagName('changeSet'))) {
-      const comment = set.getElementsByTagName('comment')[0];
-      const sqlNode = set.getElementsByTagName('sql')[0];
-      all.push({
-        filename,
-        author: set.getAttribute('author'),
-        id: set.getAttribute('id'),
-        title: comment ? comment.textContent.trim() : '',
-        sql: sqlNode ? sqlNode.textContent.trim() : '',
-      });
-    }
+/** 版本号写死在目录的 index.ts 里（与目录名无关），预演也要用它 */
+function readDeclaredVersion(absDir) {
+  const indexPath = join(absDir, 'index.ts');
+  if (!existsSync(indexPath)) {
+    return null;
   }
-  return all;
+  const match = /VERSION\s*=\s*'([^']+)'/.exec(readFileSync(indexPath, 'utf8'));
+  return match ? match[1] : null;
+}
+
+/** 解析一份 dbups.xml；账本里的 filename 取版本号 */
+function parseChangesets(version, source) {
+  const errors = [];
+  const doc = new DOMParser({
+    onError: (level, message) => {
+      errors.push(level + ': ' + message);
+    },
+  }).parseFromString(source, 'text/xml');
+  if (errors.length > 0) {
+    console.log('  ' + version + '/dbups.xml 解析报错：' + errors.join(' | '));
+  }
+  const sets = [];
+  for (const set of Array.from(doc.getElementsByTagName('changeSet'))) {
+    const comment = set.getElementsByTagName('comment')[0];
+    const sqlNode = set.getElementsByTagName('sql')[0];
+    sets.push({
+      filename: version,
+      author: set.getAttribute('author'),
+      id: set.getAttribute('id'),
+      title: comment ? comment.textContent.trim() : '',
+      sql: sqlNode ? sqlNode.textContent.trim() : '',
+    });
+  }
+  return sets;
+}
+
+/** 读全部版本目录：按目录名排序（与版本号递增一致） */
+function readVersions() {
+  const names = readdirSync(DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  return names.map((name) => {
+    const absDir = join(DIR, name);
+    const declared = readDeclaredVersion(absDir);
+    const xmlPath = join(absDir, 'dbups.xml');
+    return {
+      version: declared ?? name,
+      dirName: name,
+      declared: declared !== null,
+      dbups: existsSync(xmlPath) ? readFileSync(xmlPath, 'utf8') : null,
+      scripts: SCRIPT_FILES.filter((file) => existsSync(join(absDir, file))),
+    };
+  });
 }
 
 /** 结构与行数的快照，用于比对两条路径的结果 */
@@ -79,8 +109,35 @@ function execPending(db, sets) {
   }
 }
 
-const sets = readChangesets();
-console.log('changelog：' + sets.length + ' 条 changeset');
+const versions = readVersions();
+const sets = [];
+for (const version of versions) {
+  if (version.dbups !== null) {
+    sets.push(...parseChangesets(version.version, version.dbups));
+  }
+}
+console.log('版本目录：' + versions.length + ' 个，dbups 里的 changeset 合计 ' + sets.length + ' 条');
+const skipped = [];
+for (const version of versions) {
+  const files = [version.dbups !== null ? 'dbups.xml' : null, ...version.scripts].filter(Boolean);
+  console.log('  ' + version.version + '（' + version.dirName + '）：' + (files.length > 0 ? files.join(' + ') : '空目录'));
+  if (!version.declared) {
+    console.log('    index.ts 里没读到 VERSION 常量，按目录名当版本号');
+  }
+  if (version.version !== version.dirName) {
+    console.log('    目录名与代码里的版本号不一致；账本身份以代码里的为准');
+  }
+  if (version.scripts.length > 0) {
+    skipped.push(version.version + ' 的 ' + version.scripts.join(' / '));
+  }
+}
+if (skipped.length > 0) {
+  console.log('');
+  console.log('下面这些升级脚本不在预演范围内（TS，必须编译进主进程包才能跑），请在库副本上手工冒烟：');
+  for (const item of skipped) {
+    console.log('  ' + item);
+  }
+}
 
 // 路径一：全新库，按顺序跑完
 const fresh = join(ROOT, 'dist/data/_verify-fresh.db');

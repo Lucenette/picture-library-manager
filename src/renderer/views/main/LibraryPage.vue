@@ -40,7 +40,7 @@
         <el-table-column prop="characterName" label="角色" width="160" sortable="custom" />
         <el-table-column prop="selectedFileName" label="文件名" min-width="220" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="scriptName" label="处理脚本" width="150" sortable="custom">
-          <template #default="{ row }">{{ row.scriptName || '手动确认' }}</template>
+          <template #default="{ row }">{{ scriptLabel(row) }}</template>
         </el-table-column>
         <el-table-column prop="confirmedAt" label="确认时间" width="170" sortable="custom" />
         <el-table-column label="操作" width="80" fixed="right">
@@ -96,6 +96,19 @@ const fileNameFilter = ref('');
 const scriptFilter = ref('');
 
 const { tasks, actions } = useTasks();
+
+/**
+ * 「处理脚本」那一列显示什么。
+ *
+ * 名字是写入图库行时留下的副本：脚本被删掉之后它还在（改名时由主进程级联更新）；
+ * 没有名字却有 script_id 说明库被手工改过、名字确实查不到了——不能假装成手动确认。
+ */
+function scriptLabel(row: ProcessedImageView): string {
+  if (row.scriptName) {
+    return row.scriptName;
+  }
+  return row.scriptId === null ? '手动确认' : '已删除脚本';
+}
 
 /** 识别任务是否在跑：跑的过程中禁用按钮 */
 const recognizing = ref(false);
@@ -389,7 +402,7 @@ onMounted(loadData);
 
 <style scoped>
 .library-page {
-  padding: 0 24px;
+  padding: var(--page-padding);
   height: 100%;
   display: flex;
   flex-direction: column;

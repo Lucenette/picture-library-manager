@@ -99,6 +99,13 @@
   --el-fill-color-blank: #2b2d30;
 
   --el-font-size-base: 14px;
+
+  /* ======== 布局 ======== */
+  /* 页面内容与主区域边界之间的距离。主区域自己不留白，页面用它自己留：
+     列表页统一填这一句；工具型页面（脚本管理、加载页）整页铺满，不填。 */
+  /* --page-gap 是同一段距离的单值形式，给只需要一侧留白的场合（如编辑区顶边）用 */
+  --page-gap: 16px;
+  --page-padding: var(--page-gap) var(--page-gap) 0;
 }
 
 /* ============================================================
@@ -382,11 +389,19 @@ body {
   color: #3871e1;
 }
 
-/* ======== 应用头部 ======== */
-.app-header {
-  background: #26282c;
-  border-bottom-color: #323438 !important;
+/* ======== 失焦压暗 ======== */
+/* 窗口失焦由 entries/shell/window-chrome.ts 挂上 html.window-blurred；压暗哪些元素在这里定。
+   现在只有主窗口的标题栏与左侧导航栏有自绘栏，等其余窗口也自绘（见路线图 window-chrome）再往这里加 */
+.window-blurred .title-bar-icon,
+.window-blurred .rail-link {
+  opacity: 0.5;
 }
+
+.window-blurred .title-bar-text {
+  color: var(--el-text-color-disabled);
+}
+
+/* ======== 应用主区域 ======== */
 .app-main {
   background: #1e1f22 !important;
 }

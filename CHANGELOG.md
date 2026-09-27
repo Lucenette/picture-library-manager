@@ -4,6 +4,52 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 2026-09-28
+
+### 新增
+
+- **内置默认脚本**（名为「默认」）：库里没有它时自动入库（`identify-character` / `identify-structure` / `select-image` 三个方法齐全），
+  装完就能直接扫描，不用再去安装目录翻示例文件自己加载。它不能删除，右键的「恢复默认」会用随应用发布的源码覆盖回出厂版本。
+- **脚本分组**：`script_group` 表 + `process_script.group_id`（`NULL` 就是默认的「未分组」，它不占行）。具名分组按名称排，「未分组」固定在最后；组头可折叠（具名分组的折叠状态落库）、悬停露出「新增脚本 / 加载文件」、右键可重命名或删除分组，顶栏是「新建分组」；把脚本**拖到某个分组段上**即可换归属，删除分组只把组里的脚本退回「未分组」，脚本本身不动。分组只影响脚本管理页的列表——扫描、选图等流程选择脚本时仍是平铺列表。
+
+### 变更
+
+- **升级独立成 `ups` 模块，支持版本目录与升级脚本**：原来的 `changesets/<版本号>.xml` 变成 `changesets/<版本号>/` 目录，
+  最多放三件东西——`preups.ts`（SQL 之前跑）、`dbups.xml`（changeSet）、`postups.ts`（SQL 之后跑），缺哪个跳过哪个；
+  三段都进同一个账本，**执行过的不再执行**，脚本要与 SQL 一样能重复执行。`database/` 降为它的下层，只负责开库、
+  CRUD、账本读写与执行 SQL；启动顺序改成「开库 → 升级 → 其它初始化」。升级前仍然备份数据库，但改成**每次启动
+  都清理旧备份、保留最近 3 份**（原来是 5 份，且只在真的备份时才清）。内置默认脚本入库从启动流程搬进
+  `1.1.0` 的 `postups.ts`，不再每次启动查一遍库。
+- **脚本正文与草稿不再进数据库**：正文改成用户目录 `scripts/` 下的一份 `.js` 文件（文件名用 UUID，显示名在库里；与 `data/` 里的库分开存放），
+  库里只留索引——名称、文件路径、内置标记、分组、时间，类型关联仍在 `script_type`。`1.1.0` 的 `preups.ts` 逐条把旧库 `code` 列里的
+  源码落成文件并自校验，随后 dbups 删掉 `code` / `brief` 两列。未保存的编辑内容照 VS Code hot exit 的做法一稿一文件放在
+  `temp/scripts/` 下。**正文只有那一份文件**：磁盘上那份丢了或坏了，这条脚本就不能执行，唯一例外是内置默认脚本
+  （右键「恢复默认」能用随应用发布的源码重建它）。
+- **脚本管理页重做**：新增依赖 `monaco-editor@^0.57.0`，Monaco 常驻编辑器（一个脚本一个 model，切回来仍保留撤销历史与光标）、底部状态栏（导出类型、
+  光标 / 选区、行结束符与缩进、问题数）、行号右侧「自上次保存改了哪里」的改动色条；重命名 / 放弃修改 / 删除 / 恢复默认
+  走原生右键菜单，重命名用原生输入窗，脚本列表按类型筛选与搜索。界面里不再有「重载」按钮——执行时读的就是磁盘上那个文件。
+- **渲染进程按窗口类拆入口**：主窗口 `index.html`、六个弹窗 `dialogs.html`、图片查看器 `viewer.html`、
+  仿原生浮窗 `popup.html` 各一份引导，入口里只 import 这个窗口要用的东西。图片查看器与浮窗页面本来
+  一行 Element Plus 都没用，却和主窗口一样要加载整个组件库（拆分前实测：每个窗口 1,969 KB JS + 362 KB
+  样式）；这两个入口现在连 vue-router 也不引，浮窗的滚动条也由 `<el-scrollbar>` 换成原生滚动。
+- **Electron 40 → 44**：同时补上 `postinstall` 显式安装二进制——Electron 42 起官方不再在 install 时下载，
+  改为首次运行时按需拉取；我们仍在 `yarn install` 阶段装好，免得开发或 CI 在第一次运行时才去下载。
+  `@types/node` 跟着提到 24（Electron 44 自身依赖 ^24.9.0）。
+- **主窗口改成自绘标题栏**：去掉系统画的标题栏（它和应用自己的顶栏重复），系统的最小化 / 最大化 / 关闭
+  仍然保留——Windows / Linux 走 Window Controls Overlay，macOS 用原生红绿灯。顶栏同时是拖拽区，
+  系统按钮的位置用 `env(titlebar-area-*)` 让出，macOS 由 `platform-mac` 补红绿灯的内边距。
+  窗口失焦时标题栏与左侧导航栏的图标、标题文字、系统窗口按钮一起压暗（macOS 的红绿灯由系统自己变灰）。
+  标题栏左端的 40×40 图标槽只画在 Windows / Linux 上：macOS 那一段归红绿灯，只留标题文字。
+- **导航从顶部页签改成左侧 40px 图标栏**：栏宽和标题栏的图标槽一致，那一列上下对齐；40px 放不下文字，
+  名称改走 tooltip，任务角标贴到图标右上角。上面四个是数据流页面，脚本与任务贴到栏底（任务在最下）。
+- 页面改名：**角色确认 → 角色管理**、**图组确认 → 图组管理**（只是名字，页签顺序与职责不变）。
+- 示例脚本不再随安装包铺到安装目录：源码进了 `src/static/default-script.js`，构建时内联进主进程。
+
+- **用户数据目录改到用户主目录的 `~/.plmanager/data/`**（Windows 为 `C:\Users\<你>\.plmanager\data`），不再放安装目录：
+  Windows 的覆盖安装会先静默调用旧版卸载器、清空整个安装目录，库放在那里等于每次更新都可能丢；
+  Linux 的 deb 装在 root 所有的 `/opt/PLManager`、macOS 的 exe 在 `.app` 内部，本来也写不进去。
+  **1.0.0 及更早版本的库在安装目录的 `data/` 下，升级后要手动搬过来。**
+
 ## [1.0.0] - 2026-09-26
 
 ### 新增
@@ -64,5 +110,6 @@
 - **暗色主题**：IDEA Darcula 风格，Element Plus 全覆盖
 - 本地 SQLite（sql.js）存储，零原生依赖，绿色便携
 
+[1.1.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.0.0
 [0.0.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v0.0.1

@@ -20,6 +20,7 @@
 | 日志系统 | 待评审 | [logging.md](./logging.md) |
 | 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
+| 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
 
 ## 状态取值
 

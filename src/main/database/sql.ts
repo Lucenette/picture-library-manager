@@ -89,16 +89,41 @@ export const SQL = {
   SELECT_GROUP_ID_BY_FILE_PATH: 'SELECT image_group_id FROM image_file WHERE file_path = ?',
 
   // ----------------------------------------------------------
+  // ScriptGroup
+  // ----------------------------------------------------------
+
+  /** 建分组：名字允许重复，靠 id 区分 */
+  INSERT_SCRIPT_GROUP: 'INSERT INTO script_group (name) VALUES (?)',
+  /** 顺序交给界面（中文要按拼音，SQL 给不了），这里只保证顺序稳定 */
+  SELECT_SCRIPT_GROUPS: 'SELECT * FROM script_group ORDER BY id',
+  SELECT_SCRIPT_GROUP_BY_ID: 'SELECT id FROM script_group WHERE id = ?',
+  RENAME_SCRIPT_GROUP: 'UPDATE script_group SET name = ? WHERE id = ?',
+  SET_SCRIPT_GROUP_COLLAPSED: 'UPDATE script_group SET collapsed = ? WHERE id = ?',
+  DELETE_SCRIPT_GROUP: 'DELETE FROM script_group WHERE id = ?',
+  /** 删分组时把成员放回「未分组」 */
+  CLEAR_SCRIPT_GROUP_MEMBERS: 'UPDATE process_script SET group_id = NULL WHERE group_id = ?',
+
+  // ----------------------------------------------------------
   // ProcessScript
   // ----------------------------------------------------------
 
-  INSERT_SCRIPT: "INSERT INTO process_script (name, file_path, code, brief, loaded_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
+  INSERT_SCRIPT: "INSERT INTO process_script (name, file_path, builtin, group_id, loaded_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
   SELECT_SCRIPT_BY_PATH: 'SELECT * FROM process_script WHERE file_path = ?',
   SELECT_SCRIPT_BY_ID: 'SELECT * FROM process_script WHERE id = ?',
+  SELECT_SCRIPT_BUILTIN: 'SELECT * FROM process_script WHERE builtin = 1 LIMIT 1',
   SELECT_SCRIPTS_ALL: 'SELECT * FROM process_script ORDER BY name',
-  UPDATE_SCRIPT: "UPDATE process_script SET name = ?, code = ?, brief = ?, loaded_at = datetime('now','localtime') WHERE file_path = ?",
-  RELOAD_SCRIPT: "UPDATE process_script SET code = ?, brief = ?, loaded_at = datetime('now','localtime') WHERE file_path = ?",
-  RENAME_SCRIPT: 'UPDATE process_script SET name = ? WHERE id = ?',
+  /** 改名：正文在文件里，这里只动名称与时间戳；图库那份名字副本由调用方在同一个事务里跟着改 */
+  RENAME_SCRIPT: "UPDATE process_script SET name = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
+  /** 接管旧脚本与内置脚本落盘：只回填文件路径 */
+  SET_SCRIPT_FILE_PATH: "UPDATE process_script SET file_path = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
+  TOUCH_SCRIPT_LOADED_AT: "UPDATE process_script SET loaded_at = datetime('now','localtime') WHERE id = ?",
+  /** 改归属：`null` 就是放回「未分组」 */
+  SET_SCRIPT_GROUP: 'UPDATE process_script SET group_id = ? WHERE id = ?',
+  /** 改写图库里的脚本名副本（改名级联） */
+  RENAME_PROCESSED_SCRIPT_NAME: 'UPDATE processed_image SET script_name = ? WHERE script_id = ?',
+  COUNT_PROCESSED_BY_SCRIPT: 'SELECT COUNT(*) AS processed FROM processed_image WHERE script_id = ?',
+  /** 老库接管用：库里还有 code 列时，把每一条的源码读出来 */
+  SELECT_LEGACY_SCRIPTS: 'SELECT id, name, file_path, code FROM process_script',
   DELETE_SCRIPT: 'DELETE FROM process_script WHERE id = ?',
 
   DELETE_SCRIPT_TYPES: 'DELETE FROM script_type WHERE script_id = ?',
@@ -113,10 +138,11 @@ export const SQL = {
   // ProcessedImage
   // ----------------------------------------------------------
 
-  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+  /** 图库行里存一份「当时是哪个脚本选的」名字副本：脚本删掉之后仍然显示得出来 */
+  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, script_name, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, (SELECT name FROM process_script WHERE id = ?), datetime('now','localtime'))",
   SELECT_PROCESSED_BY_GROUP: 'SELECT * FROM processed_image WHERE image_group_id = ?',
   SELECT_PROCESSED_BY_ID_GROUP: 'SELECT image_group_id FROM processed_image WHERE id = ?',
-  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
+  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, script_name = (SELECT name FROM process_script WHERE id = ?), confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
   DELETE_PROCESSED: 'DELETE FROM processed_image WHERE id = ?',
   DELETE_PROCESSED_BY_GROUP: 'DELETE FROM processed_image WHERE image_group_id = ?',
 
@@ -145,13 +171,29 @@ export const SQL = {
 
   /** 图库列表基语句，调用方按需追加 WHERE 与 ORDER BY */
   SELECT_PROCESSED_VIEW_BASE: `SELECT pi.*, c.name AS characterName, g.name AS sourceName,
-    ps.name AS scriptName, pi.selected_file AS selectedFileName,
+    pi.script_name AS scriptName, pi.selected_file AS selectedFileName,
     f.thumbnail AS selectedFileThumbnail, f.width AS selectedFileWidth,
     f.height AS selectedFileHeight, f.file_size AS selectedFileSize
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
   JOIN source g ON pi.source_id = g.id
-  LEFT JOIN process_script ps ON pi.script_id = ps.id
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
+
+  // ----------------------------------------------------------
+  // 升级账本
+  //
+  // 账本表由升级引擎用代码创建（不写进 changelog），这里只有读写语句。
+  // 「跑过没有」按 (author, id, filename) 三元组判断，失败行不算跑过。
+  // ----------------------------------------------------------
+
+  SELECT_MIGRATION_LEDGER: 'SELECT author, id, filename, exectype, order_executed FROM schema_migration',
+  WRITE_MIGRATION_LEDGER: `INSERT INTO schema_migration (author, id, filename, title, exectype, order_executed, applied_at, execution_ms)
+  VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'), ?)
+  ON CONFLICT(author, id, filename) DO UPDATE SET
+    title = excluded.title,
+    exectype = excluded.exectype,
+    order_executed = excluded.order_executed,
+    applied_at = excluded.applied_at,
+    execution_ms = excluded.execution_ms`,
 };

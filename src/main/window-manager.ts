@@ -2,12 +2,35 @@ import { app, BrowserWindow, type WebPreferences } from 'electron';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 
+import { IPC } from '@common/ipcChannels';
+
+// ------------------------------------------------------------
+// 常量
+// ------------------------------------------------------------
+
+/** 系统窗口按钮的字形色：失焦时跟标题栏一起压暗（Windows / Linux 的 WCO 需要显式设置） */
+const SYMBOL_COLOR_ACTIVE = '#d8dadd';
+const SYMBOL_COLOR_INACTIVE = '#8e9196';
+
+/** 渲染进程入口名 → 构建产物里的 HTML 文件；每个窗口类一份，见 docs/design/window-management.md 第 4 节 */
+const ENTRY_HTML: Record<RendererEntry, string> = {
+  index: 'index.html',
+  dialogs: 'dialogs.html',
+  viewer: 'viewer.html',
+  popup: 'popup.html',
+};
+
 // ------------------------------------------------------------
 // 类型
 // ------------------------------------------------------------
 
+/** 渲染进程入口：主窗口是 index，弹窗、查看器、浮窗各有更小的一个 */
+type RendererEntry = 'index' | 'dialogs' | 'viewer' | 'popup';
+
 /** 创建窗口所需的最小配置 */
 interface WindowConfig {
+  /** 用哪个渲染进程入口；省略即主窗口的 index */
+  entry?: RendererEntry;
   width: number;
   height: number;
   minWidth?: number;
@@ -22,6 +45,19 @@ interface WindowConfig {
   modal?: boolean;
   /** 是否显示系统边框，false 为无边框 */
   frame?: boolean;
+  /**
+   * 自绘标题栏：去掉系统画的标题栏，但**保留系统的窗口按钮**。
+   *
+   * Windows / Linux 靠 `titleBarOverlay`（Window Controls Overlay）让系统继续画最小化 / 最大化 / 关闭，
+   * macOS 保留左上角的红绿灯。渲染进程那边要自己画一条标题栏（拖拽区、安全区），
+   * 见 docs/design/window-management.md 第 7 节。
+   */
+  titleBar?: {
+    /** 标题栏高度（px），必须与渲染进程那条栏相等：系统按钮在这一段里垂直居中 */
+    height: number;
+    /** 系统按钮那一段的底色，要与渲染进程标题栏的底色一致；省略则取 backgroundColor */
+    color?: string;
+  };
   minimizable?: boolean;
   maximizable?: boolean;
   resizable?: boolean;
@@ -63,6 +99,13 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   const isControl = config.isControl ?? false;
   const showWhenReady = config.showWhenReady ?? false;
   const visible = config.visible ?? true;
+  // 自绘标题栏与无边框窗口都要摘掉系统标题栏，区别在后者连窗口按钮一并不要
+  const titleBar = config.titleBar;
+  const hideTitleBar = !frame || titleBar !== undefined;
+  // 窗口按钮由 Windows / Linux 的 Window Controls Overlay 提供；macOS 的红绿灯是原生控件，不需要它
+  const hasOverlay = hideTitleBar && !isControl && process.platform !== 'darwin';
+  const overlayColor = titleBar?.color ?? config.backgroundColor ?? '#1e1f22';
+  const overlayHeight = titleBar?.height ?? 36;
 
   const window = new BrowserWindow({
     show: visible,
@@ -75,9 +118,9 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     parent,
     modal: Boolean(parent && config.modal),
     frame,
-    titleBarStyle: frame ? 'default' : 'hidden',
-    titleBarOverlay: !frame && !isControl
-      ? { color: config.backgroundColor || '#1e1f22', symbolColor: '#d8dadd', height: 36 }
+    titleBarStyle: hideTitleBar ? 'hidden' : 'default',
+    titleBarOverlay: hasOverlay
+      ? { color: overlayColor, symbolColor: SYMBOL_COLOR_ACTIVE, height: overlayHeight }
       : undefined,
     minWidth: config.minWidth,
     minHeight: config.minHeight,
@@ -87,12 +130,34 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     webPreferences: createWebPreferences(),
   });
 
+  if (hasOverlay) {
+    // 窗口按钮画在系统那一层，压暗它只能走这个接口；标题栏的图标与文字在渲染进程，
+    // 由它自己监听 focus/blur（见 App.vue）。macOS 的红绿灯由系统自己变灰，这里不用管。
+    const syncSymbolColor = (focused: boolean): void => {
+      window.setTitleBarOverlay({
+        color: overlayColor,
+        symbolColor: focused ? SYMBOL_COLOR_ACTIVE : SYMBOL_COLOR_INACTIVE,
+        height: overlayHeight,
+      });
+    };
+    window.on('focus', () => syncSymbolColor(true));
+    window.on('blur', () => {
+      // 自己拥有的浮窗弹出来时不算「切到别处去了」：字形色保持激活态。
+      // 判据要落到「这个浮窗是这个窗口的」，否则别的窗口开下拉会把这里的压暗也去掉
+      const popup = get('popup');
+      if (popup?.isVisible() === true && popup.getParentWindow() === window) {
+        return;
+      }
+      syncSymbolColor(false);
+    });
+  }
+
   if (showWhenReady && visible) {
     window.once('ready-to-show', () => window.show());
   }
 
   window.setMenu(null);
-  window.loadURL(getRouteUrl(config.route, config.backgroundColor));
+  window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
   window.on('closed', () => {
     if (windows.get(id) === window) {
       windows.delete(id);
@@ -151,6 +216,8 @@ export function createMain(route = '/'): BrowserWindow {
     height: 900,
     backgroundColor: '#1e1f22',
     route,
+    // 高度与 App.vue 的 --title-bar-height 相等，底色与 .title-bar 的 #26282c 相等
+    titleBar: { height: 40, color: '#26282c' },
   });
   // 主窗口是应用的生命周期锚点：它一关，其余窗口（查看器、各类弹窗、常驻的浮窗宿主）都不该再存在。
   // 由注册表统一关掉（此时 main 已被 create() 的 closed 回调移出注册表）——只关查看器是不够的：
@@ -167,6 +234,7 @@ export function createViewer(): BrowserWindow {
     backgroundColor: '#0d0d0d',
     title: '图片查看器',
     route: '/viewer',
+    entry: 'viewer',
     showWhenReady: true,
   });
 }
@@ -192,6 +260,7 @@ export function ensurePopup(): BrowserWindow {
     height: 120,
     backgroundColor: '#2b2d30',
     route: '/popup',
+    entry: 'popup',
     frame: false,
     minimizable: false,
     maximizable: false,
@@ -201,6 +270,17 @@ export function ensurePopup(): BrowserWindow {
   });
   // 失焦即收起。可见性由主进程掌握，渲染进程不销毁这个窗口
   window.on('blur', () => window.hide());
+
+  // 浮窗一出现它所属的窗口就失焦，但整条 chrome 不该跟着压暗。
+  // 只通知**拥有这个浮窗的那个窗口**：在弹窗上开下拉，主窗口该保持压暗，别被点亮
+  const notifyVisible = (visible: boolean): void => {
+    const owner = window.getParentWindow();
+    if (owner !== null && !owner.isDestroyed()) {
+      owner.webContents.send(IPC.POPUP_VISIBLE, visible);
+    }
+  };
+  window.on('show', () => notifyVisible(true));
+  window.on('hide', () => notifyVisible(false));
   return window;
 }
 
@@ -213,6 +293,7 @@ export function createScanConfig(): BrowserWindow {
     minHeight: 210,
     backgroundColor: '#1e1f22',
     route: '/scan-config',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -230,6 +311,7 @@ export function createBatchProcess(): BrowserWindow {
     minHeight: 210,
     backgroundColor: '#1e1f22',
     route: '/batch-process',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -247,6 +329,7 @@ export function createConfirm(): BrowserWindow {
     minHeight: 190,
     backgroundColor: '#1e1f22',
     route: '/confirm',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -264,6 +347,7 @@ export function createPrompt(): BrowserWindow {
     minHeight: 170,
     backgroundColor: '#1e1f22',
     route: '/prompt',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -281,6 +365,7 @@ export function createFileViewer(): BrowserWindow {
     minHeight: 400,
     backgroundColor: '#1e1f22',
     route: '/file-viewer',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -299,6 +384,7 @@ export function createSimilar(): BrowserWindow {
     backgroundColor: '#1e1f22',
     title: '相似图片',
     route: '/similar',
+    entry: 'dialogs',
     showWhenReady: true,
     parentId: 'main',
     modal: false,
@@ -318,13 +404,14 @@ export function createSimilar(): BrowserWindow {
  * 顺带把窗口自己的底色作为查询参数带上，渲染进程的首帧就能用它作背景，
  * 不必等组件样式到位（否则下拉浮窗、图片查看器会先闪一下默认色）。
  */
-function getRouteUrl(route: string, background?: string): string {
+function getWindowUrl(entry: RendererEntry, route: string, background?: string): string {
   const query = background ? `?bg=${encodeURIComponent(background)}` : '';
+  const file = ENTRY_HTML[entry];
   if (process.env.ELECTRON_RENDERER_URL) {
-    return `${process.env.ELECTRON_RENDERER_URL}${query}#${route}`;
+    return `${process.env.ELECTRON_RENDERER_URL}/${file}${query}#${route}`;
   }
-  const indexHtml = resolve(__dirname, '../renderer/index.html');
-  return `${pathToFileURL(indexHtml).href}${query}#${route}`;
+  const html = resolve(__dirname, '../renderer', file);
+  return `${pathToFileURL(html).href}${query}#${route}`;
 }
 
 /**

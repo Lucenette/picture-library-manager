@@ -9,10 +9,6 @@ files:
   - out/**/*
   - package.json
 
-extraFiles:
-  - from: data
-    to: data
-
 npmRebuild: false
 asar: false
 

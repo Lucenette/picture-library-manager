@@ -112,7 +112,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 角色名由 `identify-structure` / `identify-character` 决定。两种处理方式：
 
-- 少量错误：到「角色确认」页重命名。
+- 少量错误：到「角色管理」页重命名。
 - 规则不对：改脚本，然后重新扫描该图库。
 
 ---
@@ -124,9 +124,13 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 | 运行方式 | 路径 |
 |---|---|
 | 开发（`yarn dev`） | `dist/data/picture-lib.db` |
-| 打包后 | exe 同级的 `data/picture-lib.db` |
+| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<你>\.plmanager\data\picture-lib.db`） |
 
-同目录下可能有 `picture-lib.db.bak`（每 30 秒保留一次的上一版）和 `.tmp`（写入过程中的临时文件，正常情况下不会残留）。
+打包后固定落在用户主目录，**不放安装目录**：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录，
+库放那儿等于每次更新都可能丢；而 Linux 的 deb 装在 root 所有的 `/opt/PLManager`、macOS 的 exe 在 `.app` 内部，
+本来也不是能写库的地方。1.0.0 及更早的版本把库放在安装目录的 `data/` 下，升级后要手动搬过来。
+
+同目录下可能有 `picture-lib.db.bak`：定期把库整文件复制一份，供误操作兜底。
 
 ### 想彻底重置
 
@@ -190,7 +194,10 @@ Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文�
 
 ### 改了脚本文件，扫描结果没变
 
-脚本源码是**存在数据库里**的，改磁盘文件不会自动同步。到「脚本管理」页点**重载**。每次调用都会重新编译，因此重载后立即生效，无需重启。
+脚本正文就是**磁盘上那个文件**，每次调用前都会重新读盘（按路径 + mtime + 大小判断要不要重读），所以正常情况下改完文件的下一次扫描 / 选图就会用新内容，不需要点任何按钮。会「没变」的是这两种情况：
+
+- **脚本管理页里正打开着的那一份**：它停留在打开时读到的那一版，重新打开这个脚本（或右键「放弃修改」）才会显示新内容。
+- **改的其实不是脚本在用的那个文件**：导入是**复制**，这条脚本执行的是 `scripts/` 下复制出来的那一份，改原始来源文件不会影响它。
 
 ### 脚本里的 console.log 在窗口 DevTools 里看不到
 
@@ -198,4 +205,4 @@ Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文�
 
 ### 脚本里的 `require('./helper')` 报找不到模块
 
-脚本的 `filePath` 是空串，相对路径解析不到同目录文件。只能 `require` `process.cwd()` 下 `node_modules` 里的包。想复用逻辑请写进同一个文件。
+相对路径按**脚本文件自己所在的目录**（用户目录的 `scripts/`）解析，所以 `./helper` 必须也在那个目录里。「加载文件」只复制你选中的**那一个**文件，不会把同目录的 helper 一起带进来——再导入一次 helper，或者直接把文件拷进 `scripts/`。helper 本身也得是 CommonJS（`module.exports`）。

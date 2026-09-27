@@ -81,34 +81,15 @@ export function getImageGroupIdByFilePath(filePath: string): Promise<number | nu
 // ProcessScript
 // ------------------------------------------------------------
 
-/** 从磁盘导入脚本，源码由主进程读取 */
-export function importScript(filePath: string): Promise<ProcessScript> {
-  return call('importScript', filePath);
-}
-
-/** 用磁盘上的最新内容重新载入脚本 */
-export function reloadScriptFromFile(filePath: string): Promise<ProcessScript> {
-  return call('reloadScriptFromFile', filePath);
-}
-
-/** 查询全部脚本 */
-export function getAllScripts(): Promise<ProcessScript[]> {
-  return call('getAllScripts');
-}
-
-/** 查询能处理指定类型的脚本 */
+/**
+ * 查询能处理指定类型的脚本。
+ *
+ * 其余的脚本操作（导入、保存、删除、草稿）要读写用户目录里的文件，走
+ * `@/services/script-service` 的那一组 SCRIPT_* 通道；这里只留这一条列表查询，
+ * 因为来源页与图组页只要「按类型挑脚本」。
+ */
 export function getScriptsByType(type: ScriptType): Promise<ProcessScript[]> {
   return call('getScriptsByType', type);
-}
-
-/** 重命名脚本 */
-export function renameScript(id: number, name: string): Promise<void> {
-  return call('renameScript', id, name);
-}
-
-/** 删除脚本 */
-export function deleteScript(id: number): Promise<void> {
-  return call('deleteScript', id);
 }
 
 // ------------------------------------------------------------

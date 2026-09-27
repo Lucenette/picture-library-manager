@@ -1,10 +1,15 @@
-import { app, dialog, Menu } from 'electron';
-import { sendChangesetProgress, waitForChangesetQuit } from '@/database/changeset-ipc';
-import { closeDatabase, initDbIpc, initDatabase, runMigrations } from '@/database/db';
+import { app, dialog, Menu, type BrowserWindow } from 'electron';
+
+import { LOAD_TASK } from '@common/ipcChannels';
+
+import { closeDatabase, initDatabase } from '@/database/db';
 import { initDialogs } from '@/dialogs';
 import { warmPopup } from '@/dialogs/control/popup';
+import { initLoadingIpc, registerLoadTask, startLoading, waitLoadQuit } from '@/loading';
+import { initScriptIpc } from '@/script/ipc';
 import { initTaskIpc } from '@/task/ipc';
 import { taskManager } from '@/task/manager';
+import { initUps } from '@/ups';
 import { closeAll, createMain, get } from '@/window-manager';
 
 // ------------------------------------------------------------
@@ -36,29 +41,39 @@ function configureCommandLine(): void {
 // ------------------------------------------------------------
 
 /**
- * 初始化数据库、IPC 与主窗口，并把任务进度通知挂到主窗口上。
+ * 建主窗口、开库，再把这一轮启动要做的事登记给加载服务并跑起来。
  *
- * 窗口排在最前面：它的创建、渲染进程的启动、changelog 的执行三者尽量重叠，用户尽早看到界面。
- * 主窗口一律先落在加载页，加载页读 changelog 的执行状态，看到终态再自己切回主界面。
+ * 窗口排在最前面：它的创建、渲染进程的启动、升级的执行三者尽量重叠，用户尽早看到界面。
+ * 主窗口一律先落在加载页，加载页读加载服务公布的状态，看到终态再自己切回主界面。
  *
- * 下面的初始化是同步的，必须在第一个 await 之前跑完。先建窗口再注册通道不存在竞态：
- * ipcMain.handle 是同步注册，而渲染进程发来的 invoke 要等主进程回到事件循环才会被派发。
- * 顺序不要调换。
+ * 顺序是固定的：**先开库，再升级，最后其余初始化**。升级脚本要读写数据目录里的文件、
+ * 要假定库已经就绪，而它又该在「其它都还没开始」的状态下动手，所以它之后的那一串初始化
+ * 也登记成任务——加载服务的终态排在所有「必须」任务之后才公布，于是「加载页收到终态时
+ * 通道必然已经注册好」不再是一条要人守的约定，而是这张登记表的结论。
  */
 async function bootstrap(): Promise<void> {
   const mainWindow = createMain('/loading');
 
+  // 通道先挂上：渲染进程一挂载就会 invoke 状态快照，那同时是它的「就绪」信号
+  initLoadingIpc();
+
   initDatabase();
-  initDbIpc();
+
+  registerLoadTask({ target: 'main', kind: 'essential', title: '数据库升级', run: initUps });
+  registerLoadTask({ target: 'main', kind: 'essential', title: '初始化', run: () => initRest(mainWindow) });
+  registerLoadTask({ target: 'renderer', kind: 'warmup', title: '脚本编辑器', id: LOAD_TASK.EDITOR });
+
+  if (!(await startLoading())) {
+    await waitLoadQuit();
+    app.quit();
+  }
+}
+
+/** 升级之后的其余初始化：全是同步注册，跑完主界面才允许进来 */
+function initRest(mainWindow: BrowserWindow): void {
   initTaskIpc();
   initDialogs();
-
-  const outcome = await runMigrations(sendChangesetProgress, () => !get('main'));
-  if (!outcome.ok && !outcome.aborted) {
-    await waitForChangesetQuit();
-    app.quit();
-    return;
-  }
+  initScriptIpc();
 
   taskManager.init(mainWindow);
 
