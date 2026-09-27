@@ -18,4 +18,9 @@ export interface SideItem {
   name: string;
   state: 'new' | 'modified' | 'clean';
   types: ScriptType[];
+  /** 内置脚本：右键菜单里给它「恢复默认」而不是「删除」 */
+  builtin: boolean;
 }
+
+/** 左栏右键菜单里的动作 */
+export type SideAction = 'rename' | 'discard' | 'reset' | 'remove';

@@ -1,12 +1,42 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, Menu, ipcMain } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
-import type { ScriptType } from '@common/types';
+import type { ScriptMenuEntry, ScriptType } from '@common/types';
 
 import {
   checkScript, deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
-  listScriptsByType, putScriptDraft, readScript, resetBuiltinScript, saveScript,
+  listScriptsByType, putScriptDraft, readScript, renameScript, resetBuiltinScript, saveScript,
 } from '@/script/library';
+
+/** 正弹着的那份菜单：popup 返回之前不能被回收，否则原生菜单会跟着消失 */
+let openMenu: Menu | null = null;
+
+/**
+ * 弹一次原生右键菜单，返回点中的动作 id；点到别处把菜单关掉时返回 null。
+ *
+ * 原生菜单只能由主进程弹（`Menu.popup`），而「有哪些项」是界面的事：清单由渲染进程按当前状态给。
+ */
+function popupScriptMenu(window: BrowserWindow, entries: ScriptMenuEntry[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const menu = Menu.buildFromTemplate(
+      entries.map((entry) => ({
+        label: entry.label,
+        click: () => resolve(entry.id),
+      })),
+    );
+    openMenu = menu;
+    menu.popup({
+      window,
+      callback: () => {
+        // 关掉之后再放手：这一读同时保证「弹着的菜单一直有人引用」，否则它可能被回收
+        if (openMenu === menu) {
+          openMenu = null;
+        }
+        resolve(null);
+      },
+    });
+  });
+}
 
 /** 保存命令的入参：草稿 key 由渲染进程给，保存成功后要删掉它 */
 interface SaveScriptInput {
@@ -38,4 +68,14 @@ export function initScriptIpc(): void {
     putScriptDraft(key, draft),
   );
   ipcMain.handle(IPC.SCRIPT_DRAFT_DELETE, (_event, key: string) => deleteScriptDraft(key));
+
+  ipcMain.handle(IPC.SCRIPT_RENAME, (_event, id: number, name: string) => renameScript(id, name));
+
+  ipcMain.handle(IPC.SCRIPT_MENU, (event, entries: ScriptMenuEntry[]) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) {
+      return null;
+    }
+    return popupScriptMenu(window, entries);
+  });
 }

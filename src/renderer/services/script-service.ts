@@ -2,8 +2,8 @@ import { ipcRenderer } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
 import type {
-  ProcessScript, ScriptCompileError, ScriptDraft, ScriptImportResult, ScriptReadResult, ScriptSaveResult,
-  ScriptType,
+  ProcessScript, ScriptCompileError, ScriptDraft, ScriptImportResult, ScriptMenuEntry, ScriptReadResult,
+  ScriptSaveResult, ScriptType,
 } from '@common/types';
 
 /**
@@ -75,6 +75,16 @@ export function listScriptDrafts(): Promise<ScriptDraft[]> {
 /** 写一份草稿 */
 export function putScriptDraft(key: string, draft: { name: string; code: string }): Promise<void> {
   return ipcRenderer.invoke(IPC.SCRIPT_DRAFT_PUT, key, draft) as Promise<void>;
+}
+
+/** 改脚本的显示名；主进程顺带把图库里的名字副本与草稿里的名字一起改掉 */
+export function renameScript(id: number, name: string): Promise<void> {
+  return ipcRenderer.invoke(IPC.SCRIPT_RENAME, id, name) as Promise<void>;
+}
+
+/** 弹一次原生右键菜单（清单由页面按当前状态决定），返回点中的动作 id */
+export function openScriptMenu(entries: ScriptMenuEntry[]): Promise<string | null> {
+  return ipcRenderer.invoke(IPC.SCRIPT_MENU, entries) as Promise<string | null>;
 }
 
 /** 丢弃一份草稿 */

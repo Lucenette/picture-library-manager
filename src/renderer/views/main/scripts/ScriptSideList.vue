@@ -39,6 +39,7 @@
           class="side-item"
           :class="[`is-${item.state}`, { active: item.key === activeKey }]"
           @click="emit('select', item.key)"
+          @contextmenu.prevent="emit('menu', item.key)"
         >
           <span class="side-name">{{ item.name }}</span>
         </button>
@@ -75,6 +76,8 @@ const emit = defineEmits<{
   (event: 'select', key: string): void;
   (event: 'create'): void;
   (event: 'import'): void;
+  /** 右键某一项：原生菜单由主进程弹，这里只报是哪一项 */
+  (event: 'menu', key: string): void;
 }>();
 
 /** 默认全选：不筛就是全部 */
@@ -122,7 +125,7 @@ function matchesFilter(types: ScriptType[]): boolean {
   border-right: 2px solid var(--el-fill-color-light);
 }
 
-/* 表头就是这一行控件：内边距跟着 .script-side 的 --page-padding 走，右栏表头用的是同一份 */
+/* 表头就是这一行控件：内边距跟着 .script-side 的 --page-padding 走 */
 .side-head {
   display: flex;
   align-items: center;

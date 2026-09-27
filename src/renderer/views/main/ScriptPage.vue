@@ -6,23 +6,19 @@
       @select="selectKey"
       @create="createScript"
       @import="importFiles"
+      @menu="onSideMenu"
     />
 
     <ScriptEditor
       v-if="activeKey !== ''"
-      v-model:name="name"
       v-model:code="code"
       :document-key="activeKey"
       :types="types"
       :error="error"
       :problem-count="problemCount"
       :dirty="dirty"
-      :builtin="builtin"
       @save="save"
-      @discard="discard"
       @problems="problemCount = $event"
-      @remove="removeScript"
-      @reset="resetBuiltin"
     />
     <div v-else class="empty">用左边的「新增脚本」或「加载文件」开始</div>
   </div>
@@ -33,26 +29,19 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
-import type { ProcessScript, ScriptCompileError, ScriptDraft, ScriptType } from '@common/types';
+import type {
+  ProcessScript, PromptInitData, PromptResult, ScriptCompileError, ScriptDraft, ScriptMenuEntry, ScriptType,
+} from '@common/types';
+import DEFAULT_SCRIPT_SOURCE from '@static/default-script.js?raw';
+import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import {
   checkScript, deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
-  putScriptDraft, readScript, resetBuiltinScript, saveScript,
+  openScriptMenu, putScriptDraft, readScript, renameScript, resetBuiltinScript, saveScript,
 } from '@/services/script-service';
 import ScriptEditor from './scripts/ScriptEditor.vue';
 import ScriptSideList from './scripts/ScriptSideList.vue';
-import type { SideItem } from './scripts/script-list';
-
-/** 新增脚本的起始正文：给个最小骨架，省得对着空文件发呆 */
-const NEW_SCRIPT_TEMPLATE = `// 处理脚本：CommonJS，module.exports 导出要用的方法
-//   identify-structure({ rootPath, tree }) → [{ name, groups }]
-//   select-image({ characterName, groupDirPath, files }) → 某个文件的 uuid
-module.exports = {
-  'select-image': () => {
-    throw new Error('还没有实现选图逻辑');
-  },
-};
-`;
+import type { SideAction, SideItem } from './scripts/script-list';
 
 /** 草稿防抖：1 秒。VS Code 的 hot exit 也是这个量级（默认 1000ms，开 autosave 时 2000ms） */
 const DRAFT_DEBOUNCE_MS = 1000;
@@ -70,7 +59,6 @@ const code = ref('');
 const types = ref<ScriptType[]>([]);
 const error = ref<ScriptCompileError | null>(null);
 const filePath = ref('');
-const builtin = ref(false);
 /** 磁盘上的那一份：用来判断「改了没有」 */
 const baseline = ref({ name: '', code: '' });
 const saving = ref(false);
@@ -98,8 +86,8 @@ const sideItems = computed(() => {
 
   for (const draft of Object.values(drafts.value)) {
     if (draft.key.startsWith('new-')) {
-      // 还没保存：库里没有它的行，类型也无从谈起
-      items.push({ key: draft.key, name: draft.name, state: 'new', types: [] });
+      // 还没保存：库里没有它的行，类型与内置标记都无从谈起
+      items.push({ key: draft.key, name: draft.name, state: 'new', types: [], builtin: false });
     }
   }
 
@@ -112,6 +100,7 @@ const sideItems = computed(() => {
       name: drafts.value[key]?.name ?? script.name,
       state: modified ? 'modified' : 'clean',
       types: script.types,
+      builtin: script.builtin,
     });
   }
 
@@ -281,16 +270,15 @@ async function openKey(key: string): Promise<void> {
   const draft = drafts.value[key];
 
   if (key.startsWith('new-')) {
-    const row = draft ?? { key, name: '未命名脚本', code: NEW_SCRIPT_TEMPLATE, updatedAt: '' };
+    const row = draft ?? { key, name: '未命名脚本', code: DEFAULT_SCRIPT_SOURCE, updatedAt: '' };
     name.value = row.name;
     code.value = row.code;
     // 新建脚本还没落盘：基线留空，于是它一出现就是「未保存」
     baseline.value = { name: '', code: '' };
     filePath.value = '';
-    builtin.value = false;
     types.value = [];
     error.value = null;
-    // 新脚本的模板还没查过，留 null 让防抖那一次去查
+    // 新脚本的正文还没查过，留 null 让防抖那一次去查
     lastCheckedCode = null;
     activeKey.value = key;
     return;
@@ -303,7 +291,6 @@ async function openKey(key: string): Promise<void> {
     name.value = draft?.name ?? row?.name ?? '';
     code.value = draft?.code ?? result.code;
     filePath.value = row?.filePath ?? '';
-    builtin.value = row?.builtin ?? false;
     types.value = result.types;
     error.value = result.compileError;
     baseline.value = { name: row?.name ?? '', code: result.code };
@@ -325,10 +312,10 @@ async function createScript(): Promise<void> {
   // 不用 crypto.randomUUID：这里只要一个不重复的临时 key
   const key = `new-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   name.value = '未命名脚本';
-  code.value = NEW_SCRIPT_TEMPLATE;
+  // 起始正文就是随应用发布的内置脚本：两边共用同一份源码，省得维护两个默认模板
+  code.value = DEFAULT_SCRIPT_SOURCE;
   baseline.value = { name: '', code: '' };
   filePath.value = '';
-  builtin.value = false;
   types.value = [];
   error.value = null;
   activeKey.value = key;
@@ -382,7 +369,6 @@ async function save(): Promise<void> {
     name.value = result.script.name;
     baseline.value = { name: result.script.name, code: code.value };
     filePath.value = result.script.filePath;
-    builtin.value = result.script.builtin;
     types.value = result.script.types;
     error.value = result.compileError;
     lastCheckedCode = code.value;
@@ -405,6 +391,112 @@ async function discard(): Promise<void> {
   clearDraft(activeKey.value);
   await openKey(activeKey.value);
 }
+
+/**
+ * 左栏右键：按这一项的状态决定菜单里有哪些项，再交给主进程弹原生菜单。
+ *
+ * 内置脚本不给「删除」，没有未保存改动不给「放弃修改」；重命名走角色那边同一个输入弹窗。
+ */
+async function onSideMenu(key: string): Promise<void> {
+  const item = sideItems.value.find((entry) => entry.key === key);
+  if (item === undefined) {
+    return;
+  }
+
+  const entries: ScriptMenuEntry[] = [{ id: 'rename', label: '重命名' }];
+  if (item.state !== 'clean') {
+    entries.push({ id: 'discard', label: '放弃修改' });
+  }
+  entries.push(item.builtin ? { id: 'reset', label: '恢复默认' } : { id: 'remove', label: '删除' });
+
+  const action = (await openScriptMenu(entries)) as SideAction | null;
+  if (action !== null) {
+    await onSideAction(action, key);
+  }
+}
+
+/**
+ * 执行菜单里选中的动作。
+ *
+ * 菜单作用于列表里的某一项，不一定是当前打开的那一项，所以先切过去再动手。
+ */
+async function onSideAction(action: SideAction, key: string): Promise<void> {
+  if (key !== activeKey.value) {
+    await selectKey(key);
+  }
+
+  if (action === 'rename') {
+    promptRename(key);
+    return;
+  }
+  if (action === 'discard') {
+    await discard();
+    return;
+  }
+  if (action === 'reset') {
+    await resetBuiltin();
+    return;
+  }
+  await removeScript();
+}
+
+/** 重命名：用角色重命名那套现成的输入弹窗，结果从 SCRIPT_RENAME_CONFIRMED 回到主窗口 */
+function promptRename(key: string): void {
+  const current = sideItems.value.find((entry) => entry.key === key)?.name ?? '';
+  const payload: PromptInitData = {
+    title: '重命名脚本',
+    placeholder: '新名称',
+    value: current,
+    channel: IPC.SCRIPT_RENAME_CONFIRMED,
+    scriptKey: key,
+  };
+  void ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
+}
+
+/**
+ * 应用重命名结果。
+ *
+ * 已入库的改库里的名字，主进程顺带把草稿里的名字与图库里的名字副本一起改掉；
+ * 新建未保存的只改草稿——列表立刻显示新名字，等 Ctrl+S 时才把名字写进库。
+ */
+async function applyRename(key: string, value: string): Promise<void> {
+  const next = value.trim();
+  if (next === '') {
+    return;
+  }
+
+  const draft = drafts.value[key];
+  try {
+    if (key.startsWith('new-')) {
+      const code = draft?.code ?? DEFAULT_SCRIPT_SOURCE;
+      await putScriptDraft(key, { name: next, code });
+      setDraft(key, { key, name: next, code, updatedAt: new Date().toISOString() });
+    } else {
+      await renameScript(Number(key.slice('script-'.length)), next);
+      if (draft !== undefined) {
+        setDraft(key, { ...draft, name: next });
+      }
+      await loadScripts();
+    }
+
+    if (key === activeKey.value) {
+      name.value = next;
+      if (!key.startsWith('new-')) {
+        // 名字已经进库，不该因此变成「未保存」
+        baseline.value = { ...baseline.value, name: next };
+      }
+    }
+  } catch (error) {
+    await alertDialog({ title: '重命名失败', message: (error as Error).message, danger: true });
+  }
+}
+
+useIpcListener(IPC.SCRIPT_RENAME_CONFIRMED, async (result: PromptResult) => {
+  if (!result.value || !result.scriptKey) {
+    return;
+  }
+  await applyRename(result.scriptKey, result.value);
+});
 
 /**
  * 删除当前脚本。
@@ -494,7 +586,7 @@ async function resetBuiltin(): Promise<void> {
 </script>
 
 <style scoped>
-/* 工具型页面：整页铺满，不填 --page-padding；留白由左右两栏各自的表头给 */
+/* 工具型页面：整页铺满，不填 --page-padding；留白由左栏表头与编辑区自己给 */
 .script-page {
   display: flex;
   height: 100%;

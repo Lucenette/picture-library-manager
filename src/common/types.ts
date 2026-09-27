@@ -281,6 +281,13 @@ export interface ConfirmDialogResult {
   payload?: unknown;
 }
 
+/** 脚本列表的右键菜单项：有哪些项由渲染进程按当前状态决定，主进程只负责弹原生菜单 */
+export interface ScriptMenuEntry {
+  /** 动作 id，点中后原样回给渲染进程 */
+  id: string;
+  label: string;
+}
+
 /** 通用输入窗口初始化数据 */
 export interface PromptInitData {
   title: string;
@@ -290,6 +297,8 @@ export interface PromptInitData {
   channel: string;
   /** 单条重命名等场景携带的行 id */
   rowId?: number;
+  /** 脚本页重命名携带的草稿 key（`script-<id>` / `new-<uuid>`） */
+  scriptKey?: string;
 }
 
 /** 通用输入窗口的确认结果 */

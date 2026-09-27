@@ -57,6 +57,11 @@ export const IPC = {
   SCRIPT_DELETE: 'script:delete',
   SCRIPT_USAGE: 'script:usage',
   SCRIPT_RESET_BUILTIN: 'script:resetBuiltin',
+  /** 列表项的原生右键菜单：清单由渲染进程给，主进程弹完把点中的动作 id 回过来 */
+  SCRIPT_MENU: 'script:menu',
+  /** 重命名弹框确认后的回发通道（见 common/types.ts 的 PromptInitData） */
+  SCRIPT_RENAME_CONFIRMED: 'script:rename-confirmed',
+  SCRIPT_RENAME: 'script:rename',
   SCRIPT_DRAFT_LIST: 'script:draftList',
   SCRIPT_DRAFT_PUT: 'script:draftPut',
   SCRIPT_DRAFT_DELETE: 'script:draftDelete',

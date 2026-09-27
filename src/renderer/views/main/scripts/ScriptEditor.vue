@@ -1,14 +1,5 @@
 <template>
   <div class="script-editor">
-    <div class="editor-head">
-      <el-input v-model="name" class="name-input" placeholder="脚本名称" maxlength="80" />
-      <div class="head-actions">
-        <el-button :disabled="!dirty" @click="emit('discard')">放弃修改</el-button>
-        <el-button v-if="builtin" @click="emit('reset')">恢复默认</el-button>
-        <el-button v-else type="danger" @click="emit('remove')">删除</el-button>
-      </div>
-    </div>
-
     <div class="editor-body">
       <MonacoEditor
         v-model="code"
@@ -65,7 +56,6 @@ import MonacoEditor from './MonacoEditor.vue';
 import { TYPE_LABELS } from './script-list';
 
 const props = defineProps<{
-  name: string;
   code: string;
   /** 当前脚本的 key：编辑器按它保留撤销历史与光标 */
   documentKey: string;
@@ -74,27 +64,16 @@ const props = defineProps<{
   /** Monaco 自带的实时语法诊断条数：它比主进程编译更早发现写坏了的草稿 */
   problemCount: number;
   dirty: boolean;
-  builtin: boolean;
 }>();
 
 const emit = defineEmits<{
-  (event: 'update:name', value: string): void;
   (event: 'update:code', value: string): void;
   (event: 'save'): void;
-  (event: 'discard'): void;
-  (event: 'remove'): void;
-  (event: 'reset'): void;
 }>();
 
 /** 状态栏右半边：光标/选区与行结束符/缩进，由 MonacoEditor 报上来 */
 const caret = ref('');
 const format = ref('');
-
-// 名称与正文都是双向绑定的；名称一起进草稿，所以未保存状态把它们看作一件事
-const name = computed({
-  get: () => props.name,
-  set: (value: string) => emit('update:name', value),
-});
 
 const code = computed({
   get: () => props.code,
@@ -148,26 +127,8 @@ const problemTitle = computed(() => {
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-
-.editor-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: var(--page-padding);
-  padding-bottom: 10px;
-}
-
-.name-input {
-  max-width: 260px;
-}
-
-.head-actions {
-  margin-left: auto;
-}
-
-.head-actions .el-button + .el-button {
-  margin-left: 6px;
+  /* 表头没了，编辑区自己让出与左栏表头一致的上边距（左栏那份来自 .script-side 的 --page-padding） */
+  padding-top: var(--page-gap);
 }
 
 /* 状态栏：左边类型（占满剩余空间，把右边那几项顶到最右），右边光标/缩进/问题数 */

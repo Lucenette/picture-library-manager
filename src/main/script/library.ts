@@ -14,7 +14,7 @@ import type {
 
 import {
   countProcessedByScript, deleteScriptRows, getAllScripts, getScriptById, getScriptsByType,
-  insertScript, renameScript, setScriptFilePath, setScriptTypes, touchScriptLoadedAt,
+  insertScript, renameScript as renameScriptRow, setScriptFilePath, setScriptTypes, touchScriptLoadedAt,
 } from '@/database/db';
 import { inspectScript } from '@/script/compile';
 import { BUILTIN_SCRIPT } from '@/script/defaults';
@@ -131,13 +131,34 @@ export async function saveScript(input: {
   const inspected = inspectScript(input.code, filePath);
   const id = existing ? existing.id : insertScript(name, filePath, false).id;
   if (existing && existing.name !== name) {
-    renameScript(id, name);
+    renameScriptRow(id, name);
   }
   touchScriptLoadedAt(id);
   setScriptTypes(id, inspected.types);
 
   await removeDraft(input.draftKey);
   return { script: getScriptById(id)!, compileError: inspected.compileError };
+}
+
+/**
+ * 改脚本的显示名。
+ *
+ * 名字在库里，图库那一列的名字副本由 `renameScriptRow` 一并改掉（见 database/db.ts）；
+ * 有草稿的连草稿里的名字一起改，否则列表会继续显示草稿里那个旧名字。
+ */
+export async function renameScript(id: number, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (trimmed === '') {
+    throw new Error('脚本名称不能为空');
+  }
+
+  renameScriptRow(id, trimmed);
+
+  const key = draftKeyOf(id);
+  const draft = await readDraft(key);
+  if (draft !== null) {
+    await writeDraft({ ...draft, name: trimmed });
+  }
 }
 
 /**
