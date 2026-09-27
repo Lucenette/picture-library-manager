@@ -87,6 +87,10 @@ onMounted(() => {
     scrollBeyondLastLine: false,
     // 问题面板在编辑器外面，浮动控件要允许溢出容器，否则提示会被裁掉
     fixedOverflowWidgets: true,
+    // 120 列竖线：一行的长度是否超了，扫一眼就知道（写数字即可，颜色用 Monaco 的默认值）
+    rulers: [120],
+    // 粘性滚动：当前作用域（module.exports 里那个方法）滚出屏幕时，把它的首行钉在顶部
+    stickyScroll: { enabled: true, maxLineCount: 3 },
   });
 
   editor.onDidChangeModelContent(() => {

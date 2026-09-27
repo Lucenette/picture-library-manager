@@ -184,7 +184,7 @@ monaco.languages.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS); // decl
 
 脚本仍然是 **CommonJS 的 `.js`**：主进程用 `Module#_compile` 编译，`.mjs`（ESM）是另一套加载器（`import()`、没有 `require`），不在本次范围——导入对话框继续只收 `.js`，编辑器语言固定 `javascript`。
 
-worker 用 inline（blob）是为了绕开打包后 `file://` 页面构造 Worker 的限制。主题 `plmanager-dark` 取 `#1e1f22` 底，关掉 minimap，`tabSize: 4`。标记由主进程的编译结果给：语法错误取 `error.stack` 首行的 `<path>:<line>` 与第三行的插入符列，顶层抛错取堆栈里的 `<path>:line:col`，取不到就退回 1:1。
+worker 用 inline（blob）是为了绕开打包后 `file://` 页面构造 Worker 的限制。主题 `plmanager-dark` 取 `#1e1f22` 底，`tabSize: 4`，编辑器选项照 VS Code 那套习惯来：关掉 minimap、120 列处画一条 rulers 竖线、打开粘性滚动（`stickyScroll`，当前作用域滚出屏幕时把它的首行钉在顶部）。标记由主进程的编译结果给：语法错误取 `error.stack` 首行的 `<path>:<line>` 与第三行的插入符列，顶层抛错取堆栈里的 `<path>:line:col`，取不到就退回 1:1。
 
 编辑器只被 `ScriptPage` 引用，而路由本来就是按需加载，所以 Monaco 只在进入「脚本管理」时才进依赖图，不需要再套一层动态 import。
 
