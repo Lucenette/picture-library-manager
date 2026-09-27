@@ -65,9 +65,11 @@ startLoading()                                                          │ 先�
 「脚本编辑器」这一项预热分两段，中间各让一次空闲：
 
 1. `import('@/views/main/ScriptPage.vue')`——求值页面 chunk（Monaco 全套 + 两个内联 worker 的 base64）；
-2. 再 `import('.../monaco-env')` 并调 `warmUpTypeScript()`——先造一个空模型触发语言服务（语言是按需激活的：`onLanguage` 那一刻才注册 providers、建 `WorkerManager`），再真的向 worker 要一次语言服务；这一步才会解码内联的 `ts.worker`、在 worker 里把 TypeScript 求值起来。返回时语言服务已经就绪。
+2. 再 `import('.../monaco-env')` 并调 `warmUpTypeScript()`——用一个**一次性离屏编辑器**（`left:-10000px` 的容器 + 一个空 `javascript` 模型）把语言服务点着，再真的向 worker 要一次语言服务；这一步才会解码内联的 `ts.worker`、在 worker 里把 TypeScript 求值起来。返回时语言服务已经就绪，编辑器、模型与容器当场拆掉。
 
-后一条的依据是 0.57 的实现：worker 在第一次要语言服务时才创建（`workerManager.js` 的 `_getClient`），而且没有空闲回收（`setMaximumWorkerIdleTime` 是空实现），所以触发用的空模型用过就丢，预热效果留到真正打开页面的那一刻。**不用隐藏编辑器**：隐藏编辑器同样要靠自己的诊断去间接点着 worker，却把 DOM、字体与布局测量白跑一遍，真实编辑器打开时还要再来一次。
+**为什么要编辑器，而不是一个空模型**：0.57 里 `languages.onLanguage` 监听的是 `onDidRequestRichLanguageFeatures`（见 `standaloneLanguages.js`），只有把模型**挂进编辑器**才会请求富语言特性；光 `createModel` 只请求基本 tokenization，`setupJavaScript` 不会跑，`getJavaScriptWorker()` 会直接以 `JavaScript not registered!` 拒绝——开发态日志里真出现过这条。等待激活另有 5 秒上限：超时就让这次预热以失败收场（日志看得见），不无声地挂住。
+
+依据仍然是 0.57 的实现：worker 在第一次要语言服务时才创建（`workerManager.js` 的 `_getClient`），而且没有空闲回收（`setMaximumWorkerIdleTime` 是空实现），所以点着之后把编辑器拆掉不影响预热效果。
 
 ## 4. 状态只有一个来源
 

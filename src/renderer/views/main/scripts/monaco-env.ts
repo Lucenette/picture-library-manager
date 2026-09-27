@@ -70,29 +70,60 @@ monaco.typescript.javascriptDefaults.setCompilerOptions({
 });
 monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.ts');
 
+/** 等语言激活的上限：超时就当没点着，让这次预热以失败收场，而不是无声地挂住 */
+const WARM_UP_TIMEOUT_MS = 5000;
+
 /**
  * 提前把 TypeScript 语言服务点着。
  *
- * 链条是三步，都得自己走：语言服务要等到「出现过 javascript 模型」才会建起来（语言是按需激活的，
- * `onLanguage` 那一刻才注册 providers、建 WorkerManager），而 worker 又要等到第一次真要语言服务时
- * 才创建。所以这里先造一个空模型把语言服务触发出来，再真的要一次服务——这一步才会解码内联的 worker、
- * 在 worker 里把 TypeScript 求值起来并同步资源，返回时语言服务已经就绪。
+ * 链条是三步，都得自己走：语言服务（providers + WorkerManager）要等**这个语言第一次被要求富语言特性**
+ * 才建起来——0.57 里 `languages.onLanguage` 监听的是 `onDidRequestRichLanguageFeatures`，而只有把模型
+ * 挂进编辑器才会请求它（光 `createModel` 只会请求基本的 tokenization）；worker 又要等第一次真要服务时
+ * 才创建。所以这里用**一次性离屏编辑器**把前两步走完，再真的要一次语言服务——这一步才会解码内联的
+ * `ts.worker`、在里面把 TypeScript 求值起来并同步资源，返回时语言服务已经就绪。
  *
- * 模型随后丢掉不影响：worker 归 WorkerManager 持有，这个版本没有空闲回收（`setMaximumWorkerIdleTime`
- * 是空实现），只有配置变更或 `dispose()` 才会停它——上面那几条 `javascriptDefaults.*` 都发生在
- * 模型出现之前，不会把已经点着的 worker 停掉。
- *
- * 不用隐藏编辑器：隐藏编辑器也要靠自己的诊断去间接点着 worker，却额外把整棵 DOM、字体与布局测量
- * 跑一遍，而真实编辑器打开时这些还要再来一次。
+ * 用完就拆，拆掉不影响：worker 归 WorkerManager 持有，这个版本没有空闲回收
+ * （`setMaximumWorkerIdleTime` 是空实现），只有配置变更或 `dispose()` 才会停它——上面那几条
+ * `javascriptDefaults.*` 都发生在编辑器出现之前，不会把已经点着的 worker 停掉。
  */
 export async function warmUpTypeScript(): Promise<void> {
+  // 先订阅再建编辑器：激活是一次性的，错过就永远等不到
+  const ready = new Promise<void>((resolve) => {
+    const listener = monaco.languages.onLanguage('javascript', () => {
+      listener.dispose();
+      resolve();
+    });
+  });
+
+  // 离屏但要有尺寸：0×0 的容器会让布局与 tokenization 走退化路径
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:-10000px;top:0;width:600px;height:300px;';
+  document.body.appendChild(host);
+
   const model = monaco.editor.createModel('', 'javascript');
+  // 预热不关心界面：把只有真编辑时才值得做的活关掉
+  const editor = monaco.editor.create(host, {
+    model,
+    minimap: { enabled: false },
+    folding: false,
+  });
+
   try {
+    await Promise.race([ready, delay(WARM_UP_TIMEOUT_MS)]);
     const getWorker = await monaco.typescript.getJavaScriptWorker();
     await getWorker(model.uri);
   } finally {
+    editor.dispose();
     model.dispose();
+    host.remove();
   }
+}
+
+/** 预热的超时兜底 */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export { monaco };
