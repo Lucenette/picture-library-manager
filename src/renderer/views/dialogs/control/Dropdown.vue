@@ -1,6 +1,6 @@
 <template>
   <div ref="rootEl" class="script-list" tabindex="0" @keydown.esc="hide">
-    <el-scrollbar>
+    <div class="script-list-body">
       <div
         v-for="script in payload.scripts"
         :key="script.id"
@@ -11,7 +11,7 @@
         {{ script.name }}
       </div>
       <div v-if="payload.scripts.length === 0" class="script-empty">无可用脚本</div>
-    </el-scrollbar>
+    </div>
   </div>
 </template>
 
@@ -58,6 +58,12 @@ function hide(): void {
   overflow: hidden;
   background: #2b2d30;
   outline: none;
+}
+
+/* 原生滚动：这个窗口刻意不引 Element Plus（见 entries/popup.ts），省下整个组件库的启动成本 */
+.script-list-body {
+  height: 100%;
+  overflow-y: auto;
 }
 
 .script-item {

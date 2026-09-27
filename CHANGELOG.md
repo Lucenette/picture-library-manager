@@ -13,6 +13,10 @@
 
 ### 变更
 
+- **渲染进程按窗口类拆入口**：主窗口 `index.html`、六个弹窗 `dialogs.html`、图片查看器 `viewer.html`、
+  仿原生浮窗 `popup.html` 各一份引导，入口里只 import 这个窗口要用的东西。图片查看器与浮窗页面本来
+  一行 Element Plus 都没用，却和主窗口一样要加载整个组件库（拆分前实测：每个窗口 1,969 KB JS + 362 KB
+  样式）；这两个入口现在连 vue-router 也不引，浮窗的滚动条也由 `<el-scrollbar>` 换成原生滚动。
 - **Electron 40 → 44**：同时补上 `postinstall` 显式安装二进制——Electron 42 起官方不再在 install 时下载，
   改为首次运行时按需拉取；我们仍在 `yarn install` 阶段装好，免得开发或 CI 在第一次运行时才去下载。
   `@types/node` 跟着提到 24（Electron 44 自身依赖 ^24.9.0）。

@@ -1,7 +1,5 @@
 <template>
-  <router-view v-if="isPopup" />
-
-  <el-container v-else class="app-container">
+  <div class="app-container">
     <div class="title-bar">
       <div v-if="!isMac" class="title-bar-icon">
         <img :src="appIcon" alt="" />
@@ -26,11 +24,11 @@
         </div>
       </nav>
 
-      <el-main class="app-main" :class="{ 'is-loading': isLoading }">
+      <div class="app-main" :class="{ 'is-loading': isLoading }">
         <router-view />
-      </el-main>
+      </div>
     </div>
-  </el-container>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -38,30 +36,8 @@ import { computed, type Component } from 'vue';
 import { useRoute } from 'vue-router';
 import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
 import appIcon from '@static/icon.png';
+import { isMac } from '@/entries/shell/window-chrome';
 import { useTasks } from '@/composables/useTasks';
-
-/**
- * macOS：红绿灯在左上角，那一段归系统，我们既不在标题栏放图标，也要给标题文字让开位置
- * （见样式里的 .platform-mac 与模板上的 v-if）。
- */
-const isMac = navigator.platform.startsWith('Mac');
-if (isMac) {
-  document.documentElement.classList.add('platform-mac');
-}
-
-/**
- * 窗口失焦时整条标题栏压暗（图标与标题文字）。
- *
- * 系统窗口按钮不在这一层（Windows / Linux 的 WCO 由主进程同步改字形色，macOS 的红绿灯系统自己变灰），
- * 所以这里不需要 IPC：DOM 的 focus / blur 本来就由窗口焦点驱动，和主进程拿到的是同一个事件。
- */
-function syncWindowBlurred(): void {
-  document.documentElement.classList.toggle('window-blurred', !document.hasFocus());
-}
-
-window.addEventListener('focus', syncWindowBlurred);
-window.addEventListener('blur', syncWindowBlurred);
-syncWindowBlurred();
 
 /** 导航栏一项：40px 宽的栏放不下文字，名称走 tooltip */
 interface NavItem {
@@ -87,19 +63,13 @@ const NAV_ITEMS: NavItem[] = [
 /** 栏底那组的起点：它上面撑开弹性空白，把这组顶到底部 */
 const bottomStartIndex = NAV_ITEMS.findIndex((item) => item.bottom === true);
 
-/** 这些路由是独立子窗口：不套主窗口的标题栏与导航骨架 */
-const POPUP_ROUTES = [
-  '/viewer', '/scan-config', '/batch-process', '/confirm', '/prompt', '/file-viewer', '/popup', '/similar',
-];
-
 const route = useRoute();
-const isPopup = computed(() => POPUP_ROUTES.includes(route.path));
 /** 启动阶段的迁移页：在主窗口里（所以有标题栏），但没有导航 */
 const isLoading = computed(() => route.path === '/loading');
 const activeMenu = computed(() => route.path);
 
 // 只有主界面需要任务角标：迁移页在主进程注册任务通道之前就已加载，那时拉列表必然失败
-const tasks = isPopup.value || isLoading.value ? null : useTasks();
+const tasks = isLoading.value ? null : useTasks();
 const activeTaskCount = computed(() => {
   if (!tasks) {
     return 0;
@@ -125,9 +95,11 @@ body {
   --title-bar-height: 40px;
 }
 
+/* 整个窗口的骨架：标题栏一条，下面一条放导航栏与内容区。
+   不用 el-container：它的 .el-container 规则与本文件的选择器同权重，
+   样式表顺序一变整页就横过来（表现为标题栏被压成左侧一条） */
 .app-container {
   height: 100vh;
-  /* el-container 的方向是靠子元素推断的，这里加了 div 之后显式写死列方向 */
   display: flex;
   flex-direction: column;
 }
@@ -169,20 +141,15 @@ body {
 }
 
 .title-bar-text {
+  /* 标题只占一行：空间不够时省略，而不是折成一列字 */
+  flex: 1;
+  min-width: 0;
   font-size: 13px;
   color: #a0a3a9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   user-select: none;
-}
-
-/* 失焦：整条 chrome（标题栏 + 左侧导航栏）一起压暗，与系统窗口按钮同一档。
-   导航栏压的是 link 而不是 .app-rail——底色不跟着淡，否则和标题栏的底色会在接缝处对不齐 */
-.window-blurred .title-bar-icon,
-.window-blurred .rail-link {
-  opacity: 0.5;
-}
-
-.window-blurred .title-bar-text {
-  color: var(--el-text-color-disabled);
 }
 
 /* 标题栏下面那一条：左边 40px 导航栏，右边内容区 */

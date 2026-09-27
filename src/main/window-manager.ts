@@ -10,12 +10,25 @@ import { pathToFileURL } from 'url';
 const SYMBOL_COLOR_ACTIVE = '#d8dadd';
 const SYMBOL_COLOR_INACTIVE = '#8e9196';
 
+/** 渲染进程入口名 → 构建产物里的 HTML 文件；每个窗口类一份，见 docs/design/window-management.md 第 4 节 */
+const ENTRY_HTML: Record<RendererEntry, string> = {
+  index: 'index.html',
+  dialogs: 'dialogs.html',
+  viewer: 'viewer.html',
+  popup: 'popup.html',
+};
+
 // ------------------------------------------------------------
 // 类型
 // ------------------------------------------------------------
 
+/** 渲染进程入口：主窗口是 index，弹窗、查看器、浮窗各有更小的一个 */
+type RendererEntry = 'index' | 'dialogs' | 'viewer' | 'popup';
+
 /** 创建窗口所需的最小配置 */
 interface WindowConfig {
+  /** 用哪个渲染进程入口；省略即主窗口的 index */
+  entry?: RendererEntry;
   width: number;
   height: number;
   minWidth?: number;
@@ -134,7 +147,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   }
 
   window.setMenu(null);
-  window.loadURL(getRouteUrl(config.route, config.backgroundColor));
+  window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
   window.on('closed', () => {
     if (windows.get(id) === window) {
       windows.delete(id);
@@ -211,6 +224,7 @@ export function createViewer(): BrowserWindow {
     backgroundColor: '#0d0d0d',
     title: '图片查看器',
     route: '/viewer',
+    entry: 'viewer',
     showWhenReady: true,
   });
 }
@@ -236,6 +250,7 @@ export function ensurePopup(): BrowserWindow {
     height: 120,
     backgroundColor: '#2b2d30',
     route: '/popup',
+    entry: 'popup',
     frame: false,
     minimizable: false,
     maximizable: false,
@@ -257,6 +272,7 @@ export function createScanConfig(): BrowserWindow {
     minHeight: 210,
     backgroundColor: '#1e1f22',
     route: '/scan-config',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -274,6 +290,7 @@ export function createBatchProcess(): BrowserWindow {
     minHeight: 210,
     backgroundColor: '#1e1f22',
     route: '/batch-process',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -291,6 +308,7 @@ export function createConfirm(): BrowserWindow {
     minHeight: 190,
     backgroundColor: '#1e1f22',
     route: '/confirm',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -308,6 +326,7 @@ export function createPrompt(): BrowserWindow {
     minHeight: 170,
     backgroundColor: '#1e1f22',
     route: '/prompt',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -325,6 +344,7 @@ export function createFileViewer(): BrowserWindow {
     minHeight: 400,
     backgroundColor: '#1e1f22',
     route: '/file-viewer',
+    entry: 'dialogs',
     parentId: 'main',
     modal: true,
     frame: false,
@@ -343,6 +363,7 @@ export function createSimilar(): BrowserWindow {
     backgroundColor: '#1e1f22',
     title: '相似图片',
     route: '/similar',
+    entry: 'dialogs',
     showWhenReady: true,
     parentId: 'main',
     modal: false,
@@ -362,13 +383,14 @@ export function createSimilar(): BrowserWindow {
  * 顺带把窗口自己的底色作为查询参数带上，渲染进程的首帧就能用它作背景，
  * 不必等组件样式到位（否则下拉浮窗、图片查看器会先闪一下默认色）。
  */
-function getRouteUrl(route: string, background?: string): string {
+function getWindowUrl(entry: RendererEntry, route: string, background?: string): string {
   const query = background ? `?bg=${encodeURIComponent(background)}` : '';
+  const file = ENTRY_HTML[entry];
   if (process.env.ELECTRON_RENDERER_URL) {
-    return `${process.env.ELECTRON_RENDERER_URL}${query}#${route}`;
+    return `${process.env.ELECTRON_RENDERER_URL}/${file}${query}#${route}`;
   }
-  const indexHtml = resolve(__dirname, '../renderer/index.html');
-  return `${pathToFileURL(indexHtml).href}${query}#${route}`;
+  const html = resolve(__dirname, '../renderer', file);
+  return `${pathToFileURL(html).href}${query}#${route}`;
 }
 
 /**

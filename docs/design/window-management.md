@@ -28,6 +28,7 @@
 | 2026-09-25 | 首次定稿 | — |
 | 2026-09-26 | 补「主窗口关闭即退出」的注册表职责与检查点 | 浮窗宿主常驻，导致关掉主窗口后进程不退出 |
 | 2026-09-27 | 新增「自绘标题栏」一节 | 主窗口去掉系统标题栏、保留系统窗口按钮 |
+| 2026-09-27 | 第 4 节改写：从「单个入口 + `POPUP_ROUTES`」改成「每类窗口一个入口」 | 每个窗口都要付整个 Element Plus 的启动成本，而其中两个窗口根本没用它 |
 
 ---
 
@@ -65,15 +66,45 @@
 "主窗口关闭"**——浮窗宿主常驻不销毁，一旦它漏在 `closeAll()` 之外，进程就会带着一个看不见的窗口挂住，
 并且占着单实例锁：用户再点图标不会有任何反应。
 
-## 4. 单个渲染进程入口
+## 4. 每类窗口一个入口
 
-所有窗口共用同一份 `index.html` 与 `main.ts`，靠 hash 路由区分身份；`App.vue` 用 `POPUP_ROUTES`
-决定要不要套主界面的导航骨架。两条不变量：
+`src/renderer/` 下每个窗口类一份 HTML 加一份引导（`entries/`）：主窗口 `index.html`、六个弹窗
+`dialogs.html`、图片查看器 `viewer.html`、仿原生浮窗 `popup.html`。**入口里只 import 这个窗口要用的
+东西**——没 import 的模块根本不进依赖图。这比"一套入口加运行时开关"彻底，因为 Element Plus 这类包
+**摇不掉**：`app.use(ElementPlus)` 是全量注册、`import 'element-plus/dist/index.css'` 是副作用导入，
+Rollup 不敢删。拆分前实测，每个窗口都要下 1,969 KB 的 Element Plus chunk 加 362 KB 样式
+（`out/renderer/index.html` 的 preload 列表），而图片查看器与浮窗页面一行都没用它。
 
-- **除加载页外，路由组件一律动态导入。** 静态导入意味着任何一个小弹窗都要把整个应用（含主界面六个
-  页面）求值一遍：每个窗口的公共开销会从 7 个模块 / 27 KB 涨到 26 个 / 133 KB。
-- **挂载前必须 `await router.isReady()`。** vue-router 的首次导航是异步的，提前挂载时 `App.vue`
-  拿到的 `route.path` 还是初始的 `/`，子窗口会先按「主界面」渲染出导航栏再切换——肉眼可见的一帧。
+各入口的依赖集：
+
+| 入口 | vue-router | Element Plus | 主界面骨架（`App.vue`、导航栏、图标） |
+|---|---|---|---|
+| `index.html`（主窗口） | 需要 | 需要 | 需要 |
+| `dialogs.html`（六个弹窗） | 不需要 | 需要（页面在用） | 不需要 |
+| `viewer.html`（图片查看器） | 不需要 | 不需要 | 不需要 |
+| `popup.html`（浮窗宿主） | 不需要 | 不需要 | 不需要 |
+
+三条不变量：
+
+- **入口内部，除加载页外仍然全部动态导入。** 入口只解决"这个窗口不许碰别的窗口的东西"，不解决
+  "同一窗口里一次要多少"：六个弹窗仍各是一个懒加载 chunk，只有真打开的那个才加载它的代码。
+- **非主窗口入口不引 vue-router**，改用 `entries/page.ts` 的 `mountPage()`：读 hash 找到页面、
+  等 chunk 到位再挂载。这些窗口只有一个页面，不需要路由，顺带省掉"首次导航是异步的"那套时序。
+  **窗口身份由入口文件承担，不再由路由承担。**
+- **主窗口挂载前必须 `await router.isReady()`。** vue-router 的首次导航是异步的，提前挂载时
+  `App.vue` 拿到的 `route.path` 还是初始的 `/`，会先渲染出导航骨架再切成加载页——肉眼可见的一帧。
+
+各入口共用的引导放在 `entries/shell/`，按「会不会把组件库拖进来」切成四个文件：
+
+| 文件 | 内容 | 谁能引 |
+|---|---|---|
+| `shell/page.ts` | `mountPage()`：读 hash、等页面 chunk 到位再挂载 | 三个非主窗口的入口——只依赖 `vue` |
+| `shell/window-chrome.ts` | `isMac` 与 `initWindowChrome()`（平台类 + 失焦标记） | 任何入口——不依赖任何库 |
+| `shell/element-plus.ts` | `installElementPlus()`，**唯一**引组件库与它样式的地方 | 只有主窗口与弹窗入口 |
+| `shell/first-paint.ts` | 首帧内联样式片段 | 只有 `electron.vite.config.ts`（不能被浏览器入口 import） |
+
+**这个目录不能合并成一个文件**：`mountPage` 是查看器与浮窗都要用的，而 `installElementPlus` 一旦被
+它们 import 就会把整个组件库拖回来——所以这条边界必须落在文件上，不能只写在注释里。
 
 ## 5. 可见性分三档
 
@@ -90,9 +121,11 @@
 当文档背景。理由有两个：下拉浮窗是 `#2b2d30`、图片查看器是 `#0d0d0d`，写死会让它们首帧闪一下
 别的颜色；而且主题一改，写死的值就过期了。
 
-**这段样式必须内联在 `index.html` 里。** 外链 CSS 与组件样式都晚于首次绘制，而路由又是按需加载的；
-少了它，小窗口会先闪白底 → 冒出滚动条 → 才变成深色。它同时定死 `margin: 0` 与 `overflow: hidden`：
-各页面自己的滚动由组件内部的滚动容器负责（如 `.app-main` 的 `overflow-y`），文档级滚动只会带来闪现。
+**这段样式必须内联在每个入口 HTML 里。** 外链 CSS 与组件样式都晚于首次绘制，页面又是按需加载的；
+少了它，小窗口会先闪白底 → 冒出滚动条 → 才变成深色。但它**只有一份定义**：`electron.vite.config.ts`
+的 `firstPaint` 插件把它注入到各入口 HTML 的 `<!-- first-paint -->` 占位处——四个 HTML 各抄一份
+迟早会漂移。它同时定死 `margin: 0` 与 `overflow: hidden`：各页面自己的滚动由组件内部的滚动容器负责
+（如 `.app-main` 的 `overflow-y`），文档级滚动只会带来闪现。
 
 ## 7. 自绘标题栏
 
@@ -179,12 +212,13 @@
 
 | 要动的东西 | 同时要改 |
 |---|---|
-| 新增一个窗口 | `window-manager.ts` 加工厂 → `dialogs/<name>.ts` 注册 IPC 并在 `dialogs/index.ts` 挂上 → `renderer/main.ts` 加路由 → `App.vue` 的 `POPUP_ROUTES` 加路径（若它不套导航骨架） |
+| 新增一个窗口 | `window-manager.ts` 加工厂（`entry` 决定用哪份入口） → `dialogs/<name>.ts` 注册 IPC 并在 `dialogs/index.ts` 挂上 → 在对应入口（`entries/main.ts` 加路由，或 `entries/dialogs.ts` 加一条页面加载器）登记 |
 | 新增一种浮窗 | 见第 9 节四处 |
-| 改主窗口顶栏（高度 / 拖拽区） | `App.vue` 的 `.app-header` 与 `createMain()` 的 `titleBarHeight` 必须相等；顶栏里新增可点元素要补 `no-drag` |
+| 改标题栏（高度 / 拖拽区） | `--title-bar-height`（`App.vue`）与 `createMain()` 的 `titleBar.height` 必须相等；标题栏里新增可点元素要补 `no-drag` |
 | 新增一个**常驻**窗口（不随主窗口关闭而消失） | 确认 `createMain()` 的 `closed` → `closeAll()` 覆盖到它；漏掉的表现是「关窗后进程不退出」，且单实例锁被占、再点图标毫无反应 |
-| 改「哪些路由不套骨架」 | `App.vue` 的 `POPUP_ROUTES` 与 `renderer/main.ts` 的路由表必须一致 |
-| 新增启动阶段的页面 | 必须静态导入（它是第一帧），并放进 `POPUP_ROUTES` |
+| 换窗口的入口 | 三处要一致：`window-manager` 的 `entry`、`ENTRY_HTML` 里的文件名、`src/renderer/` 下真实存在的 HTML + `entries/` 引导 |
+| 新增启动阶段的页面 | 必须静态导入（它是第一帧），并留在主窗口入口的路由表里 |
+| 给某个入口加依赖 | 先确认它只服务于那一类窗口：`entries/page.ts` 与查看器 / 浮窗入口都不该出现 UI 框架 |
 
 ## 11. 已知取舍
 

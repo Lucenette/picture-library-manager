@@ -382,6 +382,18 @@ body {
   color: #3871e1;
 }
 
+/* ======== 失焦压暗 ======== */
+/* 窗口失焦由 entries/shell/window-chrome.ts 挂上 html.window-blurred；压暗哪些元素在这里定。
+   现在只有主窗口的标题栏与左侧导航栏有自绘栏，等其余窗口也自绘（见路线图 window-chrome）再往这里加 */
+.window-blurred .title-bar-icon,
+.window-blurred .rail-link {
+  opacity: 0.5;
+}
+
+.window-blurred .title-bar-text {
+  color: var(--el-text-color-disabled);
+}
+
 /* ======== 应用主区域 ======== */
 .app-main {
   background: #1e1f22 !important;

@@ -35,7 +35,7 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
-所有窗口共用同一份渲染进程入口（`src/renderer/main.ts`），靠 **hash 路由**区分身份。`App.vue` 通过 `POPUP_ROUTES` 判断是否要套导航骨架：独立子窗口、以及启动阶段的加载页都不套。主窗口一律先落在 `/loading`，加载页读到 changelog 的终态后用 `router.replace('/')` 切回主界面——正常启动时它什么都不画，所以不会闪。
+**每类窗口一份渲染进程入口**（`src/renderer/entries/`）：主窗口 `index.html` 用 vue-router 管六个页面；六个弹窗、图片查看器、仿原生浮窗各有更小的一份（`dialogs.html` / `viewer.html` / `popup.html`），按 hash 直接挂载单个页面、不引 vue-router。入口里只 import 这个窗口要用的东西——Element Plus 只出现在主窗口与弹窗入口里；图片查看器与浮窗入口连 vue-router 都不引。主窗口一律先落在 `/loading`，加载页读到 changelog 的终态后用 `router.replace('/')` 切回主界面——正常启动时它什么都不画，所以不会闪。缘由与约束见 `docs/design/window-management.md` 第 4 节。
 
 辅助窗口目前包括图片查看器、扫描配置、批量处理、输入框、确认框、文件查看、下拉浮窗，每一个都对应 `main/dialogs/` 下的一个模块与一条 hash 路由。
 

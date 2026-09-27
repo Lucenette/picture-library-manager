@@ -43,6 +43,7 @@
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | 脚本的存储与查询——那是 `database` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
+| `src/renderer/entries/` | **每个窗口类的入口**（`main` / `dialogs` / `viewer` / `popup`）；共用引导在 `entries/shell/`：`page.ts`（`mountPage`，只依赖 `vue`）、`window-chrome.ts`（平台类 + 失焦标记）、`element-plus.ts`（唯一引组件库的地方）、`first-paint.ts`（构建期片段） | 入口自己 import 组件库或 `App.vue`；`shell/page.ts` 不许引 Element Plus，否则小入口又背上整个组件库 |
 | `src/static/` | 构建资源：应用图标、内置默认脚本源码等**只当资源用**的静态文件（图标由 `yarn icon` 生成到 `dist/icons`） | 可执行的主进程 / 渲染进程模块——代码放 `main/`、`renderer/`、`common/`；这里的文件只能以 `?raw` 这类资源方式引入 |
 | `docs/` | 设计说明、不变量、排障；**已落地**的子系统说明放 `docs/design/` | 尚未实施的方案——放进 `docs/roadmap/` |
 
@@ -209,6 +210,9 @@ Windows / Linux 靠 `titleBarOverlay`（Window Controls Overlay），macOS 靠�
 Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不画这个槽**（左端归红绿灯，只留标题文字）。
 改这条栏时几条一起看：
 
+- 主窗口骨架（`.app-container` / `.title-bar` / `.app-body` / `.app-rail` / `.app-main`）一律用普通 `div`，
+  **不要用 `el-container` / `el-main`**：Element Plus 的 `.el-container{flex-direction:row}` 与 `.app-container` 同权重，
+  胜负只看样式表注入顺序，一旦它排在后面整页就横过来（标题栏缩成左侧一条、导航栏跑到窗口中间）。
 - `.title-bar` 是拖拽区，左侧导航栏不是；要在标题栏里放可点元素就得补 `no-drag`，否则表现为「点不动」。
 - `--title-bar-height`（CSS）与 `createMain()` 的 `titleBar.height` 必须相等；
   `titleBar.color` 要与 `.title-bar` 的底色一致。
