@@ -110,7 +110,7 @@ body {
   display: flex;
   align-items: center;
   height: var(--title-bar-height);
-  background: #26282c;
+  background: var(--el-fill-color-light);
   -webkit-app-region: drag;
   app-region: drag;
   /* 系统按钮占的位置由 WCO 的 titlebar-area 让出来（Windows / Linux）；
@@ -165,8 +165,7 @@ body {
   flex-direction: column;
   flex: none;
   width: 40px;
-  background: #26282c;
-  border-right: 1px solid #323438;
+  background: var(--el-fill-color-light);
 }
 
 .rail-slot {

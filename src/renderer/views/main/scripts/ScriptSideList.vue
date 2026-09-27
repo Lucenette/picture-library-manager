@@ -1,29 +1,73 @@
 <template>
   <div class="script-side">
-    <div class="side-actions">
-      <el-button size="small" type="primary" @click="emit('create')">新增脚本</el-button>
-      <el-button size="small" @click="emit('import')">加载文件</el-button>
+    <div class="side-head">
+      <el-popover trigger="click" placement="bottom-start">
+        <template #reference>
+          <button type="button" class="filter-btn">
+            <span class="filter-label">{{ filterLabel }}</span>
+            <span class="filter-arrow">▾</span>
+          </button>
+        </template>
+        <el-checkbox-group v-model="selected" class="filter-options">
+          <el-checkbox v-for="option in FILTER_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </el-checkbox>
+        </el-checkbox-group>
+      </el-popover>
+
+      <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
+        <el-button text class="icon-btn" :icon="Plus" @click="emit('create')" />
+      </el-tooltip>
+      <el-tooltip content="加载文件" placement="bottom" :show-after="300">
+        <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import')" />
+      </el-tooltip>
     </div>
 
     <div class="side-list">
-      <button
-        v-for="item in items"
-        :key="item.key"
-        type="button"
-        class="side-item"
-        :class="[`is-${item.state}`, { active: item.key === activeKey }]"
-        @click="emit('select', item.key)"
-      >
-        <span class="side-name">{{ item.name }}</span>
+      <!-- 分组现在只是外观：只有一组，将来真做分组时这里换成 v-for -->
+      <button type="button" class="group-head" @click="collapsed = !collapsed">
+        <span class="group-caret" :class="{ 'is-collapsed': collapsed }">▾</span>
+        <span class="group-name">未分组</span>
+        <span class="group-count">({{ visibleItems.length }})</span>
       </button>
+
+      <template v-if="!collapsed">
+        <button
+          v-for="item in visibleItems"
+          :key="item.key"
+          type="button"
+          class="side-item"
+          :class="[`is-${item.state}`, { active: item.key === activeKey }]"
+          @click="emit('select', item.key)"
+        >
+          <span class="side-name">{{ item.name }}</span>
+        </button>
+        <p v-if="visibleItems.length === 0" class="side-empty">没有符合筛选的脚本</p>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed, ref } from 'vue';
+import { FolderOpened, Plus } from '@element-plus/icons-vue';
+import type { ScriptType } from '@common/types';
+import { TYPE_LABELS, type SideItem } from './script-list';
+
+/** 过滤取值：三种已知类型 + 「一个类型都没识别到」 */
+type FilterValue = ScriptType | 'unknown';
+
+const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
+  { value: 'select-image', label: TYPE_LABELS['select-image'] },
+  { value: 'identify-character', label: TYPE_LABELS['identify-character'] },
+  { value: 'identify-structure', label: TYPE_LABELS['identify-structure'] },
+  // 一个方法都没识别到的脚本也要能被看到，否则它只会在筛选里静静消失
+  { value: 'unknown', label: '未识别' },
+];
+
+const props = defineProps<{
   /** 状态用名字颜色表示，照 IDEA 的 git 状态色：新建未保存绿、改过未保存蓝、干净默认色 */
-  items: { key: string; name: string; state: 'new' | 'modified' | 'clean' }[];
+  items: SideItem[];
   activeKey: string;
 }>();
 
@@ -32,6 +76,39 @@ const emit = defineEmits<{
   (event: 'create'): void;
   (event: 'import'): void;
 }>();
+
+/** 默认全选：不筛就是全部 */
+const selected = ref<FilterValue[]>(FILTER_OPTIONS.map((option) => option.value));
+const collapsed = ref(false);
+
+/**
+ * 触发按钮上那一行：部分勾选时把名字用「、」连起来（Steam 那个下拉就是这么写的），
+ * 全勾时写「全部类型」——四个名字在 220px 里只会被截成「图片、角…」。
+ */
+const filterLabel = computed(() => {
+  if (selected.value.length === FILTER_OPTIONS.length) {
+    return '全部类型';
+  }
+  if (selected.value.length === 0) {
+    return '未选择类型';
+  }
+  return FILTER_OPTIONS.filter((option) => selected.value.includes(option.value))
+    .map((option) => option.label)
+    .join('、');
+});
+
+/** 过滤后的列表 */
+const visibleItems = computed(
+  () => props.items.filter((item) => item.state === 'new' || matchesFilter(item.types)),
+);
+
+/** 草稿的类型未知（见 SideItem），不参与过滤：否则刚新建一个脚本就会被筛没 */
+function matchesFilter(types: ScriptType[]): boolean {
+  if (types.length === 0) {
+    return selected.value.includes('unknown');
+  }
+  return types.some((type) => selected.value.includes(type));
+}
 </script>
 
 <style scoped>
@@ -39,20 +116,76 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   flex: none;
-  width: 220px;
+  padding: var(--page-padding);
+  width: 300px;
   min-height: 0;
-  border-right: 1px solid var(--el-border-color);
+  border-right: 2px solid var(--el-fill-color-light);
 }
 
-.side-actions {
+/* 表头就是这一行控件：内边距跟着 .script-side 的 --page-padding 走，右栏表头用的是同一份 */
+.side-head {
   display: flex;
-  gap: 6px;
-  padding: 10px;
-  border-bottom: 1px solid var(--el-border-color);
+  align-items: center;
+  gap: 10px;
 }
 
-.side-actions .el-button + .el-button {
+.side-head .el-button + .el-button {
   margin-left: 0;
+}
+
+/* 纯图标按钮：无边框、方角（EP 默认的 --el-border-radius-base = 4px）、32px 见方——
+   与过滤控件、右栏输入框同高；字号提到 16px，图标随字号缩放，和左侧导航栏的图标一样大 */
+.side-head .icon-btn {
+  width: 32px;
+  padding: 0;
+  border-radius: var(--el-border-radius-base);
+  font-size: 16px;
+}
+
+/* 自己画的控件也要长得像输入框：照 theme.css 里 .el-input__wrapper 的那套规格 */
+.filter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 4px;
+  background: #2b2d30;
+  box-shadow: 0 0 0 1px #323438 inset;
+  color: var(--el-text-color-regular);
+  font-size: var(--el-font-size-base);
+  cursor: pointer;
+}
+
+.filter-btn:hover {
+  box-shadow: 0 0 0 1px #3e4044 inset;
+}
+
+/* 勾选项竖着排；尺寸一律交给 Element Plus 默认值 */
+.filter-options {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-options .el-checkbox {
+  margin-right: 0;
+}
+
+.filter-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.filter-arrow {
+  flex: none;
+  color: #82858b;
+  font-size: 11px;
 }
 
 .side-list {
@@ -62,16 +195,60 @@ const emit = defineEmits<{
   padding: 6px 0;
 }
 
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-head:hover {
+  color: var(--el-text-color-regular);
+}
+
+.group-caret {
+  flex: none;
+  width: 12px;
+  color: #82858b;
+  font-size: 11px;
+  text-align: center;
+  transition: transform 0.15s;
+}
+
+.group-caret.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.group-count {
+  color: #82858b;
+}
+
+/* 缩进对齐组名：组名在 12 + 12(三角) + 6(间隙) = 30px，这里 2px 竖条 + 28px 内边距同样落到 30px */
 .side-item {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 7px 10px 7px 8px;
+  padding: 8px 12px 8px 28px;
   border: none;
   border-left: 2px solid transparent;
   background: none;
   color: var(--el-text-color-regular);
-  font-size: 13px;
+  font-size: var(--el-font-size-base);
   text-align: left;
   cursor: pointer;
 }
@@ -102,5 +279,11 @@ const emit = defineEmits<{
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.side-empty {
+  padding: 8px 12px 8px 28px;
+  color: #82858b;
+  font-size: 13px;
 }
 </style>

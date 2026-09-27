@@ -9,13 +9,11 @@
       <!-- 没有保存按钮：现代编辑器都靠快捷键，这里把提示放在「未保存」标记上 -->
       <span v-if="dirty" class="dirty">未保存 · Ctrl+S</span>
       <div class="head-actions">
-        <el-button size="small" :disabled="!dirty" @click="emit('discard')">放弃修改</el-button>
-        <el-button v-if="builtin" size="small" @click="emit('reset')">恢复默认</el-button>
-        <el-button v-else size="small" type="danger" @click="emit('remove')">删除</el-button>
+        <el-button :disabled="!dirty" @click="emit('discard')">放弃修改</el-button>
+        <el-button v-if="builtin" @click="emit('reset')">恢复默认</el-button>
+        <el-button v-else type="danger" @click="emit('remove')">删除</el-button>
       </div>
     </div>
-
-    <p class="path">{{ filePath || '还没有落盘：按 Ctrl+S 保存后会生成文件' }}</p>
 
     <div class="editor-body">
       <MonacoEditor v-model="code" :document-key="documentKey" :error="error" @save="emit('save')" />
@@ -45,6 +43,8 @@
         </div>
       </el-tooltip>
     </div>
+
+    <p class="path">{{ filePath || '还没有落盘：按 Ctrl+S 保存后会生成文件' }}</p>
   </div>
 </template>
 
@@ -53,13 +53,7 @@ import { computed } from 'vue';
 import { WarningFilled } from '@element-plus/icons-vue';
 import type { ScriptCompileError, ScriptType } from '@common/types';
 import MonacoEditor from './MonacoEditor.vue';
-
-/** 类型标签与脚本页一直用的那套中文名 */
-const TYPE_LABELS: Record<ScriptType, string> = {
-  'select-image': '图片',
-  'identify-character': '角色',
-  'identify-structure': '结构',
-};
+import { TYPE_LABELS } from './script-list';
 
 const props = defineProps<{
   name: string;
@@ -128,8 +122,8 @@ function typeLabel(type: ScriptType): string {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--el-border-color);
+  padding: var(--page-padding);
+  padding-bottom: 10px;
 }
 
 .name-input {
@@ -157,6 +151,7 @@ function typeLabel(type: ScriptType): string {
 .path {
   padding: 6px 12px;
   color: var(--el-text-color-secondary);
+  border-top: 1px solid var(--el-fill-color-light);
   font-size: 12px;
   word-break: break-all;
 }

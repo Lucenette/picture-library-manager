@@ -42,6 +42,7 @@ import {
 } from '@/services/script-service';
 import ScriptEditor from './scripts/ScriptEditor.vue';
 import ScriptSideList from './scripts/ScriptSideList.vue';
+import type { SideItem } from './scripts/script-list';
 
 /** 新增脚本的起始正文：给个最小骨架，省得对着空文件发呆 */
 const NEW_SCRIPT_TEMPLATE = `// 处理脚本：CommonJS，module.exports 导出要用的方法
@@ -94,11 +95,12 @@ const dirty = computed(
  * 状态照 IDEA 的 git 状态色给名字上色：新建未保存绿、改过未保存蓝、干净用默认色。
  */
 const sideItems = computed(() => {
-  const items: { key: string; name: string; state: 'new' | 'modified' | 'clean' }[] = [];
+  const items: SideItem[] = [];
 
   for (const draft of Object.values(drafts.value)) {
     if (draft.key.startsWith('new-')) {
-      items.push({ key: draft.key, name: draft.name, state: 'new' });
+      // 还没保存：库里没有它的行，类型也无从谈起
+      items.push({ key: draft.key, name: draft.name, state: 'new', types: [] });
     }
   }
 
@@ -110,6 +112,7 @@ const sideItems = computed(() => {
       key,
       name: drafts.value[key]?.name ?? script.name,
       state: modified ? 'modified' : 'clean',
+      types: script.types,
     });
   }
 
