@@ -89,7 +89,7 @@ const dirty = computed(
 );
 
 /**
- * 左栏那一列：新建未保存的草稿排在最前（它们在库里还没有行），其余是库里的脚本。
+ * 左栏那一列：库里的脚本与新建未保存的草稿放在一起，一律按名称字典序排。
  *
  * 状态照 IDEA 的 git 状态色给名字上色：新建未保存绿、改过未保存蓝、干净用默认色。
  */
@@ -113,6 +113,8 @@ const sideItems = computed(() => {
     });
   }
 
+  // 中英混排：localeCompare('zh') 让中文按拼音落位；默认的码点顺序会把中文排到最前或最后
+  items.sort((left, right) => left.name.localeCompare(right.name, 'zh'));
   return items;
 });
 
@@ -123,9 +125,10 @@ const sideItems = computed(() => {
 onMounted(async () => {
   await loadScripts();
   await loadDrafts();
-  const first = scripts.value[0];
-  if (first) {
-    await openKey(keyOfScript(first.id));
+  // 打开左栏的第一项（排序之后的第一项，可能是一份还没保存的草稿）
+  const first = sideItems.value[0];
+  if (first !== undefined) {
+    await openKey(first.key);
   }
 });
 
@@ -401,7 +404,24 @@ async function discard(): Promise<void> {
   await openKey(activeKey.value);
 }
 
+/**
+ * 删除当前脚本。
+ *
+ * 新建未保存的脚本只活在草稿文件里（库里没有它的行），删它就是删那份草稿——只清内存里的副本
+ * 会让它在下次打开脚本页时原样回来。
+ */
 async function removeScript(): Promise<void> {
+  // 先把排着队的落草稿取消掉：删除之后再写一次，删掉的东西就回来了
+  if (draftTimer !== null) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+
+  if (activeKey.value.startsWith('new-')) {
+    await removeUnsavedScript();
+    return;
+  }
+
   const id = Number(activeKey.value.slice('script-'.length));
   const usage = await getScriptUsage(id);
   const confirmed = await confirmDialog({
@@ -424,6 +444,28 @@ async function removeScript(): Promise<void> {
   activeKey.value = '';
   if (next) {
     await openKey(keyOfScript(next.id));
+  }
+}
+
+/** 删掉一个还没保存过的新脚本：确认后只删草稿，再选中列表里的下一项 */
+async function removeUnsavedScript(): Promise<void> {
+  const key = activeKey.value;
+  const confirmed = await confirmDialog({
+    title: '删除脚本',
+    message: `确定删除「${name.value}」？它还没保存过，删掉就找不回来了。`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  await deleteScriptDraft(key);
+  clearDraft(key);
+  activeKey.value = '';
+  const next = sideItems.value[0];
+  if (next !== undefined) {
+    await openKey(next.key);
   }
 }
 
