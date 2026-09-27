@@ -90,7 +90,7 @@ export interface ProcessedImage {
 // 视图 DTO（在实体基础上补齐关联字段，供列表直接渲染）
 // ------------------------------------------------------------
 
-/** 页面「图组确认」的图片组行 */
+/** 页面「图组管理」的图片组行 */
 export interface ImageGroupView extends ImageGroup {
   characterName: string;
   sourceName: string;

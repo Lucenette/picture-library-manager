@@ -112,7 +112,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 角色名由 `identify-structure` / `identify-character` 决定。两种处理方式：
 
-- 少量错误：到「角色确认」页重命名。
+- 少量错误：到「角色管理」页重命名。
 - 规则不对：改脚本，然后重新扫描该图库。
 
 ---

@@ -11,11 +11,11 @@
           </el-menu-item>
           <el-menu-item index="/characters">
             <el-icon><User /></el-icon>
-            <span>角色确认</span>
+            <span>角色管理</span>
           </el-menu-item>
           <el-menu-item index="/process">
             <el-icon><Grid /></el-icon>
-            <span>图组确认</span>
+            <span>图组管理</span>
           </el-menu-item>
           <el-menu-item index="/library">
             <el-icon><PictureFilled /></el-icon>
