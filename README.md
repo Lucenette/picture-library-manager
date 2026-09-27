@@ -159,7 +159,7 @@ picture-library-manager/
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
 │   ├── renderer/    # 渲染进程：Vue 3 界面，每类窗口一个入口（见 entries/）
 │   └── static/      # 构建资源：应用图标、内置默认脚本源码（图标构建时生成 dist/icons）
-└── .agents/skills/  # 编码代理的工作流（文档规范）
+└── .agents/skills/  # 编码代理的工作流（文档、提交信息、数据库、发布）
 ```
 
 ---
