@@ -24,7 +24,7 @@
         </div>
       </nav>
 
-      <div class="app-main" :class="{ 'is-loading': isLoading }">
+      <div class="app-main">
         <router-view />
       </div>
     </div>
@@ -224,11 +224,6 @@ body {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 0 0 0;
-}
-
-/* 迁移页自带 60px 页头，让它从主区域顶部铺开 */
-.app-main.is-loading {
-  padding: 0;
+  /* 这里不留白：页边距归页面自己，用 --page-padding（见 styles/theme.css） */
 }
 </style>

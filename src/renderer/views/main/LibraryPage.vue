@@ -402,7 +402,7 @@ onMounted(loadData);
 
 <style scoped>
 .library-page {
-  padding: 0 24px;
+  padding: var(--page-padding);
   height: 100%;
   display: flex;
   flex-direction: column;

@@ -450,6 +450,7 @@ async function resetBuiltin(): Promise<void> {
 </script>
 
 <style scoped>
+/* 工具型页面：整页铺满，不填 --page-padding；留白由左右两栏各自的表头给 */
 .script-page {
   display: flex;
   height: 100%;
