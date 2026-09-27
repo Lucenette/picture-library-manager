@@ -40,7 +40,7 @@ description: 在本仓库改动数据库结构、订正库内数据或写版本�
 src/main/ups/changesets/
   index.ts              版本清单：只 import 各版本目录的 index.ts
   1.0.0/  index.ts + dbups.xml
-  1.0.1/  index.ts + preups.ts + dbups.xml + postups.ts     ← 四件都可缺
+  1.1.0/  index.ts + preups.ts + dbups.xml + postups.ts     ← 四件都可缺
 ```
 
 **新增一个版本目录**（复制上一个目录是最容易出错的路径）：
@@ -49,6 +49,11 @@ src/main/ups/changesets/
 2. `index.ts` 里把 `VERSION` 改成新版本号（**目录名只是给人看的，版本号以这个常量为准**）；
 3. 把不需要的 `dbups.xml` / `preups.ts` / `postups.ts` 删掉，别留下上一个版本的内容；
 4. 在 `changesets/index.ts` 的 `CHANGELOG_VERSIONS` 末尾追加一行。
+
+**一次例外**：`1.1.0`（脚本管理那一版）的目录名与 `package.json` 都是 1.1.0，但它 `index.ts` 里的 `VERSION` 故意停在
+`1.0.1`——它在改名之前已经在开发库的账本里记过账，改掉会让那些 changeSet 按新身份重跑，而 `ALTER TABLE`
+重复执行会直接失败。别顺手「修正」这个常量；1.1.0 发出去之后，下一个版本目录照常按新版本号写（缘由见
+[docs/design/ups.md](../../../docs/design/ups.md) 的 3.3）。
 
 两处身份容易记混，记住这张表就够：
 
@@ -96,7 +101,7 @@ export async function run(ctx: ChangeScriptContext): Promise<void> {
 - **不要吞异常**：抛出去才会回滚、才会显示在失败页。
 - **文件操作不受事务保护**：脚本抛错时它写进数据库的行随事务回滚，但已经写出去的文件不会消失；要覆盖或删除已有文件就先自己备份，并保证重复执行是安全的。
 - 改了**已记账**的脚本内容不会生效（身份是版本号 + 生命周期）。要重跑先删掉那一行：
-  `DELETE FROM schema_migration WHERE author = 'script' AND filename = '1.0.1';`
+  `DELETE FROM schema_migration WHERE author = 'script' AND filename = '1.0.1';`（1.0.1 就是这一版的 filename，见「版本目录与三段时机」的例外）
 
 ## 数据目录在用户主目录
 
@@ -106,7 +111,7 @@ export async function run(ctx: ChangeScriptContext): Promise<void> {
 macOS 的 exe 在 `.app` 内部，也都不是能写库的地方。
 
 内置默认脚本的源码在 `src/static/default-script.js`，构建时由 `?raw` 内联进主进程；把它插进库这件事是
-`1.0.1` 的 `preups.ts` 干的，不再挂在启动流程里每次查一遍。数据目录只有 `getDataDir()` 一个来源。
+`1.1.0` 的 `postups.ts` 干的，不再挂在启动流程里每次查一遍。数据目录只有 `getDataDir()` 一个来源。
 
 ## 改名与改键名
 
@@ -168,7 +173,7 @@ node .agents/skills/db-maintenance/scripts/verify-migration.mjs
 
 - [ ] `<sql>` 转义正确，XML 能被 `@xmldom/xmldom` 解析，`changeSet` 数量与预期一致
 - [ ] 只往当前未发布版本追加；没有改动任何已执行过的 changeset 或脚本
-- [ ] `index.ts` 里的 `VERSION` 与版本号一致，清单里没有重复版本号
+- [ ] `index.ts` 里的 `VERSION` 与版本号一致（`1.1.0` 是唯一的例外，见「版本目录与三段时机」），清单里没有重复版本号
 - [ ] 涉及改名时三类债都排查过：代码 / 结构 / 库里的 JSON
 - [ ] 改的是数据目录本身的话，`getDataDir()` 与文档里的路径一起改了
 - [ ] `verify-migration.mjs` 的新库与现有库两条路径都通过；带脚本的版本另外在库副本上冒烟过

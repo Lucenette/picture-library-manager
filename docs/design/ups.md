@@ -81,7 +81,7 @@ src/main/ups/                 升级模块（上层）
   changesets/
     index.ts                  版本清单：只 import 各版本目录的 index.ts
     1.0.0/  index.ts + dbups.xml
-    1.0.1/  index.ts + preups.ts        ← dbups.xml 与 postups.ts 按需，都可以没有
+    1.1.0/  index.ts + preups.ts        ← dbups.xml 与 postups.ts 按需，都可以没有
 src/main/database/            数据库模块（下层）
   db.ts                       建数据目录、开库（没有就建文件）、CRUD、账本读写、DB 通道
   sql.ts                      运行时 SQL 常量（含账本语句）
@@ -94,6 +94,7 @@ src/main/database/            数据库模块（下层）
 - 每个版本目录的 `index.ts` 里写死 `VERSION` 并导出 `changelog`；外层 `changesets/index.ts` 只 import 各版本目录的 `index.ts`，不碰 XML 与脚本。
 - **版本号取自代码里的常量，与目录名无关**：目录改名不会改变账本身份。清单顺序即执行顺序。
 - 清单里出现两个相同 `version` 时直接抛错：复制版本目录忘了改 `VERSION` 会让新版本的 changeSet 顶用旧版本的身份，被账本判定为已执行而静默跳过。
+- **一次例外**：`1.1.0` 的目录名与 `package.json` 都是 1.1.0（这一版做的是 minor：脚本文件库、加载服务、脚本分组），但它的 `VERSION` 故意停在 `1.0.1`——改名之前它已经在开发库的账本里记过账，改掉会让那些 changeSet 按新身份重跑，而 `ALTER TABLE` 重复执行会直接失败。这一版发出去之后，下一个版本目录照常按新版本号写。
 - 身份是三元组 `(author, id, filename)`：
 
 | 步骤 | author | id | filename |
@@ -179,7 +180,7 @@ await startLoading()   ④ 按登记顺序跑必须的任务，最后公布终�
 - **文件操作不受事务保护**：回滚不会撤销已经写出去的文件，所以脚本要保证重复执行是安全的；需要覆盖或删除已有文件时，先自己留一份（放哪里、留几份由脚本决定，框架不清理脚本写的任何文件）。
 - 可以 import 任何模块：它就是被编进主进程包的普通代码。
 - 改了**已记账**的脚本内容不会生效（身份是版本号 + 生命周期）。需要重跑时手工删掉那一行：
-  `DELETE FROM schema_migration WHERE author = 'script' AND filename = '1.0.1';`
+  `DELETE FROM schema_migration WHERE author = 'script' AND filename = '1.0.1';`（1.0.1 就是这一版的 filename，见 3.3 的例外）
 
 ### 3.10 备份与清理
 
@@ -207,7 +208,7 @@ await startLoading()   ④ 按登记顺序跑必须的任务，最后公布终�
 1. **静态检查**：`tsc -p tsconfig.node.json`、`vue-tsc -p tsconfig.web.json`、`node scripts/check-docs.mjs`、以及「`database/` 里不出现 `@/ups`」这条依赖方向检查。
 2. **迁移预演**：`node .agents/skills/db-maintenance/scripts/verify-migration.mjs` —— 全新库与现有库两条路径必须结构收敛。它**只重放 `dbups.xml`**，并会打印哪些版本带 preups/postups 而未被预演；带脚本的版本必须另外在库副本上冒烟。
 3. **引擎验证**：引擎不依赖 electron，可以用内存库或临时库在纯 Node 下直接跑 `runUps()`：三段顺序、已记账的不再执行、脚本抛错时回滚且只记 `failed`、缺文件被跳过、重复版本号被拒绝、备份只保留 3 份。
-4. **人工冒烟**（静态检查通过不等于功能正常）：在库副本上启动应用，确认加载页出现「1.0.1 预升级脚本」；再次启动不再出现该步骤；人为让脚本抛错，确认加载页显示原因、数据未受影响。
+4. **人工冒烟**（静态检查通过不等于功能正常）：在库副本上启动应用，确认加载页出现「1.0.1 预升级脚本」（步骤名是 `VERSION` + 说明，这一版显示的就是 1.0.1，见 3.3）；再次启动不再出现该步骤；人为让脚本抛错，确认加载页显示原因、数据未受影响。
 5. **目录改名验证**：把某个版本目录改个名（`index.ts` 里的 `VERSION` 不动），确认账本里已执行的 changeset 仍被认作已执行。
 
 ## 6. 已知代价

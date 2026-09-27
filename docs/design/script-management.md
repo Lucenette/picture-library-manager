@@ -74,7 +74,7 @@
 - `file_path` 恒为 `scripts/` 下的绝对路径；
 - `group_id` 指向 `script_group.id`，`NULL` 就是「未分组」（见第 5 节）。
 
-结构变更写在 `src/main/ups/changesets/1.0.1/dbups.xml` 的 changeSet 里，一条 changeSet 管一张表：
+结构变更写在 `src/main/ups/changesets/1.1.0/dbups.xml` 的 changeSet 里，一条 changeSet 管一张表：
 
 1. `process_script`：加 `builtin` 列并把 `file_path = ''` 的行标为内置；删 `code` 与 `brief`；加 `group_id` 列。
 2. `processed_image`：加 `script_name TEXT`（可空），并回填历史行（`UPDATE processed_image SET script_name = (SELECT name FROM process_script WHERE id = processed_image.script_id) WHERE script_id IS NOT NULL`）。图库那一列以后不再 JOIN `process_script`。
@@ -101,7 +101,7 @@ process_script.group_id  →  script_group.id   -- NULL 就是「未分组」
 
 - `name` **允许重复**，靠 `id` 区分，建组时不做查重；`collapsed` 存这个分组的折叠状态。
 - **`NULL` 就是「未分组」**：默认分组不占行，因此它没有名字与折叠状态可存——名字写死在界面里（「未分组」），折叠只在这一屏有效，位置恒在最后。
-- 这两处结构由 `1.0.1` 的 `dbups.xml` 里两条 changeSet 建立（一条一表），**没有回填**：升级之前没有分组的用法，老数据本来就都是「未分组」。
+- 这两处结构由 `1.1.0` 的 `dbups.xml` 里两条 changeSet 建立（一条一表），**没有回填**：升级之前没有分组的用法，老数据本来就都是「未分组」。
 
 ### 5.2 顺序
 
@@ -137,7 +137,7 @@ process_script.group_id  →  script_group.id   -- NULL 就是「未分组」
 
 **明确不动**：扫描、选图等流程选择脚本的下拉仍然只出平铺列表，分组不影响它们。
 
-## 6. 接管旧脚本（`1.0.1/preups.ts`）
+## 6. 接管旧脚本（`1.1.0/preups.ts`）
 
 在删列之前把 `code` 写成文件。这一步挂在 `preups` 上：一个版本内部的顺序是 preups → dbups → postups，所以它跑的时候列还在。
 
@@ -151,7 +151,7 @@ process_script.group_id  →  script_group.id   -- NULL 就是「未分组」
 
 内置身份由 `builtin` 列决定，源码是随应用发布的 `src/static/default-script.js`（构建时以 `?raw` 内联进主进程，不往安装目录铺文件）。
 
-- 它的行与文件由 `1.0.1` 的 `postups.ts` 建立——那时 `builtin` 列与图库的名字副本都已就位；老库上已经有那一行时，它按出厂源码把文件写出来再回填路径。新库里这一条一开始落在「未分组」，之后可以拖进任意分组。
+- 它的行与文件由 `1.1.0` 的 `postups.ts` 建立——那时 `builtin` 列与图库的名字副本都已就位；老库上已经有那一行时，它按出厂源码把文件写出来再回填路径。新库里这一条一开始落在「未分组」，之后可以拖进任意分组。
 - 运行期只有 `resetBuiltinScript()`（右键「恢复默认」）会重建它：写回出厂源码、重新分配缺失的文件路径、重测类型、删草稿。**升级之外没有启动时的重建**：内置脚本没有删除入口，文件只可能被使用者在资源管理器里手动删掉，而「恢复默认」正好就是这一种情况的重建路径，于是不为此在每次启动多查一次文件。被删后打开它只会看到「脚本文件不存在」，恢复默认能把它救回来。
 - 同一份源码也是「新增脚本」的起始正文，所以改它等于改所有新脚本的起点（`AGENTS.md` 明令不要动它的语义）。
 
@@ -275,7 +275,7 @@ monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.t
 - 动改名路径，先确认 `processed_image.script_name` 的级联——改名只有 `renameScript()` 那条路（脚本行与图库副本在同一个事务里），绕过它写名就会让图库显示旧名。
 - 动分组，先确认 `group_id` 只可能是 `null`（未分组）或 `script_group` 里存在的 id；删分组必须在同一个事务里把成员置空，从 IPC 进来的分组 id 一律先过 `ensureScriptGroup()`。
 - 动草稿，先确认 key 的两种形态（`script-<id>` 与 `new-<uuid>`）：`new-` 的草稿不参与孤儿清理，也不当成已入库脚本处理。
-- 动 `process_script` 的列或 `1.0.1` 的脚本，注意三段顺序：`preups` 在 `dbups.xml` 之前、`postups` 在之后；接管的幂等标记是「`code` 列还在不在」，落盘自校验过不了就绝不能走到删列那一条。
+- 动 `process_script` 的列或 `1.1.0` 的脚本，注意三段顺序：`preups` 在 `dbups.xml` 之前、`postups` 在之后；接管的幂等标记是「`code` 列还在不在」，落盘自校验过不了就绝不能走到删列那一条。
 - 动迁移前先看 [ups.md](./ups.md) 的记账规则：身份是 `(author, id, filename)`，**改了已经执行过的 changeSet 不会生效**；预演要覆盖全新库与现有库两条路径。
 - 改编辑器就注意 0.57 的三处：语言服务在包根的 `typescript` 上（不是 `monaco.languages.typescript`）、深导入不写 `esm/vs` 前缀、worker 必须 inline。
 - 渲染进程不直接读文件：脚本正文与草稿一律走 `SCRIPT_*` 通道。
