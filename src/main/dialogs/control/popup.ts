@@ -1,9 +1,15 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, screen } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
-import type { PopupShowData } from '@common/types';
+import type { DropdownPlacement, PopupShowData } from '@common/types';
 
 import { ensurePopup, get } from '@/window-manager';
+
+/** 浮窗与控件之间的间距 */
+const LIST_MARGIN = 10;
+
+/** 浮窗距屏幕边缘的安全距离 */
+const SCREEN_SAFE_MARGIN = 20;
 
 // ------------------------------------------------------------
 // 状态
@@ -22,6 +28,26 @@ export function initPopup(): void {
   ipcMain.handle(IPC.POPUP_HIDE, () => {
     get('popup')?.hide();
   });
+}
+
+/**
+ * 算浮窗该放在哪：默认贴在控件下方，下方空间不足时翻到控件上方。
+ *
+ * 放在这里是因为「浮窗窗口在哪」是浮窗自己的事，谁打开它、内容是什么与定位无关。
+ */
+export function resolvePopupBounds(
+  parentWindow: BrowserWindow,
+  placement: DropdownPlacement,
+): { x: number; y: number } {
+  const bounds = parentWindow.getBounds();
+  const { controlRect, listHeight } = placement;
+  const x = bounds.x + controlRect.x;
+  const belowY = bounds.y + controlRect.y + controlRect.height + LIST_MARGIN;
+  const screenHeight = screen.getPrimaryDisplay().workAreaSize.height;
+  const y = belowY + listHeight > screenHeight - SCREEN_SAFE_MARGIN
+    ? bounds.y + controlRect.y - listHeight - LIST_MARGIN
+    : belowY;
+  return { x, y };
 }
 
 /**

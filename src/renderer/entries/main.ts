@@ -1,11 +1,12 @@
 import { createApp } from 'vue';
+import { ipcRenderer } from 'electron';
 import { createRouter, createWebHashHistory } from 'vue-router';
 
-import { LOAD_TASK } from '@common/ipcChannels';
+import { IPC, LOAD_TASK } from '@common/ipcChannels';
 
 import App from '@/App.vue';
 import { installElementPlus } from '@/entries/shell/element-plus';
-import { initWindowChrome } from '@/entries/shell/window-chrome';
+import { initWindowChrome, setPopupOpen } from '@/entries/shell/window-chrome';
 import { initRendererLoading, registerRendererTask } from '@/loading';
 import '@/styles/theme.css';
 import LoadingPage from '@/views/startup/LoadingPage.vue';
@@ -35,6 +36,9 @@ const router = createRouter({
 });
 
 initWindowChrome();
+
+// 浮窗弹出时主窗口会失焦，但那是主界面自己在展开：标题栏不跟着压暗（见 shell/window-chrome.ts）
+ipcRenderer.on(IPC.POPUP_VISIBLE, (_event, visible: boolean) => setPopupOpen(visible));
 
 const app = createApp(App);
 app.use(router);

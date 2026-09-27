@@ -1,19 +1,10 @@
 <template>
   <div class="script-side">
     <div class="side-head">
-      <el-popover trigger="click" placement="bottom-start">
-        <template #reference>
-          <button type="button" class="filter-btn">
-            <span class="filter-label">{{ filterLabel }}</span>
-            <span class="filter-arrow">▾</span>
-          </button>
-        </template>
-        <el-checkbox-group v-model="selected" class="filter-options">
-          <el-checkbox v-for="option in FILTER_OPTIONS" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </el-checkbox>
-        </el-checkbox-group>
-      </el-popover>
+      <button ref="filterEl" type="button" class="filter-btn" @click="openFilter">
+        <span class="filter-label">{{ filterLabel }}</span>
+        <span class="filter-arrow">▾</span>
+      </button>
 
       <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
         <el-button text class="icon-btn" :icon="Plus" @click="emit('create')" />
@@ -50,9 +41,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
+import { ipcRenderer, type IpcRendererEvent } from 'electron';
 import { FolderOpened, Plus } from '@element-plus/icons-vue';
-import type { ScriptType } from '@common/types';
+import { IPC } from '@common/ipcChannels';
+import type { ScriptType, TypeFilterOpenData } from '@common/types';
 import { TYPE_LABELS, type SideItem } from './script-list';
 
 /** 过滤取值：三种已知类型 + 「一个类型都没识别到」 */
@@ -83,6 +76,10 @@ const emit = defineEmits<{
 /** 默认全选：不筛就是全部 */
 const selected = ref<FilterValue[]>(FILTER_OPTIONS.map((option) => option.value));
 const collapsed = ref(false);
+/** 过滤触发按钮：浮窗要按它的位置定位 */
+const filterEl = ref<HTMLElement | null>(null);
+/** 浮窗回发的订阅：浮窗是复用的，每次打开前先摘掉上一次那个 */
+let filterListener: ((event: IpcRendererEvent, selected: string[]) => void) | null = null;
 
 /**
  * 触发按钮上那一行：部分勾选时把名字用「、」连起来（Steam 那个下拉就是这么写的），
@@ -104,6 +101,43 @@ const filterLabel = computed(() => {
 const visibleItems = computed(
   () => props.items.filter((item) => item.state === 'new' || matchesFilter(item.types)),
 );
+
+onBeforeUnmount(() => {
+  if (filterListener !== null) {
+    ipcRenderer.removeListener(IPC.TYPE_FILTER_CHANGED, filterListener);
+    filterListener = null;
+  }
+});
+
+/**
+ * 打开类型过滤浮窗：与脚本下拉是同一个原生浮窗，只是内容换成多选。
+ *
+ * 勾选结果由 TYPE_FILTER_CHANGED 持续回发，窗口不收起——点到别处失焦或按 Esc 时才收。
+ */
+function openFilter(): void {
+  const rect = filterEl.value?.getBoundingClientRect();
+  if (!rect) {
+    return;
+  }
+
+  if (filterListener !== null) {
+    ipcRenderer.removeListener(IPC.TYPE_FILTER_CHANGED, filterListener);
+  }
+  filterListener = (_event: IpcRendererEvent, next: string[]) => {
+    selected.value = next.filter((value): value is FilterValue => (
+      FILTER_OPTIONS.some((option) => option.value === value)
+    ));
+  };
+  ipcRenderer.on(IPC.TYPE_FILTER_CHANGED, filterListener);
+
+  const data: TypeFilterOpenData = {
+    options: FILTER_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    selected: [...selected.value],
+    controlRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+    listHeight: FILTER_OPTIONS.length * 32,
+  };
+  void ipcRenderer.invoke(IPC.TYPE_FILTER_OPEN, data);
+}
 
 /** 草稿的类型未知（见 SideItem），不参与过滤：否则刚新建一个脚本就会被筛没 */
 function matchesFilter(types: ScriptType[]): boolean {
@@ -172,16 +206,6 @@ function matchesFilter(types: ScriptType[]): boolean {
 
 .filter-btn:hover {
   box-shadow: 0 0 0 1px #3e4044 inset;
-}
-
-/* 勾选项竖着排；尺寸一律交给 Element Plus 默认值 */
-.filter-options {
-  display: flex;
-  flex-direction: column;
-}
-
-.filter-options .el-checkbox {
-  margin-right: 0;
 }
 
 .filter-label {

@@ -319,11 +319,29 @@ export interface ScriptListInitData {
   selectedId: number | null;
 }
 
-/** 脚本下拉浮窗的打开请求，除候选数据外还需定位信息 */
-export interface ScriptListOpenData extends ScriptListInitData {
+/** 类型过滤浮窗的一项 */
+export interface TypeFilterOption {
+  value: string;
+  label: string;
+}
+
+/** 类型过滤浮窗的内容：候选与当前勾选 */
+export interface TypeFilterInitData {
+  options: TypeFilterOption[];
+  selected: string[];
+}
+
+/** 浮窗的定位信息：触发控件在所在窗口里的位置，以及期望的高度 */
+export interface DropdownPlacement {
   controlRect: { x: number; y: number; width: number; height: number };
   listHeight: number;
 }
+
+/** 脚本下拉浮窗的打开请求，除候选数据外还需定位信息 */
+export interface ScriptListOpenData extends ScriptListInitData, DropdownPlacement {}
+
+/** 类型过滤浮窗的打开请求，同样是内容 + 定位 */
+export interface TypeFilterOpenData extends TypeFilterInitData, DropdownPlacement {}
 
 // ------------------------------------------------------------
 // 后台任务
@@ -476,10 +494,12 @@ export type TaskMoveDirection = 'up' | 'down';
  * 所有浮窗共用同一个窗口（同一时刻只可能有一个可见），靠 kind 切换渲染哪个组件；
  * 新增一种浮窗就在这里加一个字面量，并在渲染进程的 PopupHost 里登记对应组件。
  */
-export type PopupKind = 'script-list';
+export type PopupKind = 'script-list' | 'type-filter';
 
 /** 推给浮窗宿主的数据：kind 决定渲染哪个组件，payload 是那个组件自己的入参 */
-export type PopupShowData = { kind: 'script-list'; payload: ScriptListInitData };
+export type PopupShowData =
+  | { kind: 'script-list'; payload: ScriptListInitData }
+  | { kind: 'type-filter'; payload: TypeFilterInitData };
 
 /**
  * 加载服务的状态：由主进程公布，加载页只负责展示。

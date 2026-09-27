@@ -88,8 +88,16 @@ export const IPC = {
   DROPDOWN_SELECT: 'script-list:select',
   DROPDOWN_SELECTED: 'script-list:selected',
 
+  // 类型过滤浮窗：自己一组，不与脚本下拉共用——多选、勾完不关窗，行为本来就不同
+  TYPE_FILTER_OPEN: 'type-filter:open',
+  /** 每勾一次回发一次当前选择 */
+  TYPE_FILTER_CHANGE: 'type-filter:change',
+  TYPE_FILTER_CHANGED: 'type-filter:changed',
+
   // 仿原生浮窗宿主：一个窗口服务全部浮窗，内容与位置在每次展开时推给它
   POPUP_SHOW: 'popup:show',
+  /** 浮窗是否可见：主窗口据此决定要不要跟着失焦压暗 */
+  POPUP_VISIBLE: 'popup:visible',
   POPUP_STATE: 'popup:state',
   POPUP_HIDE: 'popup:hide',
 
