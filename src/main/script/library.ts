@@ -158,7 +158,7 @@ export async function importScripts(sourcePaths: string[]): Promise<ScriptImport
       await writeFileAtomic(filePath, source);
 
       const base = basename(sourcePath);
-      const name = base.replace(/\.[^.]*$$/, '') || base;
+      const name = base.replace(/\.[^.]*$/, '') || base;
       const script = insertScript(name, filePath, false);
       setScriptTypes(script.id, inspectScript(source, filePath).types);
       imported.push(getScriptById(script.id)!);

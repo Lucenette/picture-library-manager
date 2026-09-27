@@ -75,7 +75,7 @@ export function describeCompileError(error: unknown): ScriptCompileError {
   const stack = error instanceof Error ? (error.stack ?? '') : '';
   const lines = stack.split('\n');
 
-  const syntax = /:(\d+)$$/.exec(lines[0] ?? '');
+  const syntax = /:(\d+)$/.exec(lines[0] ?? '');
   if (error instanceof SyntaxError && syntax !== null) {
     const caret = (lines[2] ?? '').indexOf('^');
     return { message, line: Number(syntax[1]), column: caret >= 0 ? caret + 1 : null };

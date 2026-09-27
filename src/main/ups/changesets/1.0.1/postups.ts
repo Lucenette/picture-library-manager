@@ -7,7 +7,7 @@ import { ensureScriptsDir, newScriptPath, scriptFileExists, writeFileAtomic } fr
 
 /** 去掉名字末尾的脚本扩展名：`default.js` → `default` */
 function stripScriptExtension(name: string): string {
-  return name.replace(/\.(c|m)?js$$/, '');
+  return name.replace(/\.(c|m)?js$/, '');
 }
 
 /**
