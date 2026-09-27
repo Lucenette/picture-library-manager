@@ -30,7 +30,7 @@
 1. 脚本正文存在 `用户目录/scripts/<uuid>.js`（不在 `data/` 下面），库里只留索引；界面能看、能改、能报错，不必再回文件管理器。
 2. 「加载脚本文件」= 复制：原始文件此后不再被读写。
 3. 未保存的编辑跨脚本切换、跨页面切换、跨应用重启都不丢，并能显式放弃回到磁盘版本。
-4. 编译失败是一等信息：编辑器行内标记 + 问题面板 + 类型清空 + 任务报同一个错误。
+4. 有问题要看得见：编辑器行内标记（整行染色）+ 右上角一个状态图标（IDEA 那个 widget 的做法，没问题绿勾、有问题红叹号，细节走 tooltip）+ 类型清空 + 任务报同一个错误。
 5. **老库升级不丢任何脚本源码**：删 `code` 列之前先把每一行的源码落成 `scripts/` 下的文件并逐行校验。这是 ups 前置（版本目录 + preups/postups）存在的全部意义。
 
 **非目标**
@@ -114,7 +114,7 @@
 | 位置 | 职责 |
 |---|---|
 | **新增** `src/main/script/files.ts` | 文件布局（根目录从 `paths.ts` 取）：`newScriptPath()`（`randomUUID() + '.js'`）、`writeFileAtomic()`（tmp + rename）、读写删脚本文件、读写草稿。纯文件 IO，不碰数据库 |
-| **新增** `src/main/script/library.ts` | 编排：接管、内置落盘、读取、导入、保存、全部重新检测、删除、恢复默认、草稿；`readScriptSource()` 按 path + mtime + size 缓存文件内容 |
+| **新增** `src/main/script/library.ts` | 编排：接管、内置落盘、读取、导入、保存、删除、恢复默认、草稿；`readScriptSource()` 按 path + mtime + size 缓存文件内容 |
 | **新增** `src/main/script/ipc.ts` | 注册 `SCRIPT_*` 通道（`initScriptIpc()`），在 `src/main/index.ts` 的「其余初始化」里与 `initTaskIpc()` 并列 |
 | `src/main/script/compile.ts` | `compileScriptModule(code, filename)` 加文件名参数；新增 `describeCompileError()` 把异常转成「消息 + 行列」 |
 | `src/main/script/script-service.ts` | `executeScript` 改走 `readScriptSource`（读文件 + 每次编译），错误信息带脚本名与路径 |
@@ -127,13 +127,12 @@
 - **保存**：名称非空 → 无 id 则生成 `scripts/<uuid>.js` → **原子写文件**（编译失败也照写）→ 用真实路径编译得到类型或错误 → 建行或更新 `name`/`loaded_at`（名称变了就走 `renameScript()`，由它顺带更新图库里的名字副本）→ 写类型关联（失败写空）→ 删草稿 → 返回 `{ script, compileError }`。
 - **导入**：逐个源路径 try，读源文件 → 复制到 `scripts/<uuid>.js` → 编译检测类型 → 建行（**名称取源文件名去掉扩展名**，`default.js` → `default`；今天带着扩展名，存量行在接管时一并剥掉）；失败的收进结果里由界面汇总提示。
 - **读取**：读文件（缺失则空正文 + 「脚本文件不存在」错误）→ 编译并返回错误；**只有内容来自磁盘文件时才更新类型关联**。不变量：**类型关联永远描述磁盘上的版本**，草稿只影响显示。
-- **全部重新检测**：逐个读文件 + 编译 + 更新类型，返回每个脚本的错误，由界面汇总。只在用户点按钮时跑——它等于执行一遍所有脚本的顶层代码。
 - **删除**：非内置 → 删类型关联 → 删行 → 删文件（不存在就忽略）→ 删草稿。**不动 `processed_image`**：名字副本在最后一次改名时已经同步过（见 3.2），删掉脚本正好让它成为最后一份记录；`script_id` 留作历史引用（悬空无害，AUTOINCREMENT 不复用 id）。确认框先显示受影响的图库条数。
 - **恢复默认**：把出厂源码写回内置那条的文件，更新时间戳并重新检测类型，删草稿。
 
 ### 3.7 IPC
 
-新增 `SCRIPT_*` 组（`script:list` / `listByType` / `read` / `import` / `save` / `delete` / `usage` / `resetBuiltin` / `refreshAll` / `draftList` / `draftPut` / `draftDelete`），`DB` 通道不再承载脚本操作。删除 `SCRIPT_RENAME_CONFIRMED`——改名走「名称输入框 + 保存」这一条路径。
+新增 `SCRIPT_*` 组（`script:list` / `listByType` / `read` / `import` / `save` / `delete` / `usage` / `resetBuiltin` / `draftList` / `draftPut` / `draftDelete`），`DB` 通道不再承载脚本操作。删除 `SCRIPT_RENAME_CONFIRMED`——改名走「名称输入框 + 保存」这一条路径。
 
 草稿 key：已入库脚本 `script-<id>`，新建未保存 `new-<uuid>`。
 
@@ -152,7 +151,7 @@
 └──────────────┴───────────────────────────────────────────────┘
 ```
 
-左栏 220px 只做切换（名称 + 未保存圆点），不用 `el-table`/`el-pagination`；右栏是头部（名称、类型标签、未保存徽标、文件路径、按钮组）+ 常驻编辑器 + 问题面板（有错自动展开，无错显示「编译通过」）。页面横向不内缩，代码区尽量宽。
+左栏 220px 只做切换（名称 + 未保存圆点），不用 `el-table`/`el-pagination`；右栏是头部（名称、类型标签、未保存徽标、文件路径、按钮组）+ 常驻编辑器 + 浮在编辑区右上角的状态图标（绿勾 / 红叹号，tooltip 里给行列与消息）。页面横向不内缩，代码区尽量宽。
 
 组件：`views/main/ScriptPage.vue`（重写，状态编排与草稿）、`views/main/scripts/ScriptSideList.vue`、`ScriptEditor.vue`、`MonacoEditor.vue`、`monaco-env.ts`，加 `services/script-service.ts`（IPC 薄包装）。`views/` 下已有 `dialogs/control/` 这种嵌套先例。
 

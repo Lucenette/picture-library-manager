@@ -4,8 +4,8 @@ import { IPC } from '@common/ipcChannels';
 import type { ScriptType } from '@common/types';
 
 import {
-  deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
-  listScriptsByType, putScriptDraft, readScript, refreshAllScripts, resetBuiltinScript, saveScript,
+  checkScript, deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
+  listScriptsByType, putScriptDraft, readScript, resetBuiltinScript, saveScript,
 } from '@/script/library';
 
 /** 保存命令的入参：草稿 key 由渲染进程给，保存成功后要删掉它 */
@@ -26,12 +26,13 @@ export function initScriptIpc(): void {
   ipcMain.handle(IPC.SCRIPT_LIST, () => listScripts());
   ipcMain.handle(IPC.SCRIPT_LIST_BY_TYPE, (_event, type: ScriptType) => listScriptsByType(type));
   ipcMain.handle(IPC.SCRIPT_READ, (_event, id: number) => readScript(id));
+  // 检查不落任何东西：编辑时按防抖调它，状态图标与类型标签不必等到保存才更新
+  ipcMain.handle(IPC.SCRIPT_CHECK, (_event, code: string, filePath: string) => checkScript(code, filePath));
   ipcMain.handle(IPC.SCRIPT_IMPORT, (_event, paths: string[]) => importScripts(paths));
   ipcMain.handle(IPC.SCRIPT_SAVE, (_event, input: SaveScriptInput) => saveScript(input));
   ipcMain.handle(IPC.SCRIPT_DELETE, (_event, id: number) => deleteScript(id));
   ipcMain.handle(IPC.SCRIPT_USAGE, (_event, id: number) => getScriptUsage(id));
   ipcMain.handle(IPC.SCRIPT_RESET_BUILTIN, (_event, id: number) => resetBuiltinScript(id));
-  ipcMain.handle(IPC.SCRIPT_REFRESH_ALL, () => refreshAllScripts());
   ipcMain.handle(IPC.SCRIPT_DRAFT_LIST, () => listScriptDrafts());
   ipcMain.handle(IPC.SCRIPT_DRAFT_PUT, (_event, key: string, draft: { name: string; code: string }) =>
     putScriptDraft(key, draft),

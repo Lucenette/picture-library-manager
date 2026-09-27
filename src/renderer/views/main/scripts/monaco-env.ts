@@ -58,6 +58,9 @@ monaco.editor.defineTheme('plmanager-dark', {
 monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
   noSyntaxValidation: false,
+  // 建议类诊断（如 80001「这是 CommonJS，可以转成 ES 模块」）也关掉：
+  // 我们的脚本就是 CJS，这条建议是错的，它只会出现在悬停里干扰人
+  noSuggestionDiagnostics: true,
 });
 monaco.typescript.javascriptDefaults.setCompilerOptions({
   allowJs: true,

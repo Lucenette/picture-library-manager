@@ -2,7 +2,8 @@ import { ipcRenderer } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
 import type {
-  ProcessScript, ScriptDraft, ScriptImportResult, ScriptReadResult, ScriptSaveResult, ScriptType,
+  ProcessScript, ScriptCompileError, ScriptDraft, ScriptImportResult, ScriptReadResult, ScriptSaveResult,
+  ScriptType,
 } from '@common/types';
 
 /**
@@ -23,6 +24,17 @@ export function listScriptsByType(type: ScriptType): Promise<ProcessScript[]> {
 /** 打开一个脚本：磁盘正文 + 编译结果（有草稿则是草稿的）+ 它的草稿 */
 export function readScript(id: number): Promise<ScriptReadResult> {
   return ipcRenderer.invoke(IPC.SCRIPT_READ, id) as Promise<ScriptReadResult>;
+}
+
+/** 只检查一段代码（导出了哪些方法、有没有错），不写任何东西也就不会改任何状态 */
+export function checkScript(
+  code: string,
+  filePath: string,
+): Promise<{ types: ScriptType[]; compileError: ScriptCompileError | null }> {
+  return ipcRenderer.invoke(IPC.SCRIPT_CHECK, code, filePath) as Promise<{
+    types: ScriptType[];
+    compileError: ScriptCompileError | null;
+  }>;
 }
 
 /** 导入脚本：主进程把源文件复制进用户目录的 scripts/ 下 */
@@ -53,11 +65,6 @@ export function getScriptUsage(id: number): Promise<number> {
 /** 用出厂源码覆盖内置脚本 */
 export function resetBuiltinScript(id: number): Promise<ScriptSaveResult> {
   return ipcRenderer.invoke(IPC.SCRIPT_RESET_BUILTIN, id) as Promise<ScriptSaveResult>;
-}
-
-/** 全部重新检测：逐条读文件 + 编译 + 更新类型 */
-export function refreshAllScripts(): Promise<ScriptSaveResult[]> {
-  return ipcRenderer.invoke(IPC.SCRIPT_REFRESH_ALL) as Promise<ScriptSaveResult[]>;
 }
 
 /** 全部未保存的草稿：进页面时读一次 */

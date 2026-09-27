@@ -51,6 +51,19 @@ export function listScriptsByType(type: ScriptType): ProcessScript[] {
   return getScriptsByType(type);
 }
 
+/**
+ * 只做检查：编译一段代码，报告它导出了哪些方法与错误。
+ *
+ * **什么都不落**——不写文件、不动类型关联、不碰草稿（草稿由 putScriptDraft 负责）。
+ * 编辑时按防抖调它，于是状态图标与类型标签用的一直是最新的那份代码，不必等到保存。
+ */
+export function checkScript(
+  code: string,
+  filePath: string,
+): { types: ScriptType[]; compileError: ScriptCompileError | null } {
+  return inspectScript(code, filePath);
+}
+
 /** 图库里有几条记录来自这个脚本：删除前的确认框要显示它 */
 export function getScriptUsage(id: number): number {
   return countProcessedByScript(id);
@@ -157,24 +170,6 @@ export async function importScripts(sourcePaths: string[]): Promise<ScriptImport
   return { imported, failed };
 }
 
-/** 重新检测全部脚本：读文件、编译、更新类型，返回每个脚本的错误 */
-export async function refreshAllScripts(): Promise<ScriptSaveResult[]> {
-  const results: ScriptSaveResult[] = [];
-
-  for (const script of getAllScripts()) {
-    if (!(await scriptFileExists(script.filePath))) {
-      setScriptTypes(script.id, []);
-      results.push({ script, compileError: missingFileError(script.filePath) });
-      continue;
-    }
-    const code = await readScriptSource(script.filePath);
-    const inspected = inspectScript(code, script.filePath);
-    setScriptTypes(script.id, inspected.types);
-    results.push({ script: getScriptById(script.id)!, compileError: inspected.compileError });
-  }
-
-  return results;
-}
 
 // ------------------------------------------------------------
 // 删除与恢复默认

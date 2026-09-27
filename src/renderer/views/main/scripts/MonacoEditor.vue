@@ -9,6 +9,8 @@ import { monaco } from './monaco-env';
 
 const props = defineProps<{
   modelValue: string;
+  /** 当前文档的 key（`script-<id>` / `new-<uuid>`）：一份文档一个 model，撤销历史与光标按它保留 */
+  documentKey: string;
   /** 当前显示内容的编译错误；行列取不到时标记退回第一行 */
   error: ScriptCompileError | null;
 }>();
@@ -16,26 +18,108 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void;
   (event: 'save'): void;
+  /** Monaco 自己的诊断条数变化（含我们设的编译标记），界面上的状态图标据此变色 */
+  (event: 'problems', count: number): void;
 }>();
 
 const hostEl = ref<HTMLElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 
-/** 正在把外部内容灌进编辑器：这一轮的内容变化不要再抛回去，否则会绕成环 */
+/** 一份文档一个 model：换脚本只换 model，撤销栈按 model 的 URI 记账，所以切走再切回来还能撤销 */
+const models = new Map<string, monaco.editor.ITextModel>();
+/** 每份文档的光标与滚动位置，跟着 model 一起保留 */
+const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>();
+
+/** 出错那一行整行染色的装饰集合 */
+let errorLine: monaco.editor.IEditorDecorationsCollection | null = null;
+/** marker 变化的订阅：Monaco 的语法诊断是异步算出来的，得靠它上报 */
+let markerSubscription: monaco.IDisposable | null = null;
+/** 正在把外部内容灌进编辑器：这一轮的变化不要再抛回去，否则会绕成环 */
 let applying = false;
 
-/** 把 props 的内容同步进编辑器（切脚本、放弃修改、保存回填都会走到这里） */
+/** 取当前文档的 model，没有就建一个 */
+function modelFor(key: string): monaco.editor.ITextModel {
+  const existing = models.get(key);
+  if (existing !== undefined) {
+    return existing;
+  }
+  const created = monaco.editor.createModel(props.modelValue, 'javascript');
+  models.set(key, created);
+  return created;
+}
+
+/** 找出某个 model 挂在哪个 key 上 */
+function keyOfModel(model: monaco.editor.ITextModel): string | undefined {
+  for (const [key, item] of models) {
+    if (item === model) {
+      return key;
+    }
+  }
+  return undefined;
+}
+
+/** 换文档：存下旧的位置、换上（或新建）对应 model、恢复位置 */
+function switchDocument(): void {
+  const current = editor;
+  if (current === null) {
+    return;
+  }
+
+  const previous = current.getModel();
+  const previousKey = previous === null ? undefined : keyOfModel(previous);
+  if (previous !== null && previousKey !== undefined) {
+    viewStates.set(previousKey, current.saveViewState());
+  }
+
+  // 新建脚本保存后 key 会从 new-x 变成 script-7，而内容一个字没动：
+  // 这种时候沿用同一个 model，撤销历史不至于在"第一次保存"时断掉
+  if (!models.has(props.documentKey) && previous !== null && previous.getValue() === props.modelValue) {
+    if (previousKey !== undefined) {
+      models.delete(previousKey);
+    }
+    models.set(props.documentKey, previous);
+  }
+
+  const model = modelFor(props.documentKey);
+  if (current.getModel() !== model) {
+    current.setModel(model);
+    current.restoreViewState(viewStates.get(props.documentKey) ?? null);
+  }
+  applyMarkers();
+  reportProblems();
+}
+
+/**
+ * 同一份文档里内容被换掉（放弃修改、恢复默认）。
+ *
+ * 这里是**整块替换**，Monaco 会连编辑历史一起清掉（`_setValueFromTextBuffer` 里的
+ * commandManager.clear()）——正是这两个动作该有的语义。
+ */
 function syncValue(): void {
-  if (!editor || editor.getValue() === props.modelValue) {
+  const model = editor?.getModel();
+  if (!model || model.getValue() === props.modelValue) {
     return;
   }
   applying = true;
-  editor.setValue(props.modelValue);
+  model.setValue(props.modelValue);
   applying = false;
 }
 
-/** 出错那一行整行染色的装饰集合：Monaco 的波浪线只有一两个字符宽，定位不如整行显眼 */
-let errorLine: monaco.editor.IEditorDecorationsCollection | null = null;
+/**
+ * 把当前模型上的诊断条数报给外面。
+ *
+ * 只数 Monaco 自己的诊断（`owner !== 'plmanager'`）：我们自己设的编译标记是另一条信息，
+ * 把它也算进来会让「改好了」之后计数迟迟不归零。
+ */
+function reportProblems(): void {
+  const model = editor?.getModel();
+  if (!model) {
+    emit('problems', 0);
+    return;
+  }
+  const own = monaco.editor.getModelMarkers({ resource: model.uri }).filter((marker) => marker.owner !== 'plmanager');
+  emit('problems', own.length);
+}
 
 /** 把编译错误画进代码：插入符位置一条标记 + 出错那一行整行淡红 */
 function applyMarkers(): void {
@@ -66,7 +150,8 @@ function applyMarkers(): void {
   errorLine?.set([
     { range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'plm-error-line' } },
   ]);
-  editor?.revealLineInCenterIfOutsideViewport(line);
+  // 不把视口弹到出错行：很多人是边写边存的，写着写着被抢走视线很烦；
+  // 那一行有整行染色与概览标尺，找得到
 }
 
 onMounted(() => {
@@ -75,13 +160,13 @@ onMounted(() => {
   }
 
   editor = monaco.editor.create(hostEl.value, {
-    value: props.modelValue,
-    language: 'javascript',
+    model: modelFor(props.documentKey),
     theme: 'plmanager-dark',
     // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
     automaticLayout: true,
     minimap: { enabled: false },
-    fontSize: 13,
+    // 与应用的基础字号一致（--el-font-size-base 也是 14px），Monaco 默认的 12 在深色底上偏小
+    fontSize: 14,
     tabSize: 4,
     insertSpaces: true,
     // 滚到底之后还能继续滚：最后一行可以升到视口顶部，改文件末尾时不用挤在屏幕最下边
@@ -107,14 +192,25 @@ onMounted(() => {
 
   errorLine = editor.createDecorationsCollection([]);
   applyMarkers();
+  // 我们设的编译标记与 Monaco 的语法诊断都会触发它，状态图标因此能实时反映问题
+  markerSubscription = monaco.editor.onDidChangeMarkers(() => reportProblems());
+  reportProblems();
 });
 
+watch(() => props.documentKey, switchDocument);
 watch(() => props.modelValue, syncValue);
 watch(() => props.error, applyMarkers, { deep: true });
 
 onBeforeUnmount(() => {
+  markerSubscription?.dispose();
+  markerSubscription = null;
   editor?.dispose();
   editor = null;
+  for (const model of models.values()) {
+    model.dispose();
+  }
+  models.clear();
+  viewStates.clear();
 });
 </script>
 

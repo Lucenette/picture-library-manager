@@ -6,9 +6,9 @@
         <el-tag v-for="type in types" :key="type" size="small" type="warning">{{ typeLabel(type) }}</el-tag>
         <el-tag v-if="types.length === 0" size="small" type="info">未识别到可用方法</el-tag>
       </div>
-      <span v-if="dirty" class="dirty">未保存</span>
+      <!-- 没有保存按钮：现代编辑器都靠快捷键，这里把提示放在「未保存」标记上 -->
+      <span v-if="dirty" class="dirty">未保存 · Ctrl+S</span>
       <div class="head-actions">
-        <el-button size="small" type="primary" @click="emit('save')">保存 Ctrl+S</el-button>
         <el-button size="small" :disabled="!dirty" @click="emit('discard')">放弃修改</el-button>
         <el-button v-if="builtin" size="small" @click="emit('reset')">恢复默认</el-button>
         <el-button v-else size="small" type="danger" @click="emit('remove')">删除</el-button>
@@ -18,35 +18,39 @@
     <p class="path">{{ filePath || '还没有落盘：按 Ctrl+S 保存后会生成文件' }}</p>
 
     <div class="editor-body">
-      <MonacoEditor v-model="code" :error="error" @save="emit('save')" />
+      <MonacoEditor v-model="code" :document-key="documentKey" :error="error" @save="emit('save')" />
 
       <!--
         编译状态悬浮在编辑区右上角（IDEA 那样）。
         有错时往下让一格：Monaco 自己的 marker 计数与跳转条占着最上沿那一条。
       -->
-      <div
-        class="status"
-        :class="{ 'has-error': error !== null, 'is-draft': error === null && dirty }"
-        :style="{ top: error === null ? '8px' : '34px' }"
-      >
-        <span v-if="error" class="status-text" :title="errorTitle">
-          第 {{ error.line ?? 1 }} 行第 {{ error.column ?? 1 }} 列：{{ error.message }}
-        </span>
-        <!--
-          编译只在「打开」与「保存」时发生（这是约定），所以身上有未保存改动时不能宣称通过：
-          下面这条说的永远是「最近一次编译」的结果，草稿的状态就是「还没编译」。
-        -->
-        <span v-else-if="dirty" class="status-draft" title="按 Ctrl+S 保存时才会编译草稿">
-          草稿未保存
-        </span>
-        <span v-else class="status-ok" title="当前显示的是磁盘上的版本">编译通过</span>
-      </div>
+      <!--
+        状态只用一个图标（IDEA 那个 widget 的做法）：没问题绿勾，有问题红叹号，细节走 tooltip。
+        两种来源合并到这里：Monaco 自带的实时语法诊断（problemCount）与主进程的编译错误（error）。
+      -->
+      <el-tooltip :content="problemTitle" placement="left" :show-after="200">
+        <div class="status" :class="{ 'has-problem': hasProblem }">
+          <!-- 对勾自己画：el-icon 的 Check 是细线，14px 下被抗锯齿磨得更淡 -->
+          <svg v-if="!hasProblem" class="status-check" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M3 8.5 L6.5 12 L13 4.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <el-icon v-else><WarningFilled /></el-icon>
+        </div>
+      </el-tooltip>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { WarningFilled } from '@element-plus/icons-vue';
 import type { ScriptCompileError, ScriptType } from '@common/types';
 import MonacoEditor from './MonacoEditor.vue';
 
@@ -60,8 +64,12 @@ const TYPE_LABELS: Record<ScriptType, string> = {
 const props = defineProps<{
   name: string;
   code: string;
+  /** 当前脚本的 key：编辑器按它保留撤销历史与光标 */
+  documentKey: string;
   types: ScriptType[];
   error: ScriptCompileError | null;
+  /** Monaco 自带的实时语法诊断条数：它比主进程编译更早发现写坏了的草稿 */
+  problemCount: number;
   dirty: boolean;
   builtin: boolean;
   filePath: string;
@@ -87,13 +95,19 @@ const code = computed({
   set: (value: string) => emit('update:code', value),
 });
 
-/** 悬浮条上放不下整条消息，截断显示、完整内容进 title */
-const errorTitle = computed(() => {
+/** 有问题：主进程编译报错，或者 Monaco 实时诊断出语法问题 */
+const hasProblem = computed(() => props.error !== null || props.problemCount > 0);
+
+/** 图标本身不说话，细节放进 tooltip */
+const problemTitle = computed(() => {
   const error = props.error;
-  if (error === null) {
-    return '';
+  if (error !== null) {
+    return `第 ${error.line ?? 1} 行第 ${error.column ?? 1} 列：${error.message}`;
   }
-  return `第 ${error.line ?? 1} 行第 ${error.column ?? 1} 列：${error.message}`;
+  if (props.problemCount > 0) {
+    return `代码里有 ${props.problemCount} 处语法问题`;
+  }
+  return props.dirty ? '没有发现问题；有未保存的改动，按 Ctrl+S 保存' : '没有发现问题';
 });
 
 function typeLabel(type: ScriptType): string {
@@ -153,38 +167,29 @@ function typeLabel(type: ScriptType): string {
   min-height: 0;
 }
 
-/* 悬浮状态条：不吃鼠标事件，免得挡住它下面那一行 */
+/* 状态图标：像 IDEA 的 widget 那样贴住右上角、只占一行高度、没有边框 */
+/* 右边留出滚动条的宽度，免得被那条竖条压住 */
 .status {
   position: absolute;
-  right: 18px;
+  top: 0;
+  right: 16px;
   z-index: 5;
   display: flex;
   align-items: center;
-  max-width: 70%;
-  padding: 2px 10px;
-  border: 1px solid var(--el-border-color);
-  border-radius: 10px;
-  background: rgba(38, 40, 44, 0.92);
-  font-size: 12px;
-  pointer-events: none;
+  height: 22px;
+  padding: 0 6px;
+  /* IDEA 那个绿：默认的 --el-color-success 在深色底上偏暗 */
+  color: #49794d;
+  font-size: 14px;
+  cursor: default;
 }
 
-.status-ok {
-  color: var(--el-color-success);
+.status-check {
+  width: 16px;
+  height: 16px;
 }
 
-.status-draft {
-  color: var(--el-text-color-secondary);
-}
-
-.status.has-error {
-  border-color: var(--el-color-danger);
+.status.has-problem {
   color: var(--el-color-danger);
-}
-
-.status-text {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 </style>

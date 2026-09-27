@@ -6,20 +6,22 @@
       @select="selectKey"
       @create="createScript"
       @import="importFiles"
-      @refresh="refreshAll"
     />
 
     <ScriptEditor
       v-if="activeKey !== ''"
       v-model:name="name"
       v-model:code="code"
+      :document-key="activeKey"
       :types="types"
       :error="error"
+      :problem-count="problemCount"
       :dirty="dirty"
       :builtin="builtin"
       :file-path="filePath"
       @save="save"
       @discard="discard"
+      @problems="problemCount = $event"
       @remove="removeScript"
       @reset="resetBuiltin"
     />
@@ -35,8 +37,8 @@ import { IPC } from '@common/ipcChannels';
 import type { ProcessScript, ScriptCompileError, ScriptDraft, ScriptType } from '@common/types';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import {
-  deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
-  putScriptDraft, readScript, refreshAllScripts, resetBuiltinScript, saveScript,
+  checkScript, deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
+  putScriptDraft, readScript, resetBuiltinScript, saveScript,
 } from '@/services/script-service';
 import ScriptEditor from './scripts/ScriptEditor.vue';
 import ScriptSideList from './scripts/ScriptSideList.vue';
@@ -62,9 +64,6 @@ const DRAFT_DEBOUNCE_MS = 1000;
 const scripts = ref<ProcessScript[]>([]);
 /** 全部未保存的草稿，key 是 `script-<id>` 或 `new-<uuid>` */
 const drafts = ref<Record<string, ScriptDraft>>({});
-/** 编译不过（或文件缺失）的脚本 key：左栏据此标红点 */
-const brokenKeys = ref<Record<string, true>>({});
-
 const activeKey = ref('');
 const name = ref('');
 const code = ref('');
@@ -75,6 +74,8 @@ const builtin = ref(false);
 /** 磁盘上的那一份：用来判断「改了没有」 */
 const baseline = ref({ name: '', code: '' });
 const saving = ref(false);
+/** Monaco 报上来的实时诊断条数 */
+const problemCount = ref(0);
 
 /** 防抖用的定时器；切脚本、失焦、卸载时都要把它立即结算掉 */
 let draftTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,17 +88,33 @@ const dirty = computed(
   () => name.value !== baseline.value.name || code.value !== baseline.value.code,
 );
 
-const sideItems = computed(() =>
-  scripts.value.map((script) => {
+/**
+ * 左栏那一列：新建未保存的草稿排在最前（它们在库里还没有行），其余是库里的脚本。
+ *
+ * 状态照 IDEA 的 git 状态色给名字上色：新建未保存绿、改过未保存蓝、干净用默认色。
+ */
+const sideItems = computed(() => {
+  const items: { key: string; name: string; state: 'new' | 'modified' | 'clean' }[] = [];
+
+  for (const draft of Object.values(drafts.value)) {
+    if (draft.key.startsWith('new-')) {
+      items.push({ key: draft.key, name: draft.name, state: 'new' });
+    }
+  }
+
+  for (const script of scripts.value) {
     const key = keyOfScript(script.id);
-    return {
+    // 活动项的「脏」以编辑框为准，其余项看有没有草稿
+    const modified = key === activeKey.value ? dirty.value : drafts.value[key] !== undefined;
+    items.push({
       key,
       name: drafts.value[key]?.name ?? script.name,
-      dirty: key === activeKey.value ? dirty.value : drafts.value[key] !== undefined,
-      broken: brokenKeys.value[key] === true,
-    };
-  }),
-);
+      state: modified ? 'modified' : 'clean',
+    });
+  }
+
+  return items;
+});
 
 // ------------------------------------------------------------
 // 生命周期
@@ -133,16 +150,24 @@ function onBlur(): void {
   void flushDraft();
 }
 
-/** 名称与正文改了才排草稿；载入脚本时它们与基线一致，不会误写 */
+/** 上一次检查过的正文：内容没变就不必重查（载入脚本时也因此不会白跑一次） */
+let lastCheckedCode: string | null = null;
+
+/**
+ * 正文或名称一改就排一次：先落草稿（脏了才写），再用这份最新代码查一遍状态。
+ *
+ * 判据是「与上次检查过的正文是否相同」，不是 `dirty`：把改动撤回到原样时也要重查，
+ * 否则图标会停在上一次（可能是坏的）结果上。
+ */
 watch([name, code], () => {
-  if (activeKey.value === '' || !dirty.value) {
+  if (activeKey.value === '' || code.value === lastCheckedCode) {
     return;
   }
   if (draftTimer !== null) {
     clearTimeout(draftTimer);
   }
   draftTimer = setTimeout(() => {
-    void flushDraft();
+    void syncDraftAndCheck();
   }, DRAFT_DEBOUNCE_MS);
 });
 
@@ -179,6 +204,38 @@ async function flushDraft(): Promise<void> {
   }
 }
 
+/**
+ * 用当前这份代码查一遍状态：状态图标与类型标签据此更新，不必等到 Ctrl+S。
+ *
+ * 检查是**只读**的（主进程编译一遍、什么都不落）。它失败只是状态展示不出来，
+ * 不弹窗打断，但也不装作没事——写进终端日志。
+ */
+async function checkCurrent(): Promise<void> {
+  const key = activeKey.value;
+  if (key === '') {
+    return;
+  }
+
+  const checkedCode = code.value;
+  try {
+    const checked = await checkScript(checkedCode, filePath.value);
+    if (activeKey.value !== key || code.value !== checkedCode) {
+      return;
+    }
+    error.value = checked.compileError;
+    types.value = checked.types;
+    lastCheckedCode = checkedCode;
+  } catch (caught) {
+    console.error('[script] 检查脚本失败：', caught);
+  }
+}
+
+/** 防抖到点：先落草稿（只有脏了才写），再用这份代码查一遍 */
+async function syncDraftAndCheck(): Promise<void> {
+  await flushDraft();
+  await checkCurrent();
+}
+
 async function loadDrafts(): Promise<void> {
   const list = await listScriptDrafts();
   const next: Record<string, ScriptDraft> = {};
@@ -209,8 +266,13 @@ async function selectKey(key: string): Promise<void> {
   await openKey(key);
 }
 
+/**
+ * 载入一个脚本。
+ *
+ * `activeKey` 一律**最后**赋值：编辑器的 key 与内容一起变，中间不会出现
+ * 「key 已经是新脚本、内容还是旧脚本」的半截状态（那会让编辑器先建错 model 再被覆盖）。
+ */
 async function openKey(key: string): Promise<void> {
-  activeKey.value = key;
   const draft = drafts.value[key];
 
   if (key.startsWith('new-')) {
@@ -223,6 +285,9 @@ async function openKey(key: string): Promise<void> {
     builtin.value = false;
     types.value = [];
     error.value = null;
+    // 新脚本的模板还没查过，留 null 让防抖那一次去查
+    lastCheckedCode = null;
+    activeKey.value = key;
     return;
   }
 
@@ -237,20 +302,12 @@ async function openKey(key: string): Promise<void> {
     types.value = result.types;
     error.value = result.compileError;
     baseline.value = { name: row?.name ?? '', code: result.code };
-    markBroken(key, result.compileError !== null);
+    // readScript 已经在主进程编译过这一版，记下来省掉一次无谓的检查
+    lastCheckedCode = code.value;
+    activeKey.value = key;
   } catch (caught) {
     await alertDialog({ title: '打开脚本失败', message: (caught as Error).message, danger: true });
   }
-}
-
-function markBroken(key: string, broken: boolean): void {
-  const next = { ...brokenKeys.value };
-  if (broken) {
-    next[key] = true;
-  } else {
-    delete next[key];
-  }
-  brokenKeys.value = next;
 }
 
 // ------------------------------------------------------------
@@ -270,8 +327,8 @@ async function createScript(): Promise<void> {
   types.value = [];
   error.value = null;
   activeKey.value = key;
-  // 立刻落一份草稿：保存之前，草稿是这份脚本唯一的家
-  await flushDraft();
+  // 立刻落一份草稿并查一遍：保存之前，草稿是这份脚本唯一的家
+  await syncDraftAndCheck();
 }
 
 async function importFiles(): Promise<void> {
@@ -282,9 +339,6 @@ async function importFiles(): Promise<void> {
 
   const result = await importScripts(paths);
   await loadScripts();
-  for (const script of result.imported) {
-    markBroken(keyOfScript(script.id), false);
-  }
   if (result.failed.length > 0) {
     await alertDialog({
       title: '部分脚本导入失败',
@@ -298,34 +352,7 @@ async function importFiles(): Promise<void> {
   }
 }
 
-async function refreshAll(): Promise<void> {
-  const results = await refreshAllScripts();
-  await loadScripts();
-  const broken: string[] = [];
-  for (const item of results) {
-    const key = keyOfScript(item.script.id);
-    markBroken(key, item.compileError !== null);
-    if (item.compileError !== null) {
-      broken.push(`${item.script.name}：${item.compileError.message}`);
-    }
-  }
-  // 刷新看的是磁盘上的版本，**不能拿它覆盖活动脚本的显示状态**：
-  // 有草稿时编辑器显示的是草稿，那个状态只能由草稿重新编译一次得出
-  if (drafts.value[activeKey.value] !== undefined) {
-    await openKey(activeKey.value);
-  } else if (activeKey.value.startsWith('script-')) {
-    const current = results.find((item) => keyOfScript(item.script.id) === activeKey.value);
-    if (current) {
-      error.value = current.compileError;
-      types.value = current.script.types;
-    }
-  }
-  if (broken.length > 0) {
-    await alertDialog({ title: '有脚本没通过编译', message: broken.join('\n'), danger: true });
-  } else {
-    ElMessage.success('全部脚本都通过编译');
-  }
-}
+
 
 async function save(): Promise<void> {
   if (saving.value || activeKey.value === '') {
@@ -353,14 +380,9 @@ async function save(): Promise<void> {
     builtin.value = result.script.builtin;
     types.value = result.script.types;
     error.value = result.compileError;
-    markBroken(key, result.compileError !== null);
+    lastCheckedCode = code.value;
     await loadScripts();
 
-    if (result.compileError === null) {
-      ElMessage.success('已保存');
-    } else {
-      ElMessage.warning('已保存，但编译没过：看下面的问题');
-    }
   } catch (caught) {
     await alertDialog({ title: '保存失败', message: (caught as Error).message, danger: true });
   } finally {

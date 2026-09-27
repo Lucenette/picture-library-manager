@@ -3,7 +3,6 @@
     <div class="side-actions">
       <el-button size="small" type="primary" @click="emit('create')">新增脚本</el-button>
       <el-button size="small" @click="emit('import')">加载文件</el-button>
-      <el-button size="small" @click="emit('refresh')">全部重新检测</el-button>
     </div>
 
     <div class="side-list">
@@ -12,12 +11,10 @@
         :key="item.key"
         type="button"
         class="side-item"
-        :class="{ active: item.key === activeKey }"
+        :class="[`is-#D#{item.state}`, { active: item.key === activeKey }]"
         @click="emit('select', item.key)"
       >
         <span class="side-name">{{ item.name }}</span>
-        <span v-if="item.dirty" class="side-flag is-dirty" title="有未保存的修改">●</span>
-        <span v-else-if="item.broken" class="side-flag is-broken" title="编译失败或文件缺失">!</span>
       </button>
     </div>
   </div>
@@ -25,7 +22,8 @@
 
 <script setup lang="ts">
 defineProps<{
-  items: { key: string; name: string; dirty: boolean; broken: boolean }[];
+  /** 状态用名字颜色表示，照 IDEA 的 git 状态色：新建未保存绿、改过未保存蓝、干净默认色 */
+  items: { key: string; name: string; state: 'new' | 'modified' | 'clean' }[];
   activeKey: string;
 }>();
 
@@ -33,7 +31,6 @@ const emit = defineEmits<{
   (event: 'select', key: string): void;
   (event: 'create'): void;
   (event: 'import'): void;
-  (event: 'refresh'): void;
 }>();
 </script>
 
@@ -49,7 +46,6 @@ const emit = defineEmits<{
 
 .side-actions {
   display: flex;
-  flex-direction: column;
   gap: 6px;
   padding: 10px;
   border-bottom: 1px solid var(--el-border-color);
@@ -69,7 +65,6 @@ const emit = defineEmits<{
 .side-item {
   display: flex;
   align-items: center;
-  gap: 6px;
   width: 100%;
   padding: 7px 10px 7px 8px;
   border: none;
@@ -92,24 +87,20 @@ const emit = defineEmits<{
   color: #d8dadd;
 }
 
+/* 未保存：新建的绿、改动的蓝，同 IDEA 的 git 状态色 */
+.side-item.is-new .side-name {
+  color: var(--el-color-success);
+}
+
+.side-item.is-modified .side-name {
+  color: var(--el-color-primary);
+}
+
 .side-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.side-flag {
-  flex: none;
-  font-size: 12px;
-}
-
-.side-flag.is-dirty {
-  color: var(--el-color-primary);
-}
-
-.side-flag.is-broken {
-  color: var(--el-color-danger);
 }
 </style>
