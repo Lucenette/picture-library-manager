@@ -39,11 +39,13 @@
 | `src/common/` | **主进程与渲染进程都在用**的契约（类型、IPC 通道名） | 只被单进程使用的模块——放回该进程目录 |
 | `src/main/image/` | 图片处理流水线：目录遍历 + 解码线程池 | 业务语义（任务、进度、图库概念） |
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
-| `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎、升级页 IPC；调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
+| `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎；作为加载服务的一项任务运行，调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
+| `src/main/loading/` | **加载服务**：启动阶段任务的登记与调度（谁阻塞、谁可以预热、跑在哪个进程）、加载页状态与跨进程下发 | 具体任务本身——升级在 `ups/`、预热在渲染进程入口；把业务逻辑写进调度 |
 | `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | 脚本的存储与查询——那是 `database` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
+| `src/renderer/loading/` | 加载服务的渲染进程侧：状态引用、按 id 认领任务、回执、报告就绪 | 任务清单与调度——那在主进程 |
 | `src/renderer/entries/` | **每个窗口类的入口**（`main` / `dialogs` / `viewer` / `popup`）；共用引导在 `entries/shell/`：`page.ts`（`mountPage`，只依赖 `vue`）、`window-chrome.ts`（平台类 + 失焦标记）、`element-plus.ts`（唯一引组件库的地方）、`first-paint.ts`（构建期片段） | 入口自己 import 组件库或 `App.vue`；`shell/page.ts` 不许引 Element Plus，否则小入口又背上整个组件库 |
 | `src/static/` | 构建资源：应用图标、内置默认脚本源码等**只当资源用**的静态文件（图标由 `yarn icon` 生成到 `dist/icons`） | 可执行的主进程 / 渲染进程模块——代码放 `main/`、`renderer/`、`common/`；这里的文件只能以 `?raw` 这类资源方式引入 |
 | `docs/` | 设计说明、不变量、排障；**已落地**的子系统说明放 `docs/design/` | 尚未实施的方案——放进 `docs/roadmap/` |
@@ -164,7 +166,7 @@ function upsertScript(...) {}
 ### 4. 新增 IPC 的归属
 
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
-- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `ups/progress.ts`），由各自模块的 `initXxx()` 在 `src/main/index.ts` 的启动流程里注册。
+- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见第 8 节）。
 
 ### 5. 弹窗一律用原生窗口
 
@@ -207,8 +209,13 @@ function upsertScript(...) {}
 - 升级脚本是普通模块（可以 import 任何东西），但：一律异步 IO；不要自己写 `BEGIN` / `COMMIT`；
   不要吞异常（抛错才回滚，脚本写进库的东西随事务一起不留）；**文件操作不受事务保护**，
   要改或删已有文件就自己先备份，并保证重复执行是安全的。
-- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ `await initUps()`（升级）→ 其余初始化。
-  **升级终态发出之后到所有通道注册完成之间不许有 `await`**，否则渲染进程可能在通道还没注册时就回主界面。
+- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ 升级 → 其余初始化。三者都是**加载服务**
+  （`src/main/loading/`，见 [docs/design/loading.md](docs/design/loading.md)）里的任务：升级与其余初始化
+  都是 `essential`，按登记顺序串行。加载服务的终态在所有 `essential` 任务之后才公布，因此
+  「加载页收到终态时通道必然已经注册好了」是登记表的结论，不再需要额外的时序约定。
+- 启动阶段的活一律 `registerLoadTask()` 登记，不要写在 `startLoading()` 之后。`essential` 跑完才进主界面、
+  失败即整轮失败；`warmup` 与必须的任务并行、跑完不放行、失败只记日志。渲染进程的预热用
+  `target: 'renderer'` 登记，id 加在 `common/ipcChannels.ts` 的 `LOAD_TASK` 里，实现写在渲染进程入口。
 - **破坏性结构变更（删列、删表、改名）之前，先在 preups 里把要保留的数据落成文件并自校验**：列一旦丢掉，
   除了升级前的库备份之外没有第二份副本，而备份是整库回滚、不能只捞回一个字段。落盘放在 SQL 之前、校验放在同一段脚本末尾，
   任一步失败就中止整轮升级——那时列还在。

@@ -1,8 +1,12 @@
 import { createApp } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
+
+import { LOAD_TASK } from '@common/ipcChannels';
+
 import App from '@/App.vue';
 import { installElementPlus } from '@/entries/shell/element-plus';
 import { initWindowChrome } from '@/entries/shell/window-chrome';
+import { initRendererLoading, registerRendererTask } from '@/loading';
 import '@/styles/theme.css';
 import LoadingPage from '@/views/startup/LoadingPage.vue';
 
@@ -35,6 +39,23 @@ initWindowChrome();
 const app = createApp(App);
 app.use(router);
 installElementPlus(app);
+
+/**
+ * 预热脚本管理页：它把整个 Monaco 连同两个 worker 一起吞进自己的 chunk（十几 MB），
+ * 第一次点进去要现场下载、求值，肉眼可见地卡一下。主进程的加载服务负责在启动阶段下发这一步。
+ *
+ * 先等一次空闲再加载：求值 Monaco 会占住渲染进程主线程几百毫秒，抢在首屏之前跑就是白屏，
+ * 抢在首屏之后只是预热晚一点完成。
+ */
+function warmUpEditor(): Promise<unknown> {
+  return new Promise<void>((resolve) => {
+    requestIdleCallback(() => resolve(), { timeout: 2000 });
+  }).then(() => import('@/views/main/ScriptPage.vue'));
+}
+
+registerRendererTask(LOAD_TASK.EDITOR, warmUpEditor);
+// 告诉主进程「可以下发任务了」，顺带取回当前状态
+void initRendererLoading();
 
 // 等首次导航完成再挂载。vue-router 的首次导航是异步的，提前挂载时 App.vue 拿到的 route.path
 // 还是初始的 "/"，于是会先按「主界面」渲染出导航骨架，再切成加载页——肉眼可见地闪一下。

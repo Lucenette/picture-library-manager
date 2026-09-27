@@ -802,7 +802,7 @@ const DB_METHODS: Record<string, DbMethod> = {
 /**
  * 注册数据库通道。
  *
- * 升级页那几条通道不在这里：它们归升级模块（见 ups/progress.ts），由 initUps() 注册。
+ * 加载页那几条通道不在这里：它们归加载服务（见 loading/progress.ts），由 initLoadingIpc() 注册。
  * 本函数由 initDatabase() 调用——数据库的初始化只有那一个入口。
  */
 function registerDbIpc(): void {

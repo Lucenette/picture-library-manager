@@ -88,8 +88,18 @@ export const IPC = {
   POPUP_STATE: 'popup:state',
   POPUP_HIDE: 'popup:hide',
 
-  // 升级模块（ups）：升级页的状态、进度与退出
-  UPS_STATE: 'ups:state',
-  UPS_PROGRESS: 'ups:progress',
-  UPS_QUIT: 'ups:quit',
+  // 启动加载服务：加载页的状态、渲染进程任务的登记与下发
+  LOAD_STATE: 'load:state',
+  LOAD_PROGRESS: 'load:progress',
+  LOAD_QUIT: 'load:quit',
+  /** 主进程 → 渲染进程：下发一个渲染进程任务 */
+  LOAD_TASK: 'load:task',
+  /** 渲染进程 → 主进程：任务跑完的回执 */
+  LOAD_TASK_DONE: 'load:taskDone',
+} as const;
+
+/** 渲染进程侧的加载任务 id：主进程按它下发，渲染进程按它认领实现 */
+export const LOAD_TASK = {
+  /** 预热脚本管理页（连带编辑器那一大坨依赖） */
+  EDITOR: 'editor',
 } as const;

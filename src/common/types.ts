@@ -472,19 +472,39 @@ export type PopupKind = 'script-list';
 /** 推给浮窗宿主的数据：kind 决定渲染哪个组件，payload 是那个组件自己的入参 */
 export type PopupShowData = { kind: 'script-list'; payload: ScriptListInitData };
 
-/** 数据库升级进度；百分比由主进程算好，界面只负责展示 */
-export interface MigrationProgress {
+/**
+ * 加载服务的状态：由主进程公布，加载页只负责展示。
+ *
+ * 任务名与终态（succeeded / failed）由加载服务写，其余字段由任务通过 report() 增补。
+ */
+export interface LoadProgress {
+  /** running = 还在加载，加载页挡着；succeeded = 可以进主界面；failed = 停下来等用户处理 */
   status: 'running' | 'succeeded' | 'failed';
-  /** 待执行的 changeset 总数 */
-  total: number;
-  /** 已完成的条数 */
+  /** 当前「必须」任务的名称，加载页的标题 */
+  title: string;
+  /** 当前步骤的说明（如「1.0.1 添加 builtin 列」）；没有细分的任务为空串 */
+  step: string;
+  /** 已完成 / 总步数；没有细分的任务都是 0 */
   done: number;
-  /** 整体百分比，0-100 */
+  total: number;
+  /** 整体百分比，0-100，由主进程算好 */
   percent: number;
-  /** 当前（或最后一条）changeset 的标题 */
-  currentTitle: string;
   /** 失败原因；成功时为空串 */
   error: string;
-  /** 升级前的备份路径；没有产生备份时为空串 */
-  backupPath: string;
+  /** 附注：升级失败时是备份路径那句话 */
+  note: string;
+}
+
+/** 主进程下发的渲染进程任务 */
+export interface LoadTaskRequest {
+  /** 回执里带回的序号，用来对上等待的一方 */
+  requestId: number;
+  /** 认领键，见 ipcChannels.ts 的 LOAD_TASK */
+  id: string;
+}
+
+/** 渲染进程任务跑完的回执；error 为空串表示成功 */
+export interface LoadTaskResult {
+  requestId: number;
+  error: string;
 }

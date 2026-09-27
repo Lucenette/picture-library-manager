@@ -1,11 +1,15 @@
-import { app, dialog, Menu } from 'electron';
+import { app, dialog, Menu, type BrowserWindow } from 'electron';
+
+import { LOAD_TASK } from '@common/ipcChannels';
+
 import { closeDatabase, initDatabase } from '@/database/db';
 import { initDialogs } from '@/dialogs';
 import { warmPopup } from '@/dialogs/control/popup';
+import { initLoadingIpc, registerLoadTask, startLoading, waitLoadQuit } from '@/loading';
 import { initScriptIpc } from '@/script/ipc';
 import { initTaskIpc } from '@/task/ipc';
 import { taskManager } from '@/task/manager';
-import { initUps, waitUpsQuit } from '@/ups';
+import { initUps } from '@/ups';
 import { closeAll, createMain, get } from '@/window-manager';
 
 // ------------------------------------------------------------
@@ -37,30 +41,36 @@ function configureCommandLine(): void {
 // ------------------------------------------------------------
 
 /**
- * 初始化数据库、执行升级、注册其余通道，并把任务进度通知挂到主窗口上。
+ * 建主窗口、开库，再把这一轮启动要做的事登记给加载服务并跑起来。
  *
  * 窗口排在最前面：它的创建、渲染进程的启动、升级的执行三者尽量重叠，用户尽早看到界面。
- * 主窗口一律先落在加载页，加载页读升级状态，看到终态再自己切回主界面。
+ * 主窗口一律先落在加载页，加载页读加载服务公布的状态，看到终态再自己切回主界面。
  *
  * 顺序是固定的：**先开库，再升级，最后其余初始化**。升级脚本要读写数据目录里的文件、
- * 要假定库已经就绪，而它又该在「其它都还没开始」的状态下动手。
- *
- * 不变量：升级终态发出之后到所有通道注册完成之间不许有 await。加载页收到终态就切回主界面，
- * 它发来的 invoke 要等主进程回到事件循环才会被派发；只要这一段全是同步调用，就不会出现
- * 「通道还没注册就开始 invoke」。往下面加 await 就是破坏它。
+ * 要假定库已经就绪，而它又该在「其它都还没开始」的状态下动手，所以它之后的那一串初始化
+ * 也登记成任务——加载服务的终态排在所有「必须」任务之后才公布，于是「加载页收到终态时
+ * 通道必然已经注册好」不再是一条要人守的约定，而是这张登记表的结论。
  */
 async function bootstrap(): Promise<void> {
   const mainWindow = createMain('/loading');
 
+  // 通道先挂上：渲染进程一挂载就会 invoke 状态快照，那同时是它的「就绪」信号
+  initLoadingIpc();
+
   initDatabase();
 
-  const outcome = await initUps();
-  if (!outcome.ok && !outcome.aborted) {
-    await waitUpsQuit();
-    app.quit();
-    return;
-  }
+  registerLoadTask({ target: 'main', kind: 'essential', title: '数据库升级', run: initUps });
+  registerLoadTask({ target: 'main', kind: 'essential', title: '初始化', run: () => initRest(mainWindow) });
+  registerLoadTask({ target: 'renderer', kind: 'warmup', title: '脚本编辑器', id: LOAD_TASK.EDITOR });
 
+  if (!(await startLoading())) {
+    await waitLoadQuit();
+    app.quit();
+  }
+}
+
+/** 升级之后的其余初始化：全是同步注册，跑完主界面才允许进来 */
+function initRest(mainWindow: BrowserWindow): void {
   initTaskIpc();
   initDialogs();
   initScriptIpc();
