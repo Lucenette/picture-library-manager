@@ -15,6 +15,7 @@ description: 在本仓库改动数据库结构或订正库内数据时使用—�
 
 - [标准流程](#标准流程)
 - [迁移文件的写法](#迁移文件的写法)
+- [数据目录在用户主目录](#数据目录在用户主目录)
 - [改名与改键名](#改名与改键名)
 - [在库副本上预演](#在库副本上预演)
 - [迁移失败或启动报错](#迁移失败或启动报错)
@@ -46,6 +47,16 @@ description: 在本仓库改动数据库结构或订正库内数据时使用—�
 - **转义自己负责**：`<sql>` 里 `<` 写成 `&lt;`、`&` 写成 `&amp;`。解析器不校验，漏写可能被 XML 当成标签吞掉。
 - **身份是 `(author, id, filename)`**：追加新的会被执行；**改一条已经执行过的不会生效**——账本按身份跳过它，而且没有任何校验会告诉你。
 - **账本表 `schema_migration` 由 `changeset.ts` 用代码创建**，不要写进 changelog：账本不存在时，没有任何地方能记录「创建账本」这件事。
+
+## 数据目录在用户主目录
+
+唯一指定的用户数据目录是打包后的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`，开发态是 `dist/data/`）：
+库、备份、示例脚本以及将来的日志都在里面。**不要把它挪回安装目录**——Windows 的覆盖安装会先静默调用旧版卸载器、
+清空整个安装目录，库放那儿等于每次更新都可能丢；Linux 的 deb 装在 root 所有的 `/opt/PLManager`、
+macOS 的 exe 在 `.app` 内部，也都不是能写库的地方。
+
+打包时 `electron-builder.yml` 的 `extraFiles` 会把仓库的 `data/` 复制到安装目录，那只是给人参考的示例脚本，
+**不是数据目录**。数据目录只有 `getDataDir()` 一个来源。
 
 ## 改名与改键名
 
@@ -104,6 +115,7 @@ node .agents/skills/db-maintenance/scripts/verify-migration.mjs
 - [ ] `<sql>` 转义正确，XML 能被 `@xmldom/xmldom` 解析，`changeSet` 数量与预期一致
 - [ ] 只追加在文件末尾；没有改动任何已执行过的 changeset
 - [ ] 涉及改名时三类债都排查过：代码 / 结构 / 库里的 JSON
+- [ ] 改的是数据目录本身的话，`getDataDir()` 与文档里的路径一起改了
 - [ ] `verify-migration.mjs` 的新库与现有库两条路径都通过
 - [ ] `tsc -p tsconfig.node.json` 与 `vue-tsc -p tsconfig.web.json` 通过
 - [ ] 回复里说清哪些已验证、哪些需要使用者启动应用冒烟

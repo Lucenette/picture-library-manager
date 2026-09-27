@@ -147,14 +147,14 @@ yarn build:linux
 
 ```
 picture-library-manager/
-├── data/            # 示例处理脚本，打包时随附
+├── data/            # 示例处理脚本，打包时随附（用户数据在 ~/.plmanager/data/）
 ├── docs/            # 设计说明、路线图、排障（入口见 docs/README.md）
 ├── scripts/         # 仓库自检脚本（文档与 skill）
 ├── src/
 │   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
 │   ├── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
-│   └── static/      # 构建资源：应用图标（构建时生成 dist/icons）
+│   └── static/      # 构建资源：应用图标与安装脚本（图标构建时生成 dist/icons）
 └── .agents/skills/  # 编码代理的工作流（文档规范）
 ```
 

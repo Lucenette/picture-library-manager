@@ -1,6 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
+import { homedir } from 'os';
 import { DatabaseSync } from 'node:sqlite';
-import { basename, dirname, join } from 'path';
+import { basename, join } from 'path';
 import { app, ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import { compileScriptModule } from '@/script/compile';
@@ -142,10 +143,15 @@ function backupDatabase(): void {
 // 生命周期
 // ------------------------------------------------------------
 
-/** 数据库目录：打包后位于 exe 同级的 data/，开发时位于项目 dist/data/ */
+/**
+ * 数据库目录：打包后在用户主目录的 `.plmanager/data/`，开发时在项目的 `dist/data/`。
+ *
+ * 打包态不能用 exe 同级：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录；
+ * Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部——都不是能写库的地方。
+ */
 function getDataDir(): string {
   return app.isPackaged
-    ? join(dirname(app.getPath('exe')), 'data')
+    ? join(homedir(), '.plmanager', 'data')
     : join(process.cwd(), 'dist', 'data');
 }
 
@@ -157,10 +163,20 @@ function getDataDir(): string {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  mkdirSync(dataDir, { recursive: true });
+  console.log('[db] 数据目录：', dataDir);
+
+  try {
+    mkdirSync(dataDir, { recursive: true });
+  } catch (error) {
+    throw new Error(`数据目录不可用：${dataDir}（${error instanceof Error ? error.message : String(error)}）`);
+  }
   dbPath = join(dataDir, DB_FILE_NAME);
 
-  db = new DatabaseSync(dbPath);
+  try {
+    db = new DatabaseSync(dbPath);
+  } catch (error) {
+    throw new Error(`打不开数据库：${dbPath}（${error instanceof Error ? error.message : String(error)}）`);
+  }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
 }

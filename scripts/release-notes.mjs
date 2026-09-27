@@ -125,7 +125,7 @@ out.push('');
 out.push('- **Windows**：安装包未签名，SmartScreen 会提示「未知发布者」，选「更多信息」→「仍要运行」。需要 Windows 10 及以上、x64。');
 out.push('- **macOS**：未签名也未公证，首次打开需右键「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/PLManager.app`。');
 out.push('- **Linux**：AppImage 先 `chmod +x` 再运行；deb 用 `sudo dpkg -i` 安装。');
-out.push('- **数据**：库文件与备份在应用目录下的 `data/`。首次启动（或结构有变更时）会自动执行数据库迁移，**执行前先把整库备份到 `data/backups/`**，保留最近 5 份。安装包自带的 `data/` 只有示例脚本，不会覆盖你的 `picture-lib.db`。');
+out.push('- **数据**：库与备份在你的用户目录下（`~/.plmanager/data/`，Windows 同理），安装、更新、卸载都不会碰到它。1.0.1 及更早的版本把库放在安装目录的 `data/` 下，升级后要手动搬过来。首次启动（或结构有变更时）会自动执行数据库迁移，**执行前先把整库备份到 `data/backups/`**，保留最近 5 份。');
 out.push('- **升级**：直接装新版本即可，无需先卸载。');
 out.push('');
 out.push('---');

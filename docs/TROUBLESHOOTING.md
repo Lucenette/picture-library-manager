@@ -124,9 +124,13 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 | 运行方式 | 路径 |
 |---|---|
 | 开发（`yarn dev`） | `dist/data/picture-lib.db` |
-| 打包后 | exe 同级的 `data/picture-lib.db` |
+| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<你>\.plmanager\data\picture-lib.db`） |
 
-同目录下可能有 `picture-lib.db.bak`（每 30 秒保留一次的上一版）和 `.tmp`（写入过程中的临时文件，正常情况下不会残留）。
+打包后固定落在用户主目录，**不放安装目录**：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录，
+库放那儿等于每次更新都可能丢；而 Linux 的 deb 装在 root 所有的 `/opt/PLManager`、macOS 的 exe 在 `.app` 内部，
+本来也不是能写库的地方。1.0.1 及更早的版本把库放在安装目录的 `data/` 下，升级后要手动搬过来。
+
+同目录下可能有 `picture-lib.db.bak`：定期把库整文件复制一份，供误操作兜底。
 
 ### 想彻底重置
 

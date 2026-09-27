@@ -9,7 +9,7 @@
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
 - **技术栈**：Electron 40 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在 exe 同级的 `data/` 下。
+- **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在用户主目录的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
