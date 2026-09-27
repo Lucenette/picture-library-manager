@@ -14,10 +14,12 @@
       </el-tooltip>
     </div>
 
-    <div class="side-list">
+    <el-scrollbar class="side-list">
       <!-- 分组现在只是外观：只有一组，将来真做分组时这里换成 v-for -->
       <button type="button" class="group-head" @click="collapsed = !collapsed">
-        <span class="group-caret" :class="{ 'is-collapsed': collapsed }">▾</span>
+        <el-icon class="group-icon">
+          <component :is="collapsed ? Folder : FolderOpened" />
+        </el-icon>
         <span class="group-name">未分组</span>
         <span class="group-count">({{ visibleItems.length }})</span>
       </button>
@@ -36,14 +38,14 @@
         </button>
         <p v-if="visibleItems.length === 0" class="side-empty">没有符合筛选的脚本</p>
       </template>
-    </div>
+    </el-scrollbar>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { ipcRenderer, type IpcRendererEvent } from 'electron';
-import { FolderOpened, Plus } from '@element-plus/icons-vue';
+import { Folder, FolderOpened, Plus } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
 import type { ScriptType, TypeFilterOpenData } from '@common/types';
 import { TYPE_LABELS, type SideItem } from './script-list';
@@ -165,6 +167,7 @@ function matchesFilter(types: ScriptType[]): boolean {
   align-items: center;
   gap: 10px;
   padding: var(--page-padding);
+  padding-bottom: 16px;
 }
 
 .side-head .el-button + .el-button {
@@ -224,9 +227,18 @@ function matchesFilter(types: ScriptType[]): boolean {
 .side-list {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: var(--page-padding);
-  padding-top: 10px;
+}
+
+/* 内边距放在内容层：EP 的滚动条要贴着自己那一层，别被内边距推开。上下不加——
+   上面那行表头已经让出过间距了（与 .side-head 的 --page-padding 对齐） */
+.side-list :deep(.el-scrollbar__view) {
+  padding: 0 var(--page-gap);
+}
+
+/* 行距：只在相邻两行之间留 2px（与 DSH 的 `.groupSection > * + *` 同一条规则），
+   高亮背景因此是 32px/34px 一个独立的圆角块，不会和邻行连成一片 */
+.side-list :deep(.el-scrollbar__view) > * + * {
+  margin-top: 2px;
 }
 
 .group-head {
@@ -234,8 +246,10 @@ function matchesFilter(types: ScriptType[]): boolean {
   align-items: center;
   gap: 6px;
   width: 100%;
+  height: 34px;
   padding: 6px 12px;
   border: none;
+  border-radius: var(--el-border-radius-base);
   background: none;
   color: var(--el-text-color-secondary);
   font-size: 13px;
@@ -243,25 +257,22 @@ function matchesFilter(types: ScriptType[]): boolean {
   cursor: pointer;
 }
 
+/* 组头也要有悬停底色（DSH 那边 projectRow 与 sessionRow 是同一条 hover 规则），
+   底色与脚本项一致，形状也跟着项的圆角 */
 .group-head:hover {
+  background: #2b2d30;
   color: var(--el-text-color-regular);
 }
 
-.group-caret {
+/* 组图标：折叠是合着的文件夹、展开是打开的文件夹（接替原来那个 ▾，色不变） */
+.group-icon {
   flex: none;
-  width: 12px;
   color: #82858b;
-  font-size: 11px;
-  text-align: center;
-  transition: transform 0.15s;
+  font-size: 16px;
 }
 
-.group-caret.is-collapsed {
-  transform: rotate(-90deg);
-}
-
+/* 名称按内容宽：后面的计数直接跟在它后面（不再被顶到最右）。名字太长时才由它自己省略 */
 .group-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -269,15 +280,17 @@ function matchesFilter(types: ScriptType[]): boolean {
 }
 
 .group-count {
+  flex: none;
   color: #82858b;
 }
 
-/* 缩进对齐组名：组名在 12 + 12(三角) + 6(间隙) = 30px，这里 2px 竖条 + 28px 内边距同样落到 30px */
+/* 缩进对齐组名：组名在 12（内边距）+ 16（文件夹图标）+ 6（间隙）= 34px */
 .side-item {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 8px 12px 8px 28px;
+  height: 32px;
+  padding: 8px 12px 8px 34px;
   border: none;
   border-radius: var(--el-border-radius-base);
   background: none;
@@ -291,9 +304,8 @@ function matchesFilter(types: ScriptType[]): boolean {
   background: #2b2d30;
 }
 
-/* 选中态与左侧导航栏同一套：一道竖条 + 提亮 */
+/* 选中态：一块圆角底色 + 提亮（与悬停同一块底色，只是文字更亮） */
 .side-item.active {
-  border-left-color: var(--el-color-primary);
   background: #2b2d30;
   color: #d8dadd;
 }
@@ -316,7 +328,7 @@ function matchesFilter(types: ScriptType[]): boolean {
 }
 
 .side-empty {
-  padding: 8px 12px 8px 28px;
+  padding: 8px 12px 8px 34px;
   color: #82858b;
   font-size: 13px;
 }
