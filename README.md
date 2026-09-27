@@ -90,7 +90,7 @@
 
 | 层 | 技术 | 说明 |
 |---|---|---|
-| 桌面壳 | Electron 40 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
+| 桌面壳 | Electron 44 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
 | 前端 | Vue 3 + Vite 6 + TypeScript 5 | Composition API + `<script setup>` |
 | UI 组件 | Element Plus 2 | 暗色主题全覆盖 |
 | 数据库 | SQLite (node:sqlite) | Electron 内置，真实文件 + WAL，单条写入毫秒级落盘 |
@@ -105,7 +105,7 @@
 
 ### 环境要求
 
-- Node.js ≥ 22.12（Electron 40 的要求）
+- Node.js ≥ 22.12（Electron 44 的要求）
 - Yarn（推荐）或 npm
 - Windows 10/11
 
@@ -119,6 +119,10 @@ yarn dev        # 启动开发环境
 yarn preview    # 构建后预览生产产物（不打包）
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
 ```
+
+> Electron 42 起官方不再在 `install` 阶段下载二进制（改成首次运行 `electron .` 时按需拉取）。
+> 本项目在 `postinstall` 里显式把它装好，所以 `yarn install` 之后可以直接 `yarn dev`；
+> GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指定镜像。
 
 ### 解码引擎：sharp
 

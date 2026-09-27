@@ -5,6 +5,7 @@
   "description": "角色图库管理器",
   "main": "out/main/index.js",
   "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
     "dev": "electron-vite dev",
     "preview": "electron-vite preview",
     "icon": "electron-icon-builder --input=src/static/icon.png --output=dist",
@@ -27,9 +28,9 @@
     "vue-router": "^4.4.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^5.2.0",
-    "electron": "^40.0.0",
+    "electron": "^44.4.5",
     "electron-builder": "^25.0.0",
     "electron-icon-builder": "^2.0.1",
     "electron-vite": "^5.0.0",

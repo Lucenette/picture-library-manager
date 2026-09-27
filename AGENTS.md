@@ -7,7 +7,7 @@
 ## 项目速览
 
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
-- **技术栈**：Electron 40 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
+- **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
 - **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在用户主目录的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
@@ -209,6 +209,10 @@ function upsertScript(...) {}
 - **`yarn build` 可能无法在受限沙箱里跑完**：esbuild 需要 `spawn` 子进程并用命名管道通信，沙箱会以 `spawn EPERM` 拒绝。遇到时如实说明"构建未验证"，不要假装通过，也不要绕过沙箱。
 - **`vue-tsc` 已随依赖安装**（当前 5.9.3）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
   只跑 `tsc` 就宣称"类型已检查"是错的——曾经因此漏掉一个缺失的 import，对应按钮一点就报 `ReferenceError`。
+- **Electron ≥ 42 不再在 install 时下载二进制**：官方的 `postinstall` 没了，改成首次运行 `electron .` 时按需拉取。
+  本仓库在 `package.json` 的 `postinstall` 里显式跑 `node node_modules/electron/install.js`（幂等，装过就跳过），
+  让 `yarn install` 之后直接就能开发。GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指镜像——
+  别再往 `.npmrc` 写 `electron_mirror`，npm 已警告这类未知配置下个大版本会失效。
 - **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
 - **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
