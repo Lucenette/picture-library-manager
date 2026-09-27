@@ -1,28 +1,57 @@
 <template>
   <div class="script-side">
-    <div class="side-head">
-      <button ref="filterEl" type="button" class="filter-btn" @click="openFilter">
-        <span class="filter-label">{{ filterLabel }}</span>
-        <span class="filter-arrow">▾</span>
-      </button>
+    <div class="side-head" :class="{ 'is-searching': searching }">
+      <!-- 表头那一排控件：展开搜索框时整条收掉（宽度与透明度一起过渡） -->
+      <div class="head-bar">
+        <button ref="filterEl" type="button" class="filter-btn" @click="openFilter">
+          <span class="filter-label">{{ filterLabel }}</span>
+          <span class="filter-arrow">▾</span>
+        </button>
 
-      <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
-        <el-button text class="icon-btn" :icon="Plus" @click="emit('create')" />
-      </el-tooltip>
-      <el-tooltip content="加载文件" placement="bottom" :show-after="300">
-        <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import')" />
-      </el-tooltip>
+        <el-tooltip content="搜索脚本" placement="bottom" :show-after="300">
+          <el-button text class="icon-btn" :icon="Search" @click="startSearch" />
+        </el-tooltip>
+        <el-tooltip content="新建分组" placement="bottom" :show-after="300">
+          <!-- 功能未实现：等分组做了再接动作 -->
+          <el-button text class="icon-btn" :icon="FolderAdd" />
+        </el-tooltip>
+      </div>
+
+      <!-- 搜索框：点搜索按钮从 0 宽展开过来。搜索功能未实现，先把交互与位置定下来：
+           失焦时有内容就留着、空的就收，点清空那个叉号也收 -->
+      <el-input
+        ref="searchEl"
+        v-model="keyword"
+        class="search-input"
+        placeholder="搜索脚本"
+        clearable
+        @keydown.esc="endSearch"
+        @blur="onSearchBlur"
+        @clear="endSearch"
+      />
     </div>
 
     <el-scrollbar class="side-list">
       <!-- 分组现在只是外观：只有一组，将来真做分组时这里换成 v-for -->
-      <button type="button" class="group-head" @click="collapsed = !collapsed">
-        <el-icon class="group-icon">
-          <component :is="collapsed ? Folder : FolderOpened" />
-        </el-icon>
-        <span class="group-name">未分组</span>
-        <span class="group-count">({{ visibleItems.length }})</span>
-      </button>
+      <div class="group-head">
+        <button type="button" class="group-toggle" @click="collapsed = !collapsed">
+          <el-icon class="group-icon">
+            <component :is="collapsed ? Folder : FolderOpened" />
+          </el-icon>
+          <span class="group-name">未分组</span>
+          <span class="group-count">({{ visibleItems.length }})</span>
+        </button>
+
+        <!-- 每个分组自己的动作：悬停或键盘进入时才露出来 -->
+        <div class="group-actions">
+          <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
+            <el-button text class="icon-btn" :icon="Plus" @click="emit('create')" />
+          </el-tooltip>
+          <el-tooltip content="加载文件" placement="bottom" :show-after="300">
+            <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import')" />
+          </el-tooltip>
+        </div>
+      </div>
 
       <template v-if="!collapsed">
         <button
@@ -43,9 +72,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import { ipcRenderer, type IpcRendererEvent } from 'electron';
-import { Folder, FolderOpened, Plus } from '@element-plus/icons-vue';
+import { Folder, FolderAdd, FolderOpened, Plus, Search } from '@element-plus/icons-vue';
+import type { InputInstance } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
 import type { ScriptType, TypeFilterOpenData } from '@common/types';
 import { TYPE_LABELS, type SideItem } from './script-list';
@@ -82,6 +112,10 @@ const collapsed = ref(false);
 const filterEl = ref<HTMLElement | null>(null);
 /** 浮窗回发的订阅：浮窗是复用的，每次打开前先摘掉上一次那个 */
 let filterListener: ((event: IpcRendererEvent, selected: string[]) => void) | null = null;
+/** 搜索框：点搜索按钮才展开（搜索功能未实现，先只做交互） */
+const searching = ref(false);
+const keyword = ref('');
+const searchEl = ref<InputInstance | null>(null);
 
 /**
  * 触发按钮上那一行：部分勾选时把名字用「、」连起来（Steam 那个下拉就是这么写的），
@@ -110,6 +144,24 @@ onBeforeUnmount(() => {
     filterListener = null;
   }
 });
+
+/** 展开搜索框并把焦点打进去 */
+function startSearch(): void {
+  searching.value = true;
+  void nextTick(() => searchEl.value?.focus());
+}
+
+/** 收起搜索框（Esc / 点清空叉号） */
+function endSearch(): void {
+  searching.value = false;
+}
+
+/** 失焦：有内容就留着（可能还要接着看结果），空着就收回去 */
+function onSearchBlur(): void {
+  if (keyword.value === '') {
+    endSearch();
+  }
+}
 
 /**
  * 打开类型过滤浮窗：与脚本下拉是同一个原生浮窗，只是内容换成多选。
@@ -161,22 +213,54 @@ function matchesFilter(types: ScriptType[]): boolean {
   border-right: 2px solid var(--el-fill-color-light);
 }
 
-/* 表头就是这一行控件：内边距跟着 .script-side 的 --page-padding 走 */
+/* 表头就是这一行控件：内边距跟着 .script-side 的 --page-padding 走。
+   这里刻意不写 gap：左排与搜索框是互补的（一个收到 0、一个从 0 撑开），
+   而 gap 对 0 宽的子项照样生效，留出的一侧空白就是这么来的 */
 .side-head {
   display: flex;
   align-items: center;
-  gap: 10px;
   padding: var(--page-padding);
   padding-bottom: 16px;
 }
 
-.side-head .el-button + .el-button {
-  margin-left: 0;
+/* 表头那一排控件：展开搜索框时整条收紧到 0。
+   宽度与透明度一起过渡——DSH 的 sectionLabel / headerActions 用的也是 max-width + opacity 这一套 */
+.head-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width 0.18s ease, opacity 0.12s ease;
 }
 
-/* 纯图标按钮：无边框、方角（EP 默认的 --el-border-radius-base = 4px）、32px 见方——
-   与过滤控件、右栏输入框同高；字号提到 16px，图标随字号缩放，和左侧导航栏的图标一样大 */
-.side-head .icon-btn {
+.side-head.is-searching .head-bar {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 搜索框：从 0 宽展开到占满这一行（与过滤控件同高） */
+.search-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-width 0.18s ease, opacity 0.12s ease;
+}
+
+.side-head.is-searching .search-input {
+  max-width: 100%;
+  opacity: 1;
+}
+
+/* 纯图标按钮：无边框、方角（EP 默认的 --el-border-radius-base = 4px）；
+   字号 16px，图标随字号缩放，和左侧导航栏的图标一样大 */
+.icon-btn {
   padding: 0;
   border-radius: var(--el-border-radius-base);
   font-size: 16px;
@@ -247,9 +331,26 @@ function matchesFilter(types: ScriptType[]): boolean {
   gap: 6px;
   width: 100%;
   height: 34px;
-  padding: 6px 12px;
-  border: none;
+  padding: 0 8px 0 12px;
   border-radius: var(--el-border-radius-base);
+}
+
+/* 组头也要有悬停底色（DSH 那边 projectRow 与 sessionRow 是同一条 hover 规则），
+   底色与脚本项一致，形状也跟着项的圆角 */
+.group-head:hover {
+  background: #2b2d30;
+}
+
+/* 折叠开关：图标 + 组名 + 计数，占满剩下的宽度 */
+.group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
   background: none;
   color: var(--el-text-color-secondary);
   font-size: 13px;
@@ -257,11 +358,30 @@ function matchesFilter(types: ScriptType[]): boolean {
   cursor: pointer;
 }
 
-/* 组头也要有悬停底色（DSH 那边 projectRow 与 sessionRow 是同一条 hover 规则），
-   底色与脚本项一致，形状也跟着项的圆角 */
-.group-head:hover {
-  background: #2b2d30;
+.group-toggle:hover {
   color: var(--el-text-color-regular);
+}
+
+/* 每个分组自己的动作：平时藏着但占位仍在（悬停时不整行跳动），
+   鼠标悬停或键盘聚焦才露出来 */
+.group-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s;
+}
+
+.group-head:hover .group-actions,
+.group-head:focus-within .group-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.group-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 /* 组图标：折叠是合着的文件夹、展开是打开的文件夹（接替原来那个 ▾，色不变） */
