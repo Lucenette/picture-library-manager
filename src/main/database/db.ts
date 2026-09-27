@@ -32,7 +32,14 @@ type SqlValue = null | number | bigint | string | Uint8Array;
 let db: DatabaseSync | null = null;
 let dbPath = '';
 
-/** 事务嵌套深度，大于 0 表示正处于一次事务中 */
+/**
+ * 事务嵌套深度：大于 0 表示正处在一次事务里。
+ *
+ * **它是「当前有没有事务」的唯一状态**：`beginBatch()` / `endBatch()` 与
+ * `runInMigrationTransaction()` 都先占住它，所以后者套前者（或反过来）会像 Spring 的
+ * `PROPAGATION_REQUIRED` 那样并入外层，而不是再发一个 `BEGIN`（SQLite 会直接拒绝）。
+ * 新增任何事务入口都必须先经过这个计数器，否则就会绕开它、重现「事务里开事务」。
+ */
 let batchDepth = 0;
 
 /** 上次写入备份的时间戳 */
@@ -216,6 +223,11 @@ export function execSql(sql: string): void {
  * 回调可以是异步的（升级脚本就是异步的）。
  */
 export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
+  if (batchDepth > 0) {
+    // 迁移只应该是最外层（它在启动阶段跑，那时还没有任何任务）；跑在别的批里说明用错了地方
+    throw new Error('迁移事务不能嵌套在别的事务里：先结束那次批处理再升级');
+  }
+
   const handle = db!;
   handle.exec('BEGIN');
   // 也占住嵌套计数器：升级脚本里若调到 beginBatch()/endBatch()（例如 renameScript），
