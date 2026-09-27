@@ -1,6 +1,9 @@
 /**
  * 生成 Release 说明：提交信息、更新详情（取自 CHANGELOG）、各平台产物、安装与升级提示。
  *
+ * 「更新详情」是**上次发布（最近一个 tag）以来的全部小节**，不是只有发布号那一节：中间那些没发布的
+ * 版本（跳过的 z 补丁、只落到 master 而没打 tag 的版本）会一并带上；多节时按版本分块、节内标题降一级。
+ *
  * 运行：node scripts/release-notes.mjs > RELEASE_NOTES.md
  * CI 由 .github/workflows/release.yml 的 release job 调用；本地可用环境变量覆盖：
  *   GITHUB_SHA / GITHUB_REF_NAME / GITHUB_REPOSITORY / ARTIFACTS_DIR
@@ -24,29 +27,75 @@ function git(args) {
   }
 }
 
-/** 从 CHANGELOG 里取出某个版本的正文；优先按版本号找，找不到就退回「未发布」 */
-function changelogSection(text, version) {
+/** 把 CHANGELOG 拆成有序小节；顺序与文件一致（新的在前），链接定义不算正文 */
+function changelogSections(text) {
   const lines = text.split('\n');
-  const candidates = [version, '未发布'].map((token) => `[${token}]`);
-  for (const token of candidates) {
-    const start = lines.findIndex((line) => line.startsWith('## ') && line.includes(token));
-    if (start < 0) {
+  const sections = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const heading = /^## \[([^\]]+)\]/.exec(lines[i]);
+    if (heading === null) {
       continue;
     }
     const body = [];
-    for (let i = start + 1; i < lines.length; i += 1) {
-      const line = lines[i];
-      if (line.startsWith('## ')) {
-        break;
-      }
-      if (/^\[/.test(line)) {
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const line = lines[j];
+      if (line.startsWith('## ') || /^\[/.test(line)) {
         break;
       }
       body.push(line);
     }
-    return body.join('\n').trim();
+    sections.push({ version: heading[1], body: body.join('\n').trim() });
   }
-  return '';
+  return sections;
+}
+
+/** 只比 x.y.z 三段；非版本号（`未发布`）按「更新」处理，返回 1 */
+function compareVersions(left, right) {
+  const parse = (value) => {
+    const match = /^(\d+)\.(\d+)\.(\d+)/.exec(value);
+    return match === null ? null : [Number(match[1]), Number(match[2]), Number(match[3])];
+  };
+  const a = parse(left);
+  const b = parse(right);
+  if (a === null || b === null) {
+    return 1;
+  }
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] !== b[i]) {
+      return a[i] - b[i];
+    }
+  }
+  return 0;
+}
+
+/**
+ * 上次发布以来的小节。
+ *
+ * 上次发布 = 最近一个 tag：取它对应那一节**上面**的全部小节（文件是新的在前）。找不到那一节时退回按
+ * 版本号比较；连 tag 都没有（首次发布，或环境里没有 git）就全部带上——宁可多带，不能漏掉没发布过的版本。
+ * 空小节（例如刚定稿后补回的 `[未发布]`）不进结果。
+ */
+function sectionsSinceLastRelease(sections, previousTag) {
+  const usable = sections.filter((section) => section.body !== '');
+  const previous = previousTag.replace(/^v/, '');
+  if (previous === '') {
+    return usable;
+  }
+  const index = usable.findIndex((section) => section.version === previous);
+  if (index >= 0) {
+    return usable.slice(0, index);
+  }
+  return usable.filter((section) => compareVersions(section.version, previous) > 0);
+}
+
+/** 拼成「更新详情」的正文：只有一节原样输出；多节按版本分块、节内标题降一级 */
+function formatSections(sections) {
+  if (sections.length <= 1) {
+    return sections[0]?.body ?? '';
+  }
+  return sections
+    .map((section) => `### [${section.version}]\n\n${section.body.replace(/^### /gm, '#### ')}`)
+    .join('\n\n');
 }
 
 /**
@@ -90,7 +139,7 @@ const sha = process.env.GITHUB_SHA || git(['rev-parse', 'HEAD']);
 const tag = process.env.GITHUB_REF_NAME || git(['describe', '--tags', '--exact-match']) || ('v' + pkg.version);
 const repo = process.env.GITHUB_REPOSITORY || '';
 const previous = sha ? git(['describe', '--tags', '--abbrev=0', sha + '^']) : '';
-const section = changelogSection(changelog, pkg.version);
+const sections = sectionsSinceLastRelease(changelogSections(changelog), previous);
 
 const out = [];
 out.push('## 提交');
@@ -105,7 +154,7 @@ if (repo && previous && tag) {
 out.push('');
 out.push('## 更新详情');
 out.push('');
-out.push(section || '（CHANGELOG 里没有找到对应版本的小节）');
+out.push(formatSections(sections) || '（CHANGELOG 里没有找到上次发布以来的条目）');
 out.push('');
 const groups = collectArtifacts();
 if (groups.length > 0) {

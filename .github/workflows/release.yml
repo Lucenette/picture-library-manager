@@ -92,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # 取上一个 tag 需要完整历史，发布说明里有对比链接
+          # 取上一个 tag 需要完整历史：发布说明的对比链接与「更新详情」都从它起算
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
