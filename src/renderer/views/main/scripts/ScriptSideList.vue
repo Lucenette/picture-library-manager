@@ -11,7 +11,7 @@
         :key="item.key"
         type="button"
         class="side-item"
-        :class="[`is-#D#{item.state}`, { active: item.key === activeKey }]"
+        :class="[`is-${item.state}`, { active: item.key === activeKey }]"
         @click="emit('select', item.key)"
       >
         <span class="side-name">{{ item.name }}</span>
