@@ -26,15 +26,20 @@
       -->
       <div
         class="status"
-        :class="{ 'has-error': error !== null }"
+        :class="{ 'has-error': error !== null, 'is-draft': error === null && dirty }"
         :style="{ top: error === null ? '8px' : '34px' }"
       >
         <span v-if="error" class="status-text" :title="errorTitle">
           第 {{ error.line ?? 1 }} 行第 {{ error.column ?? 1 }} 列：{{ error.message }}
         </span>
-        <span v-else class="status-ok" :title="dirty ? '当前显示的是未保存的草稿' : '当前显示的是磁盘上的版本'">
-          编译通过<template v-if="dirty">（草稿）</template>
+        <!--
+          编译只在「打开」与「保存」时发生（这是约定），所以身上有未保存改动时不能宣称通过：
+          下面这条说的永远是「最近一次编译」的结果，草稿的状态就是「还没编译」。
+        -->
+        <span v-else-if="dirty" class="status-draft" title="按 Ctrl+S 保存时才会编译草稿">
+          草稿未保存
         </span>
+        <span v-else class="status-ok" title="当前显示的是磁盘上的版本">编译通过</span>
       </div>
     </div>
   </div>
@@ -166,6 +171,10 @@ function typeLabel(type: ScriptType): string {
 
 .status-ok {
   color: var(--el-color-success);
+}
+
+.status-draft {
+  color: var(--el-text-color-secondary);
 }
 
 .status.has-error {

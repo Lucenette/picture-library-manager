@@ -309,7 +309,11 @@ async function refreshAll(): Promise<void> {
       broken.push(`${item.script.name}：${item.compileError.message}`);
     }
   }
-  if (activeKey.value.startsWith('script-')) {
+  // 刷新看的是磁盘上的版本，**不能拿它覆盖活动脚本的显示状态**：
+  // 有草稿时编辑器显示的是草稿，那个状态只能由草稿重新编译一次得出
+  if (drafts.value[activeKey.value] !== undefined) {
+    await openKey(activeKey.value);
+  } else if (activeKey.value.startsWith('script-')) {
     const current = results.find((item) => keyOfScript(item.script.id) === activeKey.value);
     if (current) {
       error.value = current.compileError;
