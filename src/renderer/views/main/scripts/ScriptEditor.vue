@@ -19,16 +19,23 @@
 
     <div class="editor-body">
       <MonacoEditor v-model="code" :error="error" @save="emit('save')" />
-    </div>
 
-    <div class="problems" :class="{ 'has-error': error !== null }">
-      <template v-if="error">
-        第 `{{ error.line ?? 1 }}` 行第 `{{ error.column ?? 1 }}` 列：`{{ error.message }}`
-      </template>
-      <template v-else>
-        <span class="problem-ok">编译通过</span>
-        <span class="problem-hint">`{{ dirty ? '当前显示的是未保存的草稿' : '当前显示的是磁盘上的版本' }}`</span>
-      </template>
+      <!--
+        编译状态悬浮在编辑区右上角（IDEA 那样）。
+        有错时往下让一格：Monaco 自己的 marker 计数与跳转条占着最上沿那一条。
+      -->
+      <div
+        class="status"
+        :class="{ 'has-error': error !== null }"
+        :style="{ top: error === null ? '8px' : '34px' }"
+      >
+        <span v-if="error" class="status-text" :title="errorTitle">
+          第 {{ error.line ?? 1 }} 行第 {{ error.column ?? 1 }} 列：{{ error.message }}
+        </span>
+        <span v-else class="status-ok" :title="dirty ? '当前显示的是未保存的草稿' : '当前显示的是磁盘上的版本'">
+          编译通过<template v-if="dirty">（草稿）</template>
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -73,6 +80,15 @@ const name = computed({
 const code = computed({
   get: () => props.code,
   set: (value: string) => emit('update:code', value),
+});
+
+/** 悬浮条上放不下整条消息，截断显示、完整内容进 title */
+const errorTitle = computed(() => {
+  const error = props.error;
+  if (error === null) {
+    return '';
+  }
+  return `第 ${error.line ?? 1} 行第 ${error.column ?? 1} 列：${error.message}`;
 });
 
 function typeLabel(type: ScriptType): string {
@@ -127,33 +143,39 @@ function typeLabel(type: ScriptType): string {
 }
 
 .editor-body {
+  position: relative;
   flex: 1;
   min-height: 0;
 }
 
-.problems {
+/* 悬浮状态条：不吃鼠标事件，免得挡住它下面那一行 */
+.status {
+  position: absolute;
+  right: 18px;
+  z-index: 5;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  max-height: 30%;
-  overflow-y: auto;
-  padding: 8px 12px;
-  border-top: 1px solid var(--el-border-color);
-  background: #26282c;
-  color: var(--el-text-color-regular);
+  align-items: center;
+  max-width: 70%;
+  padding: 2px 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 10px;
+  background: rgba(38, 40, 44, 0.92);
   font-size: 12px;
-  word-break: break-all;
+  pointer-events: none;
 }
 
-.problems.has-error {
-  color: var(--el-color-danger);
-}
-
-.problem-ok {
+.status-ok {
   color: var(--el-color-success);
 }
 
-.problem-hint {
-  color: var(--el-text-color-secondary);
+.status.has-error {
+  border-color: var(--el-color-danger);
+  color: var(--el-color-danger);
+}
+
+.status-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

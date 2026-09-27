@@ -34,7 +34,10 @@ function syncValue(): void {
   applying = false;
 }
 
-/** 把编译错误画成行内标记 */
+/** 出错那一行整行染色的装饰集合：Monaco 的波浪线只有一两个字符宽，定位不如整行显眼 */
+let errorLine: monaco.editor.IEditorDecorationsCollection | null = null;
+
+/** 把编译错误画进代码：插入符位置一条标记 + 出错那一行整行淡红 */
 function applyMarkers(): void {
   const model = editor?.getModel();
   if (!model) {
@@ -44,6 +47,7 @@ function applyMarkers(): void {
   const error = props.error;
   if (error === null) {
     monaco.editor.setModelMarkers(model, 'plmanager', []);
+    errorLine?.set([]);
     return;
   }
 
@@ -58,6 +62,9 @@ function applyMarkers(): void {
       endLineNumber: line,
       endColumn: column + 1,
     },
+  ]);
+  errorLine?.set([
+    { range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'plm-error-line' } },
   ]);
   editor?.revealLineInCenterIfOutsideViewport(line);
 }
@@ -91,6 +98,7 @@ onMounted(() => {
   // 焦点在编辑器里时 Monaco 先吃到按键，所以页面的 Ctrl+S 之外这里也注册一份
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => emit('save'));
 
+  errorLine = editor.createDecorationsCollection([]);
   applyMarkers();
 });
 
@@ -107,5 +115,10 @@ onBeforeUnmount(() => {
 .monaco-host {
   height: 100%;
   min-height: 0;
+}
+
+/* 编译失败那一行的底色；装饰画在 Monaco 自己的 DOM 里，所以要 :deep */
+.monaco-host :deep(.plm-error-line) {
+  background: rgba(199, 84, 88, 0.16);
 }
 </style>
