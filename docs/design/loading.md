@@ -31,6 +31,7 @@
 | `src/main/loading/progress.ts` | 状态与通道：快照、进度推送、退出、渲染进程任务的下发与回执 |
 | `src/renderer/loading/index.ts` | 渲染进程那一半：状态引用、按 id 认领任务、回执、报告就绪 |
 | `src/renderer/views/startup/LoadingPage.vue` | 加载页：只读状态画界面 |
+| `src/renderer/entries/main.ts` + `views/main/scripts/monaco-env.ts` | 预热任务本身：求值脚本页的 chunk，再把 TypeScript 语言服务点着 |
 
 任务只在主进程登记（`src/main/index.ts` 的 `bootstrap()` 里三行），渲染进程只声明「自己会跑哪些 id」：
 
@@ -59,6 +60,15 @@ startLoading()                                                          │ 先�
 - **预热任务在 `startLoading()` 一开头就全部起跑**，与「必须」的任务并行；它们不参与放行判定，也不参与成败判定。于是升级跑多久就预热多久，而没有升级要跑时它退化成后台预热，不会让启动多等一秒。
 - **失败只由「必须」的任务定义**：它抛出的错误成为加载页上的 `error`，`startLoading()` 返回 `false`，调用方等用户点「退出」再收摊。预热任务失败不改变终态——它只是没预热上，下次进那一页慢一点，日志里有记录。
 
+### 3.1 预热任务做什么
+
+「脚本编辑器」这一项预热分两段，中间各让一次空闲：
+
+1. `import('@/views/main/ScriptPage.vue')`——求值页面 chunk（Monaco 全套 + 两个内联 worker 的 base64）；
+2. 再 `import('.../monaco-env')` 并调 `warmUpTypeScript()`——先造一个空模型触发语言服务（语言是按需激活的：`onLanguage` 那一刻才注册 providers、建 `WorkerManager`），再真的向 worker 要一次语言服务；这一步才会解码内联的 `ts.worker`、在 worker 里把 TypeScript 求值起来。返回时语言服务已经就绪。
+
+后一条的依据是 0.57 的实现：worker 在第一次要语言服务时才创建（`workerManager.js` 的 `_getClient`），而且没有空闲回收（`setMaximumWorkerIdleTime` 是空实现），所以触发用的空模型用过就丢，预热效果留到真正打开页面的那一刻。**不用隐藏编辑器**：隐藏编辑器同样要靠自己的诊断去间接点着 worker，却把 DOM、字体与布局测量白跑一遍，真实编辑器打开时还要再来一次。
+
 ## 4. 状态只有一个来源
 
 - **状态在主进程**：任务名、终态与错误由加载服务写；任务通过 `report({ step, done, total, percent, note })` 只补自己这一步的进展（`note` 是失败时的附注，升级用它带备份路径）。
@@ -84,12 +94,12 @@ startLoading()                                                          │ 先�
 - 新增启动步骤就 `registerLoadTask()` 登记，别在 `startLoading()` 之后直接写同步代码或 `await`——那会重新引入第 5 节的问题。
 - 任务的实现（主进程）与认领（渲染进程）用同一个 id：常量加在 `common/ipcChannels.ts` 的 `LOAD_TASK` 里，两边都从这里取。
 - 给任务加新的进展字段时，同步改 `common/types.ts` 的 `LoadProgress`、`progress.ts` 的 `LoadTaskPatch` 与加载页的展示。
-- 预热任务不许阻塞启动：它要么放在渲染进程的空闲时刻跑（见 `entries/main.ts` 的 `warmUpEditor()`），要么是主进程里明确「可以慢」的活。
+- 预热任务不许阻塞启动：渲染进程侧要先等空闲（见 `entries/main.ts` 的 `nextIdle()`），主进程侧只能是明确「可以慢」的活。往预热里加东西前先掂量它值不值这几百毫秒主线程。
 
 ## 8. 已知取舍
 
 | 取舍 | 代价 |
 |---|---|
 | 加载页只画加载服务公布的一种状态，不再是「升级页」 | 升级特有的措辞（备份路径、接着这一条继续）由任务自己塞进 `note`，加载页按通用样式显示 |
-| 预热把 Monaco 常驻渲染进程 | 即使从不打开脚本页，也多占一块渲染进程堆内存 |
-| 预热的收益没有量化 | 受限环境里跑不起 `yarn dev`（esbuild `spawn EPERM`），首开耗时的观感只能由使用者冒烟确认。预热带走的是「下载 + 求值」那一半；第一次创建编辑器时 worker 里 TypeScript 语言服务的启动仍要付 |
+| 预热把 Monaco 与 TypeScript 语言服务常驻渲染进程 | 即使从不打开脚本页，也多占一块堆内存（编辑器代码 + 一个跑着 TS 编译器与 lib 的 worker）——这是「第一次点进脚本页不卡」的代价 |
+| 预热的收益没有量化 | 受限环境里跑不起 `yarn dev`（esbuild `spawn EPERM`），首开耗时的观感只能由使用者冒烟确认 |

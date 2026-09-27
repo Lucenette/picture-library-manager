@@ -70,4 +70,29 @@ monaco.typescript.javascriptDefaults.setCompilerOptions({
 });
 monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.ts');
 
+/**
+ * 提前把 TypeScript 语言服务点着。
+ *
+ * 链条是三步，都得自己走：语言服务要等到「出现过 javascript 模型」才会建起来（语言是按需激活的，
+ * `onLanguage` 那一刻才注册 providers、建 WorkerManager），而 worker 又要等到第一次真要语言服务时
+ * 才创建。所以这里先造一个空模型把语言服务触发出来，再真的要一次服务——这一步才会解码内联的 worker、
+ * 在 worker 里把 TypeScript 求值起来并同步资源，返回时语言服务已经就绪。
+ *
+ * 模型随后丢掉不影响：worker 归 WorkerManager 持有，这个版本没有空闲回收（`setMaximumWorkerIdleTime`
+ * 是空实现），只有配置变更或 `dispose()` 才会停它——上面那几条 `javascriptDefaults.*` 都发生在
+ * 模型出现之前，不会把已经点着的 worker 停掉。
+ *
+ * 不用隐藏编辑器：隐藏编辑器也要靠自己的诊断去间接点着 worker，却额外把整棵 DOM、字体与布局测量
+ * 跑一遍，而真实编辑器打开时这些还要再来一次。
+ */
+export async function warmUpTypeScript(): Promise<void> {
+  const model = monaco.editor.createModel('', 'javascript');
+  try {
+    const getWorker = await monaco.typescript.getJavaScriptWorker();
+    await getWorker(model.uri);
+  } finally {
+    model.dispose();
+  }
+}
+
 export { monaco };

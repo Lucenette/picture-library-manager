@@ -42,15 +42,25 @@ installElementPlus(app);
 
 /**
  * 预热脚本管理页：它把整个 Monaco 连同两个 worker 一起吞进自己的 chunk（十几 MB），
- * 第一次点进去要现场下载、求值，肉眼可见地卡一下。主进程的加载服务负责在启动阶段下发这一步。
+ * 第一次点进去要现场下载、求值，肉眼可见地卡一下。主进程的加载服务在启动阶段下发这一步。
  *
- * 先等一次空闲再加载：求值 Monaco 会占住渲染进程主线程几百毫秒，抢在首屏之前跑就是白屏，
- * 抢在首屏之后只是预热晚一点完成。
+ * 分两段跑、中间各让一次空闲：求值 Monaco 与解码内联的 worker 各要占住主线程几百毫秒，
+ * 抢在首屏之前跑就是白屏，分段之后加载页至少能在两段之间重画一次。
+ * 第二段把 TypeScript 语言服务也点着（见 monaco-env.ts），那原本要等第一次打开编辑器才付。
  */
 function warmUpEditor(): Promise<unknown> {
+  return nextIdle()
+    .then(() => import('@/views/main/ScriptPage.vue'))
+    .then(() => nextIdle())
+    .then(() => import('@/views/main/scripts/monaco-env'))
+    .then((env) => env.warmUpTypeScript());
+}
+
+/** 等一次渲染进程的空闲；超时兜底，别让预热永远排不上 */
+function nextIdle(): Promise<void> {
   return new Promise<void>((resolve) => {
     requestIdleCallback(() => resolve(), { timeout: 2000 });
-  }).then(() => import('@/views/main/ScriptPage.vue'));
+  });
 }
 
 registerRendererTask(LOAD_TASK.EDITOR, warmUpEditor);
