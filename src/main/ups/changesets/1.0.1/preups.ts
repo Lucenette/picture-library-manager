@@ -3,6 +3,7 @@ import {
 } from '@/database/db';
 import { getScriptsDir } from '@/paths';
 import { ensureScriptsDir, newScriptPath, scriptFileExists, writeFileAtomic } from '@/script/files';
+import type { ChangeScriptContext } from '@/ups/engine';
 
 /**
  * 接管旧脚本：把库里 `code` 列存的源码落成 `scripts/` 下的文件。
@@ -11,8 +12,11 @@ import { ensureScriptsDir, newScriptPath, scriptFileExists, writeFileAtomic } fr
  * 顺序由版本目录固定：preups → dbups → postups，这里抛错就中止整轮升级，那时列还在。
  *
  * 幂等靠「`code` 列还在不在」判断：老库为真、新库为假，接管过之后不会重复落盘。
+ *
+ * 签名按升级脚本的契约收下上下文，但**用不到它**：它只带 `dataDir`，而这一段写的是用户目录
+ * 下的 `scripts/`，路径由 `@/paths` 一处派生，不在这里另算一份。
  */
-export async function run(): Promise<void> {
+export async function run(_ctx: ChangeScriptContext): Promise<void> {
   if (!hasScriptCodeColumn()) {
     return;
   }

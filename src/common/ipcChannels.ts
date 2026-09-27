@@ -66,6 +66,16 @@ export const IPC = {
   SCRIPT_DRAFT_PUT: 'script:draftPut',
   SCRIPT_DRAFT_DELETE: 'script:draftDelete',
 
+  // 脚本分组：真正落库的只有具名分组，「未分组」是 groupId 为 null 的默认落点
+  SCRIPT_GROUP_LIST: 'script:groupList',
+  SCRIPT_GROUP_CREATE: 'script:groupCreate',
+  SCRIPT_GROUP_RENAME: 'script:groupRename',
+  SCRIPT_GROUP_DELETE: 'script:groupDelete',
+  SCRIPT_GROUP_COLLAPSE: 'script:groupCollapse',
+  SCRIPT_GROUP_ASSIGN: 'script:groupAssign',
+  /** 分组输入弹框确认后的回发通道：带 groupId 是改名，不带是新建 */
+  SCRIPT_GROUP_CONFIRMED: 'script:groupConfirmed',
+
   // 后台任务
   TASK_SUBMIT: 'task:submit',
   TASK_CANCEL: 'task:cancel',

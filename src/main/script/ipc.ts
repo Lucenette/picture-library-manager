@@ -4,8 +4,10 @@ import { IPC } from '@common/ipcChannels';
 import type { ScriptMenuEntry, ScriptType } from '@common/types';
 
 import {
-  checkScript, deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
-  listScriptsByType, putScriptDraft, readScript, renameScript, resetBuiltinScript, saveScript,
+  assignScriptGroup, checkScript, createScriptGroup, deleteScript, deleteScriptDraft, deleteScriptGroup,
+  getScriptUsage, importScripts, listScriptDrafts, listScriptGroups, listScripts, listScriptsByType,
+  putScriptDraft, readScript, renameScript, renameScriptGroup, resetBuiltinScript, saveScript,
+  setScriptGroupCollapsed,
 } from '@/script/library';
 
 /** 正弹着的那份菜单：popup 返回之前不能被回收，否则原生菜单会跟着消失 */
@@ -44,6 +46,8 @@ interface SaveScriptInput {
   name: string;
   code: string;
   draftKey: string;
+  /** 新脚本落在哪一组；已入库脚本的归属走 SCRIPT_GROUP_ASSIGN */
+  groupId: number | null;
 }
 
 /**
@@ -58,18 +62,33 @@ export function initScriptIpc(): void {
   ipcMain.handle(IPC.SCRIPT_READ, (_event, id: number) => readScript(id));
   // 检查不落任何东西：编辑时按防抖调它，状态图标与类型标签不必等到保存才更新
   ipcMain.handle(IPC.SCRIPT_CHECK, (_event, code: string, filePath: string) => checkScript(code, filePath));
-  ipcMain.handle(IPC.SCRIPT_IMPORT, (_event, paths: string[]) => importScripts(paths));
+  ipcMain.handle(IPC.SCRIPT_IMPORT, (_event, paths: string[], groupId: number | null) =>
+    importScripts(paths, groupId),
+  );
   ipcMain.handle(IPC.SCRIPT_SAVE, (_event, input: SaveScriptInput) => saveScript(input));
   ipcMain.handle(IPC.SCRIPT_DELETE, (_event, id: number) => deleteScript(id));
   ipcMain.handle(IPC.SCRIPT_USAGE, (_event, id: number) => getScriptUsage(id));
   ipcMain.handle(IPC.SCRIPT_RESET_BUILTIN, (_event, id: number) => resetBuiltinScript(id));
   ipcMain.handle(IPC.SCRIPT_DRAFT_LIST, () => listScriptDrafts());
-  ipcMain.handle(IPC.SCRIPT_DRAFT_PUT, (_event, key: string, draft: { name: string; code: string }) =>
-    putScriptDraft(key, draft),
+  ipcMain.handle(
+    IPC.SCRIPT_DRAFT_PUT,
+    (_event, key: string, draft: { name: string; code: string; groupId?: number | null }) =>
+      putScriptDraft(key, draft),
   );
   ipcMain.handle(IPC.SCRIPT_DRAFT_DELETE, (_event, key: string) => deleteScriptDraft(key));
 
   ipcMain.handle(IPC.SCRIPT_RENAME, (_event, id: number, name: string) => renameScript(id, name));
+
+  ipcMain.handle(IPC.SCRIPT_GROUP_LIST, () => listScriptGroups());
+  ipcMain.handle(IPC.SCRIPT_GROUP_CREATE, (_event, name: string) => createScriptGroup(name));
+  ipcMain.handle(IPC.SCRIPT_GROUP_RENAME, (_event, id: number, name: string) => renameScriptGroup(id, name));
+  ipcMain.handle(IPC.SCRIPT_GROUP_DELETE, (_event, id: number) => deleteScriptGroup(id));
+  ipcMain.handle(IPC.SCRIPT_GROUP_COLLAPSE, (_event, id: number, collapsed: boolean) =>
+    setScriptGroupCollapsed(id, collapsed),
+  );
+  ipcMain.handle(IPC.SCRIPT_GROUP_ASSIGN, (_event, scriptId: number, groupId: number | null) =>
+    assignScriptGroup(scriptId, groupId),
+  );
 
   ipcMain.handle(IPC.SCRIPT_MENU, (event, entries: ScriptMenuEntry[]) => {
     const window = BrowserWindow.fromWebContents(event.sender);

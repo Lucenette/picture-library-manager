@@ -9,7 +9,7 @@
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
 - **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态在 `dist/data/picture-lib.db`，打包后在用户主目录的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
+- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<你>\.plmanager`），里面分三份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
@@ -43,7 +43,7 @@
 | `src/main/loading/` | **加载服务**：启动阶段任务的登记与调度（谁阻塞、谁可以预热、跑在哪个进程）、加载页状态与跨进程下发 | 具体任务本身——升级在 `ups/`、预热在渲染进程入口；把业务逻辑写进调度 |
 | `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
-| `src/main/script/` | 处理脚本的编译与调用 | 脚本的存储与查询——那是 `database` 的事 |
+| `src/main/script/` | 脚本文件与草稿的落盘（用户目录的 `scripts/`、`temp/scripts/`）、编译与调用 | SQL 与表结构——那是 `database/` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
 | `src/renderer/loading/` | 加载服务的渲染进程侧：状态引用、按 id 认领任务、回执、报告就绪 | 任务清单与调度——那在主进程 |
 | `src/renderer/entries/` | **每个窗口类的入口**（`main` / `dialogs` / `viewer` / `popup`）；共用引导在 `entries/shell/`：`page.ts`（`mountPage`，只依赖 `vue`）、`window-chrome.ts`（平台类 + 失焦标记）、`element-plus.ts`（唯一引组件库的地方）、`first-paint.ts`（构建期片段） | 入口自己 import 组件库或 `App.vue`；`shell/page.ts` 不许引 Element Plus，否则小入口又背上整个组件库 |

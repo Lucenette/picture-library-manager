@@ -2,8 +2,8 @@ import { ipcRenderer } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
 import type {
-  ProcessScript, ScriptCompileError, ScriptDraft, ScriptImportResult, ScriptMenuEntry, ScriptReadResult,
-  ScriptSaveResult, ScriptType,
+  ProcessScript, ScriptCompileError, ScriptDraft, ScriptGroup, ScriptImportResult, ScriptMenuEntry,
+  ScriptReadResult, ScriptSaveResult, ScriptType,
 } from '@common/types';
 
 /**
@@ -37,9 +37,9 @@ export function checkScript(
   }>;
 }
 
-/** 导入脚本：主进程把源文件复制进用户目录的 scripts/ 下 */
-export function importScripts(paths: string[]): Promise<ScriptImportResult> {
-  return ipcRenderer.invoke(IPC.SCRIPT_IMPORT, paths) as Promise<ScriptImportResult>;
+/** 导入脚本：主进程把源文件复制进用户目录的 scripts/ 下，并落到指定分组（null = 未分组） */
+export function importScripts(paths: string[], groupId: number | null): Promise<ScriptImportResult> {
+  return ipcRenderer.invoke(IPC.SCRIPT_IMPORT, paths, groupId) as Promise<ScriptImportResult>;
 }
 
 /** 保存：写文件 + 更新行 + 重新检测类型；编译失败也照样落盘 */
@@ -48,6 +48,8 @@ export function saveScript(input: {
   name: string;
   code: string;
   draftKey: string;
+  /** 新脚本落在哪一组；已入库脚本的归属走 assignScriptGroup */
+  groupId: number | null;
 }): Promise<ScriptSaveResult> {
   return ipcRenderer.invoke(IPC.SCRIPT_SAVE, input) as Promise<ScriptSaveResult>;
 }
@@ -72,8 +74,11 @@ export function listScriptDrafts(): Promise<ScriptDraft[]> {
   return ipcRenderer.invoke(IPC.SCRIPT_DRAFT_LIST) as Promise<ScriptDraft[]>;
 }
 
-/** 写一份草稿 */
-export function putScriptDraft(key: string, draft: { name: string; code: string }): Promise<void> {
+/** 写一份草稿；groupId 只对 `new-` 草稿有意义（它预定这个新脚本落在哪一组） */
+export function putScriptDraft(
+  key: string,
+  draft: { name: string; code: string; groupId?: number | null },
+): Promise<void> {
   return ipcRenderer.invoke(IPC.SCRIPT_DRAFT_PUT, key, draft) as Promise<void>;
 }
 
@@ -90,4 +95,34 @@ export function openScriptMenu(entries: ScriptMenuEntry[]): Promise<string | nul
 /** 丢弃一份草稿 */
 export function deleteScriptDraft(key: string): Promise<void> {
   return ipcRenderer.invoke(IPC.SCRIPT_DRAFT_DELETE, key) as Promise<void>;
+}
+
+/** 列出全部分组 */
+export function listScriptGroups(): Promise<ScriptGroup[]> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_LIST) as Promise<ScriptGroup[]>;
+}
+
+/** 建一个分组；名字允许重复，靠 id 区分 */
+export function createScriptGroup(name: string): Promise<ScriptGroup> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_CREATE, name) as Promise<ScriptGroup>;
+}
+
+/** 改分组名 */
+export function renameScriptGroup(id: number, name: string): Promise<void> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_RENAME, id, name) as Promise<void>;
+}
+
+/** 删分组：组里的脚本回到「未分组」，脚本本身不会删 */
+export function deleteScriptGroup(id: number): Promise<void> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_DELETE, id) as Promise<void>;
+}
+
+/** 记下折叠状态；「未分组」不占库里的行，那份状态由页面自己留着 */
+export function setScriptGroupCollapsed(id: number, collapsed: boolean): Promise<void> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_COLLAPSE, id, collapsed) as Promise<void>;
+}
+
+/** 把脚本挪进某个分组；null = 未分组 */
+export function assignScriptGroup(scriptId: number, groupId: number | null): Promise<void> {
+  return ipcRenderer.invoke(IPC.SCRIPT_GROUP_ASSIGN, scriptId, groupId) as Promise<void>;
 }

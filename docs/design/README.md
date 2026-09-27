@@ -12,3 +12,4 @@
 | 窗口管理：成本模型、可见性、按需加载、浮窗宿主 | [window-management.md](./window-management.md) |
 | 升级模块 ups：版本目录、升级脚本与账本 | [ups.md](./ups.md) |
 | 加载服务：启动任务的登记与调度 | [loading.md](./loading.md) |
+| 脚本管理：用户目录里的脚本文件库、常驻编辑器与脚本分组 | [script-management.md](./script-management.md) |

@@ -8,13 +8,16 @@
 import { basename } from 'path';
 
 import type {
-  ProcessScript, ScriptCompileError, ScriptDraft, ScriptImportResult, ScriptReadResult,
+  ProcessScript, ScriptCompileError, ScriptDraft, ScriptGroup, ScriptImportResult, ScriptReadResult,
   ScriptSaveResult, ScriptType,
 } from '@common/types';
 
 import {
-  countProcessedByScript, deleteScriptRows, getAllScripts, getScriptById, getScriptsByType,
-  insertScript, renameScript as renameScriptRow, setScriptFilePath, setScriptTypes, touchScriptLoadedAt,
+  countProcessedByScript, deleteScriptGroup as deleteScriptGroupRow, deleteScriptRows,
+  getAllScriptGroups, getAllScripts, getScriptById, getScriptsByType, insertScript,
+  insertScriptGroup as insertScriptGroupRow, renameScript as renameScriptRow,
+  renameScriptGroup as renameScriptGroupRow, scriptGroupExists, setScriptFilePath, setScriptGroup,
+  setScriptGroupCollapsed as setScriptGroupCollapsedRow, setScriptTypes, touchScriptLoadedAt,
 } from '@/database/db';
 import { inspectScript } from '@/script/compile';
 import { BUILTIN_SCRIPT } from '@/script/defaults';
@@ -113,6 +116,8 @@ export async function saveScript(input: {
   code: string;
   /** 当前编辑器对应的草稿 key：保存成功后要删掉它 */
   draftKey: string;
+  /** 新脚本落在哪个分组（`null` = 未分组）；已入库脚本的归属走 assignScriptGroup() */
+  groupId: number | null;
 }): Promise<ScriptSaveResult> {
   const name = input.name.trim();
   if (name === '') {
@@ -129,7 +134,11 @@ export async function saveScript(input: {
   await writeFileAtomic(filePath, input.code);
 
   const inspected = inspectScript(input.code, filePath);
-  const id = existing ? existing.id : insertScript(name, filePath, false).id;
+  if (existing === undefined) {
+    // 只有建新行时才认这个分组；已入库脚本的归属由界面单独改（避免保存时拿旧状态覆盖）
+    ensureScriptGroupIfAny(input.groupId);
+  }
+  const id = existing ? existing.id : insertScript(name, filePath, false, input.groupId).id;
   if (existing && existing.name !== name) {
     renameScriptRow(id, name);
   }
@@ -165,9 +174,11 @@ export async function renameScript(id: number, name: string): Promise<void> {
  * 从磁盘导入脚本：**复制**一份到 `scripts/` 下，原文件此后不再被读写。
  *
  * 名称取源文件名去掉扩展名（`default.js` → `default`）；逐个 try，一份失败不影响其余，
- * 失败原因收在结果里由界面汇总——静默跳过是禁止的。
+ * 失败原因收在结果里由界面汇总——静默跳过是禁止的。导入的脚本一律落到调用方指定的分组
+ * （`null` = 「未分组」）。
  */
-export async function importScripts(sourcePaths: string[]): Promise<ScriptImportResult> {
+export async function importScripts(sourcePaths: string[], groupId: number | null): Promise<ScriptImportResult> {
+  ensureScriptGroupIfAny(groupId);
   await ensureScriptsDir();
   const imported: ProcessScript[] = [];
   const failed: { path: string; message: string }[] = [];
@@ -180,7 +191,7 @@ export async function importScripts(sourcePaths: string[]): Promise<ScriptImport
 
       const base = basename(sourcePath);
       const name = base.replace(/\.[^.]*$/, '') || base;
-      const script = insertScript(name, filePath, false);
+      const script = insertScript(name, filePath, false, groupId);
       setScriptTypes(script.id, inspectScript(source, filePath).types);
       imported.push(getScriptById(script.id)!);
     } catch (error) {
@@ -266,12 +277,85 @@ export async function listScriptDrafts(): Promise<ScriptDraft[]> {
   return listDrafts();
 }
 
-/** 写一份草稿；一稿一文件，只有改动的那一份被重写 */
-export async function putScriptDraft(key: string, draft: { name: string; code: string }): Promise<void> {
-  await writeDraft({ key, name: draft.name, code: draft.code, updatedAt: new Date().toISOString() });
+/**
+ * 写一份草稿；一稿一文件，只有改动的那一份被重写。
+ *
+ * 分组只跟着 `new-` 草稿走：已入库脚本的分组在库里，草稿再存一份就成了两份真相。
+ */
+export async function putScriptDraft(
+  key: string,
+  draft: { name: string; code: string; groupId?: number | null },
+): Promise<void> {
+  const groupId = key.startsWith('new-') ? draft.groupId ?? null : null;
+  await writeDraft({ key, name: draft.name, code: draft.code, groupId, updatedAt: new Date().toISOString() });
 }
 
 /** 丢弃一份草稿：保存成功后、或者使用者点「放弃修改」时 */
 export async function deleteScriptDraft(key: string): Promise<void> {
   await removeDraft(key);
+}
+
+// ------------------------------------------------------------
+// 分组
+// ------------------------------------------------------------
+
+/** 列出全部分组；顺序（中文按拼音）由界面排，「未分组」固定在最后 */
+export function listScriptGroups(): ScriptGroup[] {
+  return getAllScriptGroups();
+}
+
+/** 分组名的统一整形：去首尾空白，空名字直接拒绝，别让库里出现看不见名字的分组 */
+function normalizeGroupName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed === '') {
+    throw new Error('分组名称不能为空');
+  }
+  return trimmed;
+}
+
+/** 传进来的分组必须真实存在：界面拿的是刚拉过的列表，悬空就说明那份列表已经过期 */
+function ensureScriptGroup(id: number): void {
+  if (!scriptGroupExists(id)) {
+    throw new Error(`分组不存在（id=${id}）`);
+  }
+}
+
+/** `null` 是合法取值（「未分组」），只有真给了 id 才需要查 */
+function ensureScriptGroupIfAny(id: number | null): void {
+  if (id !== null) {
+    ensureScriptGroup(id);
+  }
+}
+
+/** 建一个分组；名字允许重复，靠 id 区分 */
+export function createScriptGroup(name: string): ScriptGroup {
+  return insertScriptGroupRow(normalizeGroupName(name));
+}
+
+/** 改分组名 */
+export function renameScriptGroup(id: number, name: string): void {
+  ensureScriptGroup(id);
+  renameScriptGroupRow(id, normalizeGroupName(name));
+}
+
+/**
+ * 删一个分组。
+ *
+ * 只解散归属：组里的脚本回到「未分组」，脚本、正文文件、草稿、图库一律不动。
+ */
+export function deleteScriptGroup(id: number): void {
+  ensureScriptGroup(id);
+  deleteScriptGroupRow(id);
+}
+
+/** 记下折叠状态；「未分组」没有行可记，那份状态由界面自己留着 */
+export function setScriptGroupCollapsed(id: number, collapsed: boolean): void {
+  ensureScriptGroup(id);
+  setScriptGroupCollapsedRow(id, collapsed);
+}
+
+/** 把脚本挪进某个分组；`null` 就是放回「未分组」 */
+export function assignScriptGroup(scriptId: number, groupId: number | null): void {
+  ensureScriptGroupIfAny(groupId);
+  setScriptGroup(scriptId, groupId);
 }

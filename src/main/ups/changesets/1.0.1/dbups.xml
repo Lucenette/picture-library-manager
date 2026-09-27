@@ -25,4 +25,23 @@
       ALTER TABLE process_script DROP COLUMN brief;
     </sql>
   </changeSet>
+
+  <changeSet id="20260927220000000004" author="powerinv">
+    <comment>script_group | 脚本分组表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS script_group (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        collapsed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260927220000000005" author="powerinv">
+    <comment>process_script | 处理脚本表：新增分组列</comment>
+    <sql>
+      ALTER TABLE process_script ADD COLUMN group_id INTEGER;
+    </sql>
+  </changeSet>
 </databaseChangeLog>

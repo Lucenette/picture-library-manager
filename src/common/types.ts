@@ -71,8 +71,23 @@ export interface ProcessScript {
   types: ScriptType[];
   /** 内置脚本：源码随应用发布、不能删除，只能「恢复默认」 */
   builtin: boolean;
+  /** 所属分组；`null` 就是「未分组」（默认分组不占 script_group 的行） */
+  groupId: number | null;
   loadedAt: string;
   createdAt: string;
+}
+
+/**
+ * 脚本分组。
+ *
+ * 「未分组」不是这里的一行：脚本的 `groupId` 为 `null` 就是它，位置固定在最后。
+ * 名字允许重复，靠 `id` 区分。
+ */
+export interface ScriptGroup {
+  id: number;
+  name: string;
+  /** 具名分组的折叠状态存库；「未分组」没地方存，只在本次停留期间有效 */
+  collapsed: boolean;
 }
 
 /** 编译失败的位置；行或列取不到时为 null */
@@ -89,6 +104,12 @@ export interface ScriptDraft {
   /** 名称也是可编辑可未保存的，所以跟着草稿走 */
   name: string;
   code: string;
+  /**
+   * 新建脚本预定的分组（`null` = 「未分组」）。
+   *
+   * 只有 `new-` 草稿带得动它：已入库脚本的分组在库里，草稿再存一份就是两份真相。
+   */
+  groupId?: number | null;
   updatedAt: string;
 }
 
@@ -299,6 +320,10 @@ export interface PromptInitData {
   rowId?: number;
   /** 脚本页重命名携带的草稿 key（`script-<id>` / `new-<uuid>`） */
   scriptKey?: string;
+  /** 脚本页分组携带的分组 id：有它是改分组名，没有是新建分组 */
+  groupId?: number;
+  /** 进窗口后把预填的名字全选（新建分组用：回车用默认名，直接打字就把它覆盖掉） */
+  selectAll?: boolean;
 }
 
 /** 通用输入窗口的确认结果 */

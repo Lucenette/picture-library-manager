@@ -12,13 +12,12 @@
           <el-button text class="icon-btn" :icon="Search" @click="startSearch" />
         </el-tooltip>
         <el-tooltip content="新建分组" placement="bottom" :show-after="300">
-          <!-- 功能未实现：等分组做了再接动作 -->
-          <el-button text class="icon-btn" :icon="FolderAdd" />
+          <el-button text class="icon-btn" :icon="FolderAdd" @click="emit('group-new')" />
         </el-tooltip>
       </div>
 
-      <!-- 搜索框：点搜索按钮从 0 宽展开过来。搜索功能未实现，先把交互与位置定下来：
-           失焦时有内容就留着、空的就收，点清空那个叉号也收 -->
+      <!-- 搜索框：点搜索按钮从 0 宽展开过来，输入即过滤。失焦时有内容就留着、空的就收，
+           点清空那个叉号或按 Esc 都清空并收起 -->
       <el-input
         ref="searchEl"
         v-model="keyword"
@@ -32,41 +31,54 @@
     </div>
 
     <el-scrollbar class="side-list">
-      <!-- 分组现在只是外观：只有一组，将来真做分组时这里换成 v-for -->
-      <div class="group-head">
-        <button type="button" class="group-toggle" @click="collapsed = !collapsed">
-          <el-icon class="group-icon">
-            <component :is="collapsed ? Folder : FolderOpened" />
-          </el-icon>
-          <span class="group-name">未分组</span>
-          <span class="group-count">({{ visibleItems.length }})</span>
-        </button>
+      <!-- 一个分组一段：整段都是「拖脚本进来」的落点，高亮也就加在段上 -->
+      <section
+        v-for="group in groups"
+        :key="group.key"
+        class="group-section"
+        :class="{ 'is-drop-target': dropTargetKey === group.key }"
+        @dragover.prevent="onGroupDragOver(group)"
+        @drop.prevent="onGroupDrop(group)"
+      >
+        <div class="group-head" @contextmenu.prevent="onGroupContextMenu(group.id)">
+          <button type="button" class="group-toggle" @click="emit('group-toggle', group.id)">
+            <el-icon class="group-icon">
+              <component :is="isCollapsed(group) ? Folder : FolderOpened" />
+            </el-icon>
+            <span class="group-name">{{ group.name }}</span>
+            <span class="group-count">({{ countOf(group) }})</span>
+          </button>
 
-        <!-- 每个分组自己的动作：悬停或键盘进入时才露出来 -->
-        <div class="group-actions">
-          <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
-            <el-button text class="icon-btn" :icon="Plus" @click="emit('create')" />
-          </el-tooltip>
-          <el-tooltip content="加载文件" placement="bottom" :show-after="300">
-            <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import')" />
-          </el-tooltip>
+          <!-- 每个分组自己的动作：悬停或键盘进入时才露出来 -->
+          <div class="group-actions">
+            <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
+              <el-button text class="icon-btn" :icon="Plus" @click="emit('create', group.id)" />
+            </el-tooltip>
+            <el-tooltip content="加载文件" placement="bottom" :show-after="300">
+              <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import', group.id)" />
+            </el-tooltip>
+          </div>
         </div>
-      </div>
 
-      <template v-if="!collapsed">
-        <button
-          v-for="item in visibleItems"
-          :key="item.key"
-          type="button"
-          class="side-item"
-          :class="[`is-${item.state}`, { active: item.key === activeKey }]"
-          @click="emit('select', item.key)"
-          @contextmenu.prevent="emit('menu', item.key)"
-        >
-          <span class="side-name">{{ item.name }}</span>
-        </button>
-        <p v-if="visibleItems.length === 0" class="side-empty">没有符合筛选的脚本</p>
-      </template>
+        <template v-if="!isCollapsed(group)">
+          <button
+            v-for="item in visibleOf(group)"
+            :key="item.key"
+            type="button"
+            class="side-item"
+            :class="[`is-${item.state}`, { active: item.key === activeKey }]"
+            draggable="true"
+            @click="emit('select', item.key)"
+            @contextmenu.prevent="emit('menu', item.key)"
+            @dragstart="onItemDragStart($event, item.key)"
+            @dragend="onItemDragEnd"
+          >
+            <span class="side-name">{{ item.name }}</span>
+          </button>
+        </template>
+      </section>
+
+      <p v-if="visibleCount === 0" class="side-empty">没有符合条件的脚本</p>
     </el-scrollbar>
   </div>
 </template>
@@ -78,7 +90,7 @@ import { Folder, FolderAdd, FolderOpened, Plus, Search } from '@element-plus/ico
 import type { InputInstance } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
 import type { ScriptType, TypeFilterOpenData } from '@common/types';
-import { TYPE_LABELS, type SideItem } from './script-list';
+import { TYPE_LABELS, type ScriptGroupView, type SideItem } from './script-list';
 
 /** 过滤取值：三种已知类型 + 「一个类型都没识别到」 */
 type FilterValue = ScriptType | 'unknown';
@@ -92,30 +104,41 @@ const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
 ];
 
 const props = defineProps<{
-  /** 状态用名字颜色表示，照 IDEA 的 git 状态色：新建未保存绿、改过未保存蓝、干净默认色 */
-  items: SideItem[];
+  /** 一段一段的分组；顺序由页面排好（字典序，未分组在最后），这里只管渲染与筛选 */
+  groups: ScriptGroupView[];
   activeKey: string;
 }>();
 
 const emit = defineEmits<{
   (event: 'select', key: string): void;
-  (event: 'create'): void;
-  (event: 'import'): void;
+  /** 在某个分组里新建脚本；null = 未分组 */
+  (event: 'create', groupId: number | null): void;
+  /** 往某个分组里加载文件；null = 未分组 */
+  (event: 'import', groupId: number | null): void;
   /** 右键某一项：原生菜单由主进程弹，这里只报是哪一项 */
   (event: 'menu', key: string): void;
+  /** 顶栏的「新建分组」 */
+  (event: 'group-new'): void;
+  /** 右键某个分组的头；「未分组」不弹 */
+  (event: 'group-menu', groupId: number): void;
+  (event: 'group-toggle', groupId: number | null): void;
+  /** 把某一项拖进了某个分组；null = 未分组 */
+  (event: 'script-move', key: string, groupId: number | null): void;
 }>();
 
 /** 默认全选：不筛就是全部 */
 const selected = ref<FilterValue[]>(FILTER_OPTIONS.map((option) => option.value));
-const collapsed = ref(false);
 /** 过滤触发按钮：浮窗要按它的位置定位 */
 const filterEl = ref<HTMLElement | null>(null);
 /** 浮窗回发的订阅：浮窗是复用的，每次打开前先摘掉上一次那个 */
 let filterListener: ((event: IpcRendererEvent, selected: string[]) => void) | null = null;
-/** 搜索框：点搜索按钮才展开（搜索功能未实现，先只做交互） */
+/** 搜索框：点搜索按钮才展开，输入即过滤（脚本名或分组名，不区分大小写） */
 const searching = ref(false);
 const keyword = ref('');
 const searchEl = ref<InputInstance | null>(null);
+/** 正被拖着的那一项，以及它悬停到的分组：都只是这次拖拽的临时状态 */
+const draggingKey = ref<string | null>(null);
+const dropTargetKey = ref<string | null>(null);
 
 /**
  * 触发按钮上那一行：部分勾选时把名字用「、」连起来（Steam 那个下拉就是这么写的），
@@ -133,9 +156,17 @@ const filterLabel = computed(() => {
     .join('、');
 });
 
-/** 过滤后的列表 */
-const visibleItems = computed(
-  () => props.items.filter((item) => item.state === 'new' || matchesFilter(item.types)),
+/** 类型筛选不是全选，或者搜索框里有内容：计数这时显示「可见/总数」 */
+const filterActive = computed(
+  () => selected.value.length !== FILTER_OPTIONS.length || keyword.value.trim() !== '',
+);
+
+/** 搜索词：去空白并小写，匹配时用它 */
+const query = computed(() => keyword.value.trim().toLowerCase());
+
+/** 整张列表里可见的条目数：一个都没有时才给那行提示 */
+const visibleCount = computed(
+  () => props.groups.reduce((sum, group) => sum + visibleOf(group).length, 0),
 );
 
 onBeforeUnmount(() => {
@@ -143,6 +174,7 @@ onBeforeUnmount(() => {
     ipcRenderer.removeListener(IPC.TYPE_FILTER_CHANGED, filterListener);
     filterListener = null;
   }
+  setNativeDragAcceptance(false);
 });
 
 /** 展开搜索框并把焦点打进去 */
@@ -151,8 +183,9 @@ function startSearch(): void {
   void nextTick(() => searchEl.value?.focus());
 }
 
-/** 收起搜索框（Esc / 点清空叉号） */
+/** 清空并收起搜索框（Esc / 点清空叉号）：留着关键字却把框收起来，就成了看不见的过滤条件 */
 function endSearch(): void {
+  keyword.value = '';
   searching.value = false;
 }
 
@@ -199,6 +232,112 @@ function matchesFilter(types: ScriptType[]): boolean {
     return selected.value.includes('unknown');
   }
   return types.some((type) => selected.value.includes(type));
+}
+
+/**
+ * 搜索命中：**脚本名或它所属分组的名**里含这个子串（不区分大小写）。
+ *
+ * 判据照 DSH 的会话搜索（它匹配会话标题与所属工作区的名字）；不做正文搜索——
+ * 那要读每个脚本文件，是另一个量级的活。
+ */
+function matchesKeyword(group: ScriptGroupView, item: SideItem): boolean {
+  if (query.value === '') {
+    return true;
+  }
+  return item.name.toLowerCase().includes(query.value) || group.name.toLowerCase().includes(query.value);
+}
+
+/** 一个分组里可见的条目：类型筛选与搜索都通过才算 */
+function visibleOf(group: ScriptGroupView): SideItem[] {
+  return group.items.filter(
+    (item) => (item.state === 'new' || matchesFilter(item.types)) && matchesKeyword(group, item),
+  );
+}
+
+/** 这一个分组此刻折不折：搜索命中的分组临时展开——折叠状态本身不动，清空搜索就回到原样 */
+function isCollapsed(group: ScriptGroupView): boolean {
+  if (!group.collapsed) {
+    return false;
+  }
+  return !(query.value !== '' && visibleOf(group).length > 0);
+}
+
+/** 组头的计数：没筛选就是总数，筛了就是「可见/总数」 */
+function countOf(group: ScriptGroupView): string {
+  return filterActive.value ? `${visibleOf(group).length}/${group.items.length}` : `${group.items.length}`;
+}
+
+/** 右键分组头：「未分组」不能改名也不能删，所以它不弹菜单 */
+function onGroupContextMenu(groupId: number | null): void {
+  if (groupId === null) {
+    return;
+  }
+  emit('group-menu', groupId);
+}
+
+// ------------------------------------------------------------
+// 拖拽：只用来换分组
+// ------------------------------------------------------------
+
+function acceptDrag(event: DragEvent): void {
+  event.preventDefault();
+  if (event.dataTransfer !== null) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+}
+
+function acceptDrop(event: DragEvent): void {
+  event.preventDefault();
+}
+
+/**
+ * 拖动期间在 document 上放行落点（照 DSH 的 useNativeDragAcceptance）。
+ *
+ * 落点只在分组段上，光标一旦移到列表外就会显示成「禁止」，看起来像要丢件；在 document 上
+ * preventDefault 之后，松手在哪儿都不会出现那个光标，也不会丢掉最后一次落点。
+ */
+function setNativeDragAcceptance(active: boolean): void {
+  if (active) {
+    document.addEventListener('dragover', acceptDrag);
+    document.addEventListener('drop', acceptDrop);
+    return;
+  }
+  document.removeEventListener('dragover', acceptDrag);
+  document.removeEventListener('drop', acceptDrop);
+}
+
+function onItemDragStart(event: DragEvent, key: string): void {
+  draggingKey.value = key;
+  dropTargetKey.value = null;
+  if (event.dataTransfer !== null) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', key);
+  }
+  setNativeDragAcceptance(true);
+}
+
+/** 悬停到某个分组段上：它就是落点（落下只改归属，所以不区分上下半区） */
+function onGroupDragOver(group: ScriptGroupView): void {
+  if (draggingKey.value === null) {
+    return;
+  }
+  dropTargetKey.value = group.key;
+}
+
+function onGroupDrop(group: ScriptGroupView): void {
+  const key = draggingKey.value;
+  onItemDragEnd();
+  if (key === null) {
+    return;
+  }
+  emit('script-move', key, group.id);
+}
+
+/** 拖拽结束（含拖到窗口外松手）：清掉全部临时状态并摘掉 document 上的监听 */
+function onItemDragEnd(): void {
+  draggingKey.value = null;
+  dropTargetKey.value = null;
+  setNativeDragAcceptance(false);
 }
 </script>
 
@@ -319,10 +458,21 @@ function matchesFilter(types: ScriptType[]): boolean {
   padding: 0 var(--page-gap);
 }
 
-/* 行距：只在相邻两行之间留 2px（与 DSH 的 `.groupSection > * + *` 同一条规则），
-   高亮背景因此是 32px/34px 一个独立的圆角块，不会和邻行连成一片 */
+/* 段间距 4px、段内行距 2px：与 DSH 的 `.groupSection + .groupSection` / `.groupSection > * + *`
+   同一条规则。高亮背景因此是 32px/34px 一个独立的圆角块，不会和邻行连成一片 */
 .side-list :deep(.el-scrollbar__view) > * + * {
+  margin-top: 4px;
+}
+
+.group-section > * + * {
   margin-top: 2px;
+}
+
+/* 拖脚本时悬停到的分组：整段亮一下（落下只改归属，所以没有"插到某两行之间"的落点线） */
+.group-section.is-drop-target {
+  border-radius: var(--el-border-radius-base);
+  background: #26282b;
+  box-shadow: inset 0 0 0 1px #3e4044;
 }
 
 .group-head {

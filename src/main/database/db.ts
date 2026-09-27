@@ -5,7 +5,7 @@ import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
   Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
+  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
   SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
@@ -539,6 +539,8 @@ interface ScriptRow {
   name: string;
   filePath: string;
   builtin: number;
+  /** NULL = 「未分组」 */
+  groupId: number | null;
   loadedAt: string;
   createdAt: string;
 }
@@ -576,9 +578,18 @@ export function getScriptsByType(type: ScriptType): ProcessScript[] {
   return queryAll<ScriptRow>(SQL.SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
 }
 
-/** 插入一个脚本行；正文不进库，所以这里只收名称与文件路径 */
-export function insertScript(name: string, filePath: string, builtin: boolean): ProcessScript {
-  const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0]);
+/**
+ * 插入一个脚本行；正文不进库，所以这里只收名称、文件路径与归属。
+ *
+ * `groupId` 传 `null` 就是「未分组」——内置脚本与升级带进来的行都落在那里。
+ */
+export function insertScript(
+  name: string,
+  filePath: string,
+  builtin: boolean,
+  groupId: number | null,
+): ProcessScript {
+  const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0, groupId]);
   return getScriptById(id)!;
 }
 
@@ -628,6 +639,69 @@ export function hasScriptCodeColumn(): boolean {
 /** 老库接管：把每一条的旧源码读出来 */
 export function listLegacyScriptSources(): { id: number; name: string; filePath: string; code: string }[] {
   return queryAll<{ id: number; name: string; filePath: string; code: string }>(SQL.SELECT_LEGACY_SCRIPTS);
+}
+
+
+// ------------------------------------------------------------
+// ScriptGroup
+// ------------------------------------------------------------
+
+/** 行原始形态：SQLite 把 collapsed 存成 0/1，视图要的是 boolean */
+interface ScriptGroupRow {
+  id: number;
+  name: string;
+  collapsed: number;
+}
+
+function enrichScriptGroup(row: ScriptGroupRow): ScriptGroup {
+  return { id: row.id, name: row.name, collapsed: row.collapsed === 1 };
+}
+
+/** 列出全部分组。顺序交给界面（中文要按拼音，SQL 给不了），这里只保证顺序稳定 */
+export function getAllScriptGroups(): ScriptGroup[] {
+  return queryAll<ScriptGroupRow>(SQL.SELECT_SCRIPT_GROUPS).map(enrichScriptGroup);
+}
+
+/** 这个分组还在不在：界面手里的 id 可能是别处刚删掉的 */
+export function scriptGroupExists(id: number): boolean {
+  return queryOne<{ id: number }>(SQL.SELECT_SCRIPT_GROUP_BY_ID, [id]) !== undefined;
+}
+
+/** 建一个分组；名字允许重复，所以这里不做任何查重 */
+export function insertScriptGroup(name: string): ScriptGroup {
+  const id = insert(SQL.INSERT_SCRIPT_GROUP, [name]);
+  return { id, name, collapsed: false };
+}
+
+/** 改分组名：只动名字，成员的归属不受影响 */
+export function renameScriptGroup(id: number, name: string): void {
+  run(SQL.RENAME_SCRIPT_GROUP, [name, id]);
+}
+
+/** 记下折叠状态；「未分组」不占行，所以这里不会拿到 null */
+export function setScriptGroupCollapsed(id: number, collapsed: boolean): void {
+  run(SQL.SET_SCRIPT_GROUP_COLLAPSED, [collapsed ? 1 : 0, id]);
+}
+
+/**
+ * 删一个分组：成员回到「未分组」（`group_id = NULL`），脚本本身一行都不动。
+ *
+ * 两步必须一起成败——只删行会留下指向不存在分组的 `group_id`，界面上看不出来（会被兜回
+ * 「未分组」），但库里的数据已经悬空了。
+ */
+export function deleteScriptGroup(id: number): void {
+  beginBatch();
+  try {
+    run(SQL.CLEAR_SCRIPT_GROUP_MEMBERS, [id]);
+    run(SQL.DELETE_SCRIPT_GROUP, [id]);
+  } finally {
+    endBatch();
+  }
+}
+
+/** 改一个脚本的归属；`null` 就是放回「未分组」 */
+export function setScriptGroup(scriptId: number, groupId: number | null): void {
+  run(SQL.SET_SCRIPT_GROUP, [groupId, scriptId]);
 }
 
 
@@ -790,9 +864,7 @@ const DB_METHODS: Record<string, DbMethod> = {
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
 
-  getAllScripts,
   getScriptsByType,
-  renameScript,
 
   upsertProcessedImage,
   getAllProcessedImages,

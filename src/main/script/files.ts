@@ -117,6 +117,8 @@ export async function readDraft(key: string): Promise<ScriptDraft | null> {
       key,
       name: parsed.name,
       code: parsed.code,
+      // 只有「新建未保存」的草稿带得动分组，缺字段的老草稿就是「未分组」
+      groupId: typeof parsed.groupId === 'number' ? parsed.groupId : null,
       updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '',
     };
   } catch {

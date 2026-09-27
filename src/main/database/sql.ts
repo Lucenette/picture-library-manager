@@ -89,10 +89,25 @@ export const SQL = {
   SELECT_GROUP_ID_BY_FILE_PATH: 'SELECT image_group_id FROM image_file WHERE file_path = ?',
 
   // ----------------------------------------------------------
+  // ScriptGroup
+  // ----------------------------------------------------------
+
+  /** 建分组：名字允许重复，靠 id 区分 */
+  INSERT_SCRIPT_GROUP: 'INSERT INTO script_group (name) VALUES (?)',
+  /** 顺序交给界面（中文要按拼音，SQL 给不了），这里只保证顺序稳定 */
+  SELECT_SCRIPT_GROUPS: 'SELECT * FROM script_group ORDER BY id',
+  SELECT_SCRIPT_GROUP_BY_ID: 'SELECT id FROM script_group WHERE id = ?',
+  RENAME_SCRIPT_GROUP: 'UPDATE script_group SET name = ? WHERE id = ?',
+  SET_SCRIPT_GROUP_COLLAPSED: 'UPDATE script_group SET collapsed = ? WHERE id = ?',
+  DELETE_SCRIPT_GROUP: 'DELETE FROM script_group WHERE id = ?',
+  /** 删分组时把成员放回「未分组」 */
+  CLEAR_SCRIPT_GROUP_MEMBERS: 'UPDATE process_script SET group_id = NULL WHERE group_id = ?',
+
+  // ----------------------------------------------------------
   // ProcessScript
   // ----------------------------------------------------------
 
-  INSERT_SCRIPT: "INSERT INTO process_script (name, file_path, builtin, loaded_at) VALUES (?, ?, ?, datetime('now','localtime'))",
+  INSERT_SCRIPT: "INSERT INTO process_script (name, file_path, builtin, group_id, loaded_at) VALUES (?, ?, ?, ?, datetime('now','localtime'))",
   SELECT_SCRIPT_BY_PATH: 'SELECT * FROM process_script WHERE file_path = ?',
   SELECT_SCRIPT_BY_ID: 'SELECT * FROM process_script WHERE id = ?',
   SELECT_SCRIPT_BUILTIN: 'SELECT * FROM process_script WHERE builtin = 1 LIMIT 1',
@@ -102,6 +117,8 @@ export const SQL = {
   /** 接管旧脚本与内置脚本落盘：只回填文件路径 */
   SET_SCRIPT_FILE_PATH: "UPDATE process_script SET file_path = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
   TOUCH_SCRIPT_LOADED_AT: "UPDATE process_script SET loaded_at = datetime('now','localtime') WHERE id = ?",
+  /** 改归属：`null` 就是放回「未分组」 */
+  SET_SCRIPT_GROUP: 'UPDATE process_script SET group_id = ? WHERE id = ?',
   /** 改写图库里的脚本名副本（改名级联） */
   RENAME_PROCESSED_SCRIPT_NAME: 'UPDATE processed_image SET script_name = ? WHERE script_id = ?',
   COUNT_PROCESSED_BY_SCRIPT: 'SELECT COUNT(*) AS processed FROM processed_image WHERE script_id = ?',
