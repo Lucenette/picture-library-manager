@@ -119,7 +119,7 @@ function matchesFilter(types: ScriptType[]): boolean {
   display: flex;
   flex-direction: column;
   flex: none;
-  padding: var(--page-padding);
+  padding: 0;
   width: 300px;
   min-height: 0;
   border-right: 2px solid var(--el-fill-color-light);
@@ -130,6 +130,7 @@ function matchesFilter(types: ScriptType[]): boolean {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: var(--page-padding);
 }
 
 .side-head .el-button + .el-button {
@@ -139,10 +140,15 @@ function matchesFilter(types: ScriptType[]): boolean {
 /* 纯图标按钮：无边框、方角（EP 默认的 --el-border-radius-base = 4px）、32px 见方——
    与过滤控件、右栏输入框同高；字号提到 16px，图标随字号缩放，和左侧导航栏的图标一样大 */
 .side-head .icon-btn {
-  width: 32px;
   padding: 0;
   border-radius: var(--el-border-radius-base);
   font-size: 16px;
+  color: var(--el-text-color-secondary);
+
+  &:hover {
+    color: var(--el-text-color-regular);
+    background: inherit !important;
+  }
 }
 
 /* 自己画的控件也要长得像输入框：照 theme.css 里 .el-input__wrapper 的那套规格 */
@@ -195,7 +201,8 @@ function matchesFilter(types: ScriptType[]): boolean {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 0;
+  padding: var(--page-padding);
+  padding-top: 10px;
 }
 
 .group-head {
@@ -248,7 +255,7 @@ function matchesFilter(types: ScriptType[]): boolean {
   width: 100%;
   padding: 8px 12px 8px 28px;
   border: none;
-  border-left: 2px solid transparent;
+  border-radius: var(--el-border-radius-base);
   background: none;
   color: var(--el-text-color-regular);
   font-size: var(--el-font-size-base);

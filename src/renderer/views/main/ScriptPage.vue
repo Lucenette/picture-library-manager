@@ -16,6 +16,7 @@
       :types="types"
       :error="error"
       :problem-count="problemCount"
+      :changes="changes"
       :dirty="dirty"
       @save="save"
       @problems="problemCount = $event"
@@ -41,6 +42,7 @@ import {
 } from '@/services/script-service';
 import ScriptEditor from './scripts/ScriptEditor.vue';
 import ScriptSideList from './scripts/ScriptSideList.vue';
+import { diffLineChanges, type ScriptLineChange } from './scripts/diff';
 import type { SideAction, SideItem } from './scripts/script-list';
 
 /** 草稿防抖：1 秒。VS Code 的 hot exit 也是这个量级（默认 1000ms，开 autosave 时 2000ms） */
@@ -75,6 +77,20 @@ let draftTimer: ReturnType<typeof setTimeout> | null = null;
 const dirty = computed(
   () => name.value !== baseline.value.name || code.value !== baseline.value.code,
 );
+
+/**
+ * 自上次保存改了哪里：拿当前正文跟磁盘上那一版比。
+ *
+ * 算法就在渲染进程跑，而且做成计算属性——正文一变就重算（几百行的脚本是亚毫秒级，实测 3000 行
+ * 也就几毫秒），所以色条跟手，不需要防抖，也不会有「算出来的结果已经过期」这种问题。
+ */
+const changes = computed<ScriptLineChange[]>(() => {
+  // 还没落盘：没有可比的一版，不画色条（列表那边已经用绿色标了「新建」）
+  if (activeKey.value.startsWith('new-')) {
+    return [];
+  }
+  return diffLineChanges(baseline.value.code, code.value);
+});
 
 /**
  * 左栏那一列：库里的脚本与新建未保存的草稿放在一起，一律按名称字典序排。
@@ -229,6 +245,7 @@ async function syncDraftAndCheck(): Promise<void> {
   await flushDraft();
   await checkCurrent();
 }
+
 
 async function loadDrafts(): Promise<void> {
   const list = await listScriptDrafts();

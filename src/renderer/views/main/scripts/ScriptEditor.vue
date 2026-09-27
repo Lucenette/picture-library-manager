@@ -5,6 +5,7 @@
         v-model="code"
         :document-key="documentKey"
         :error="error"
+        :changes="changes"
         @save="emit('save')"
         @caret="caret = $event"
         @format="format = $event"
@@ -53,6 +54,7 @@ import { computed, ref } from 'vue';
 import { WarningFilled } from '@element-plus/icons-vue';
 import type { ScriptCompileError, ScriptType } from '@common/types';
 import MonacoEditor from './MonacoEditor.vue';
+import type { ScriptLineChange } from './diff';
 import { TYPE_LABELS } from './script-list';
 
 const props = defineProps<{
@@ -63,6 +65,8 @@ const props = defineProps<{
   error: ScriptCompileError | null;
   /** Monaco 自带的实时语法诊断条数：它比主进程编译更早发现写坏了的草稿 */
   problemCount: number;
+  /** 与磁盘那一版的逐行差异：编辑器左边那些改动色条 */
+  changes: ScriptLineChange[];
   dirty: boolean;
 }>();
 
@@ -127,7 +131,6 @@ const problemTitle = computed(() => {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  /* 表头没了，编辑区自己让出与左栏表头一致的上边距（左栏那份来自 .script-side 的 --page-padding） */
   padding-top: var(--page-gap);
 }
 

@@ -5,7 +5,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ScriptCompileError } from '@common/types';
+import type { ScriptLineChange } from './diff';
 import { monaco } from './monaco-env';
+
+/** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，与主题里那三个语义色一致 */
+const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
+  added: '#4ab86a',
+  modified: '#3871e1',
+  deleted: '#c75458',
+};
 
 const props = defineProps<{
   modelValue: string;
@@ -13,6 +21,8 @@ const props = defineProps<{
   documentKey: string;
   /** 当前显示内容的编译错误；行列取不到时标记退回第一行 */
   error: ScriptCompileError | null;
+  /** 与磁盘那一版的逐行差异：左边槽里画改动色条 */
+  changes: ScriptLineChange[];
 }>();
 
 const emit = defineEmits<{
@@ -36,6 +46,8 @@ const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>();
 
 /** 出错那一行整行染色的装饰集合 */
 let errorLine: monaco.editor.IEditorDecorationsCollection | null = null;
+/** 「自上次保存改了哪里」的装饰集合 */
+let changeDecorations: monaco.editor.IEditorDecorationsCollection | null = null;
 /** marker 变化的订阅：Monaco 的语法诊断是异步算出来的，得靠它上报 */
 let markerSubscription: monaco.IDisposable | null = null;
 /** 正在把外部内容灌进编辑器：这一轮的变化不要再抛回去，否则会绕成环 */
@@ -202,6 +214,32 @@ function reportFormat(): void {
   emit('format', `${eol} · ${indent}`);
 }
 
+/**
+ * 画「自上次保存改了哪里」。
+ *
+ * 新增与修改用行号右侧那条窄带上的色条（`linesDecorationsClassName`），纯删除在那条带上画个小三角；
+ * 同时在右侧概览标尺上打一个同样的颜色，滚轮拉得再远也看得见改了哪儿。
+ */
+function applyChanges(): void {
+  if (changeDecorations === null) {
+    return;
+  }
+
+  changeDecorations.set(
+    props.changes.map((change) => ({
+      range: new monaco.Range(change.startLineNumber, 1, change.endLineNumber, 1),
+      options: {
+        isWholeLine: true,
+        linesDecorationsClassName: `plm-change-${change.kind}`,
+        overviewRuler: {
+          color: CHANGE_COLORS[change.kind],
+          position: monaco.editor.OverviewRulerLane.Left,
+        },
+      },
+    })),
+  );
+}
+
 onMounted(() => {
   if (!hostEl.value) {
     return;
@@ -223,6 +261,10 @@ onMounted(() => {
     smoothScrolling: true,
     // 问题面板在编辑器外面，浮动控件要允许溢出容器，否则提示会被裁掉
     fixedOverflowWidgets: true,
+    // 不用 Monaco 自带的右键菜单（剪切/复制/命令面板那一套）：脚本页的菜单一律走原生菜单
+    contextmenu: false,
+    // 行号与正文之间那条窄带：默认 10px 太窄，改动色条会紧贴行号（见下面的 .plm-change-* 样式）
+    lineDecorationsWidth: 14,
     // 120 列竖线：一行的长度是否超了，扫一眼就知道（写数字即可，颜色用 Monaco 的默认值）
     rulers: [120],
     // 粘性滚动：当前作用域（module.exports 里那个方法）滚出屏幕时，把它的首行钉在顶部
@@ -242,6 +284,8 @@ onMounted(() => {
 
   errorLine = editor.createDecorationsCollection([]);
   applyMarkers();
+  changeDecorations = editor.createDecorationsCollection([]);
+  applyChanges();
   // 我们设的编译标记与 Monaco 的语法诊断都会触发它，状态图标因此能实时反映问题
   markerSubscription = monaco.editor.onDidChangeMarkers(() => reportProblems());
   reportProblems();
@@ -256,6 +300,7 @@ onMounted(() => {
 watch(() => props.documentKey, switchDocument);
 watch(() => props.modelValue, syncValue);
 watch(() => props.error, applyMarkers, { deep: true });
+watch(() => props.changes, applyChanges, { deep: true });
 
 onBeforeUnmount(() => {
   markerSubscription?.dispose();
@@ -279,5 +324,31 @@ onBeforeUnmount(() => {
 /* 编译失败那一行的底色；装饰画在 Monaco 自己的 DOM 里，所以要 :deep */
 .monaco-host :deep(.plm-error-line) {
   background: rgba(199, 84, 88, 0.16);
+}
+
+/* 「自上次保存改了哪里」：行号右侧那条窄带上的色条（Git 那种 gutter 标记）。
+   margin-left 让它离行号有一点距离，既不贴住数字，也不压到正文 */
+.monaco-host :deep(.plm-change-added) {
+  margin-left: 4px;
+  border-left: 3px solid #4ab86a;
+  box-sizing: border-box;
+}
+
+.monaco-host :deep(.plm-change-modified) {
+  margin-left: 4px;
+  border-left: 3px solid #3871e1;
+  box-sizing: border-box;
+}
+
+/* 纯删除在当前正文里没有行，就在那一行上沿画个三角 */
+.monaco-host :deep(.plm-change-deleted::after) {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 4px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid #c75458;
+  border-right: 5px solid transparent;
 }
 </style>
