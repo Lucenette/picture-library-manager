@@ -218,11 +218,16 @@ export function execSql(sql: string): void {
 export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
   const handle = db!;
   handle.exec('BEGIN');
+  // 也占住嵌套计数器：升级脚本里若调到 beginBatch()/endBatch()（例如 renameScript），
+  // 那一次就该退化成「嵌套」而不是再发一个 BEGIN——SQLite 不允许事务里再开事务
+  batchDepth += 1;
   try {
     const result = await fn();
+    batchDepth -= 1;
     handle.exec('COMMIT');
     return result;
   } catch (error) {
+    batchDepth -= 1;
     handle.exec('ROLLBACK');
     throw error;
   }
