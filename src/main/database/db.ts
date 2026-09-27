@@ -9,13 +9,9 @@ import { BUILTIN_SCRIPT } from '@/script/defaults';
 import type {
   Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
-  MigrationProgress, SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
+  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
-import { runChangesets } from '@/database/changeset';
-import type { MigrationOutcome } from '@/database/changeset';
-import { initChangesetIpc } from '@/database/changeset-ipc';
-import { CHANGELOG_FILES } from '@/database/changesets';
 import { SQL } from '@/database/sql';
 
 // ------------------------------------------------------------
@@ -150,7 +146,7 @@ function backupDatabase(): void {
  * 打包态不能用 exe 同级：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录；
  * Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部——都不是能写库的地方。
  */
-function getDataDir(): string {
+export function getDataDir(): string {
   return app.isPackaged
     ? join(homedir(), '.plmanager', 'data')
     : join(process.cwd(), 'dist', 'data');
@@ -180,21 +176,9 @@ export function initDatabase(): void {
   }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
-}
 
-/** 执行待处理的 changeset，并在动库之前留一份备份 */
-export function runMigrations(
-  onProgress: (progress: MigrationProgress) => void,
-  shouldAbort?: () => boolean,
-): Promise<MigrationOutcome> {
-  return runChangesets({
-    db: db!,
-    dbPath,
-    backupsDir: join(getDataDir(), 'backups'),
-    files: CHANGELOG_FILES,
-    onProgress,
-    shouldAbort,
-  });
+  // 数据库相关的初始化只在这一个函数里：开库 + 注册 DB 通道
+  registerDbIpc();
 }
 
 /** 关闭数据库，供退出前调用；WAL 会在关闭时合并回主文件 */
@@ -208,6 +192,77 @@ export function closeDatabase(): void {
     console.error('[db] 关闭数据库失败：', error);
   }
   db = null;
+}
+
+// ------------------------------------------------------------
+// 升级模块的接口
+// ------------------------------------------------------------
+
+/** 账本里的一行 */
+export interface MigrationLedgerRow {
+  author: string;
+  id: string;
+  filename: string;
+  exectype: string;
+  /** 全局执行序号，用来算下一个序号 */
+  orderExecuted: number;
+}
+
+/** 要写进账本的一行 */
+export interface MigrationLedgerEntry {
+  author: string;
+  id: string;
+  filename: string;
+  title: string;
+  exectype: 'executed' | 'failed';
+  order: number;
+  executionMs: number;
+}
+
+/** 库文件路径：升级模块备份时要用 */
+export function getDbPath(): string {
+  return dbPath;
+}
+
+/** 在库上执行一段 SQL：升级模块用它跑迁移 SQL、建账本、做 checkpoint */
+export function execSql(sql: string): void {
+  db!.exec(sql);
+}
+
+/**
+ * 把一段回调包进一个事务：要么全做、要么全不做。
+ *
+ * 与 beginBatch / endBatch 不是一回事：那条路径不接受回滚，这里要的是失败时整体回滚。
+ * 回调可以是异步的（升级脚本就是异步的）。
+ */
+export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
+  const handle = db!;
+  handle.exec('BEGIN');
+  try {
+    const result = await fn();
+    handle.exec('COMMIT');
+    return result;
+  } catch (error) {
+    handle.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/** 读账本：「跑过没有」由升级模块按身份判断 */
+export function readMigrationLedger(): MigrationLedgerRow[] {
+  return queryAll<MigrationLedgerRow>(SQL.SELECT_MIGRATION_LEDGER);
+}
+
+/**
+ * 写一条账本记录。
+ *
+ * 不走 run()：那条路径会按 BACKUP_INTERVAL_MS 触发一次整库复制，升级过程中不需要再来一次
+ * ——升级自己已经在开始前备份过。
+ */
+export function writeMigrationLedger(entry: MigrationLedgerEntry): void {
+  db!
+    .prepare(SQL.WRITE_MIGRATION_LEDGER)
+    .run(entry.author, entry.id, entry.filename, entry.title, entry.exectype, entry.order, entry.executionMs);
 }
 
 // ------------------------------------------------------------
@@ -506,18 +561,18 @@ function enrichScript(script: ProcessScript): ProcessScript {
   };
 }
 
-/** 按文件路径查询脚本并补齐类型 */
-function getScriptByPath(filePath: string): ProcessScript {
+/** 按文件路径查询脚本并补齐类型；升级脚本用它判断「这一条是不是已经在了」 */
+export function getScriptByPath(filePath: string): ProcessScript {
   return enrichScript(queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath])!);
 }
 
 /**
- * 新增或更新脚本，按文件路径去重。
+ * 新增或更新脚本，按文件路径去重；导出的方法类型自动检测。
  *
- * @param types 显式指定类型；省略时自动检测
+ * 升级脚本（`ups/changesets/`）用它把内置默认脚本写进库。
  */
-function upsertScript(name: string, filePath: string, code: string, types?: ScriptType[]): ProcessScript {
-  const resolvedTypes = types ?? detectScriptTypes(code);
+export function upsertScript(name: string, filePath: string, code: string): ProcessScript {
+  const resolvedTypes = detectScriptTypes(code);
   const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
 
   if (existing) {
@@ -548,19 +603,6 @@ export function importScript(filePath: string): ProcessScript {
 /** 用磁盘上的最新内容重新载入已入库的脚本 */
 export function reloadScriptFromFile(filePath: string): ProcessScript {
   return reloadScript(filePath, readFileSync(filePath, 'utf-8'));
-}
-
-/**
- * 播种内置默认脚本：库里还没有这一条时插入，已有则原样不动。
- *
- * 它不允许删除，所以插过一次就一直在——不需要额外的「已播种」标记，
- * 也不会覆盖使用者改过的代码。
- */
-export function seedBuiltinScript(): void {
-  if (queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [BUILTIN_SCRIPT.path])) {
-    return;
-  }
-  upsertScript(BUILTIN_SCRIPT.name, BUILTIN_SCRIPT.path, BUILTIN_SCRIPT.source);
 }
 
 /** 用随应用发布的内置源码覆盖内置脚本；名字是使用者的，不动 */
@@ -774,10 +816,13 @@ const DB_METHODS: Record<string, DbMethod> = {
   deleteProcessedImage,
 };
 
-/** 注册数据库相关的全部 IPC 通道，含加载页用的那三条 changelog 通道 */
-export function initDbIpc(): void {
-  initChangesetIpc();
-
+/**
+ * 注册数据库通道。
+ *
+ * 升级页那几条通道不在这里：它们归升级模块（见 ups/progress.ts），由 initUps() 注册。
+ * 本函数由 initDatabase() 调用——数据库的初始化只有那一个入口。
+ */
+function registerDbIpc(): void {
   ipcMain.handle(IPC.DB, (_event, method: string, ...args: unknown[]) => {
     const handler = DB_METHODS[method];
     if (!handler) {

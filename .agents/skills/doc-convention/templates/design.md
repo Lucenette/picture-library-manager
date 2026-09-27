@@ -2,7 +2,7 @@
 
 用于 `docs/design/<子系统>.md`——已经落地的子系统。参考
 [window-management.md](../../../../docs/design/window-management.md)（现行架构）与
-[db-migration.md](../../../../docs/design/db-migration.md)（由路线图迁入）。
+[ups.md](../../../../docs/design/ups.md)（由路线图迁入）。
 
 与路线图方案的区别只有三点：状态行不同；必须在背景后保留 `### 1.1 修改历史`；正文用现在时陈述既成事实，
 不再出现「将要」「计划」。文件本身由路线图 `git mv` 而来，不在这里新写。

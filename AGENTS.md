@@ -39,7 +39,8 @@
 | `src/common/` | **主进程与渲染进程都在用**的契约（类型、IPC 通道名） | 只被单进程使用的模块——放回该进程目录 |
 | `src/main/image/` | 图片处理流水线：目录遍历 + 解码线程池 | 业务语义（任务、进度、图库概念） |
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
-| `src/main/database/` | 开库、CRUD、changelog 迁移与账本、DB 的 IPC 调度 | 业务编排；建表语句——结构写在 `changesets/*.xml` 里 |
+| `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎、升级页 IPC；调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
+| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 处理脚本的编译与调用 | 脚本的存储与查询——那是 `database` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
@@ -163,7 +164,7 @@ function upsertScript(...) {}
 ### 4. 新增 IPC 的归属
 
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
-- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts`），在 `src/main/index.ts` 里与 `initDbIpc()` 并列注册。
+- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `ups/progress.ts`），由各自模块的 `initXxx()` 在 `src/main/index.ts` 的启动流程里注册。
 
 ### 5. 弹窗一律用原生窗口
 
@@ -191,17 +192,25 @@ function upsertScript(...) {}
 - 进度写库节流到不低于 1 秒；任务成功结束时进度记为 100%。
 - 新增一种任务照 `docs/ARCHITECTURE.md` 末尾的五步配方；runner 只在单元边界调用 `ctx.checkpoint()`。
 
-### 8. 数据库结构由 changelog 演进
+### 8. 升级模块与版本目录
 
-- 建表语句不进代码，写进 `src/main/database/changesets/<package.json 的版本号>.xml` 的 `<changeSet>` 里；
-  一条 changeset 用 `<comment>` 说明它做了什么。
-- **已发布的版本文件冻结**：新的结构变更写进新版本的文件。改一条已经执行过的 changeset 不会生效——
-  它会被账本判定为已跑过而跳过，而且没有任何校验会告诉你这件事。
-- 一条 changeset 的身份是 `(author, id, filename)`，`id` 用 20 位定长数字时间戳；账本表
-  `schema_migration` 记着哪些跑过了。**账本表由 `changeset.ts` 用代码创建，不要写进 changelog**：
-  账本不存在时，没有任何地方能记录「创建账本」这件事。
-- 结构与数据订正都写在这里；需要图片解码或文件 IO 的补数据仍归任务系统，不要塞进 changeset。
+- 升级独立成 `src/main/ups/`，`src/main/database/` 是它的下层：升级模块调用数据库模块跑 SQL、读写账本，
+  **`database/` 里不出现 `@/ups`**。
+- 一个版本 = `src/main/ups/changesets/<package.json 的版本号>/` 一个目录，最多三件东西：
+  `preups.ts`（SQL 之前跑）、`dbups.xml`（`<changeSet>`）、`postups.ts`（SQL 之后跑），缺哪个就跳过哪个。
+  目录里的 `index.ts` 写死 `VERSION` 并导出 `changelog`——**版本号以代码里的常量为准，目录名只给人看**；
+  外层 `changesets/index.ts` 只 import 各版本目录的 `index.ts`。清单里出现相同版本号直接抛错。
+- 建表语句不进代码，写进 `dbups.xml` 的 `<changeSet>` 里，一条用 `<comment>` 说明它做了什么。
+- **账本按身份记账、执行过的不再执行**：changeSet 是 `(author, id, filename)`（`id` 用 20 位定长数字时间戳），
+  脚本是 `(script, 'preups' | 'postups', 版本号)`。**已发布版本的目录冻结**：改一条已执行的 changeset 或脚本
+  都不会生效，要重跑得先删掉 `schema_migration` 里那一行。账本表由引擎用代码创建，不要写进 changelog。
+- 升级脚本是普通模块（可以 import 任何东西），但：一律异步 IO；不要自己写 `BEGIN` / `COMMIT`；
+  不要吞异常（抛错才回滚，脚本写进库的东西随事务一起不留）；**文件操作不受事务保护**，
+  要改或删已有文件就自己先备份，并保证重复执行是安全的。
+- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ `await initUps()`（升级）→ 其余初始化。
+  **升级终态发出之后到所有通道注册完成之间不许有 `await`**，否则渲染进程可能在通道还没注册时就回主界面。
 - 转义由写的人负责：`<sql>` 里出现 `<` 写成 `&lt;`（漏写可能被 XML 当成标签吞掉），`&` 写成 `&amp;`。
+- 需要图片解码的补数据仍归任务系统，不要塞进 changeSet。
 
 ### 9. 自绘标题栏
 

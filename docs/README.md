@@ -24,6 +24,6 @@
 
 ## 检查
 
-`node scripts/check-docs.mjs` 检查编码（无 BOM 的合法 UTF-8，含 `changesets/*.xml`）、相对链接与锚点、
+`node scripts/check-docs.mjs` 检查编码（无 BOM 的合法 UTF-8，含 `ups/changesets/**/dbups.xml`）、相对链接与锚点、
 `roadmap/` 与 `design/` 的 README 索引、skill 的 frontmatter、占位符残留。零依赖，CI 与
 [AGENTS.md](../AGENTS.md) 的「改完必须自检」都会跑它。

@@ -20,7 +20,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 const SCAN_DIRS = ['docs', '.agents/skills'];
 const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'CONTRIBUTING.md'];
 /** 只校验编码、不参与链接与索引检查的目录：changelog 里有中文表名注释，存错编码会静默变成乱码写进账本。 */
-const ENCODING_DIRS = ["src/main/database/changesets"];
+const ENCODING_DIRS = ["src/main/ups/changesets"];
 /** 这两个目录的 README 是索引表，必须与目录内的文件双向一致。 */
 const INDEX_DIRS = ['docs/roadmap', 'docs/design'];
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -210,18 +210,29 @@ function checkLinks(sources) {
   return linkCount;
 }
 
+/** 递归收集目录下的 XML；changelog 现在按版本目录存放（ups/changesets/<版本>/dbups.xml） */
+function walkXml(absDir, relDir, out) {
+  if (!existsSync(absDir)) {
+    return;
+  }
+  for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+    const rel = `${relDir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      walkXml(join(absDir, entry.name), rel, out);
+    } else if (entry.isFile() && entry.name.endsWith(".xml")) {
+      out.push(rel);
+    }
+  }
+}
+
 /** 校验只关心编码的目录（readText 内部报错，返回值丢弃）。 */
 function checkEncodings() {
+  const files = [];
   for (const dir of ENCODING_DIRS) {
-    const absDir = resolve(ROOT, dir);
-    if (!existsSync(absDir)) {
-      continue;
-    }
-    for (const entry of readdirSync(absDir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(".xml")) {
-        readText(`${dir}/${entry.name}`);
-      }
-    }
+    walkXml(resolve(ROOT, dir), dir, files);
+  }
+  for (const rel of files) {
+    readText(rel);
   }
 }
 

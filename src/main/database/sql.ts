@@ -154,4 +154,21 @@ export const SQL = {
   LEFT JOIN process_script ps ON pi.script_id = ps.id
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
+
+  // ----------------------------------------------------------
+  // 升级账本
+  //
+  // 账本表由升级引擎用代码创建（不写进 changelog），这里只有读写语句。
+  // 「跑过没有」按 (author, id, filename) 三元组判断，失败行不算跑过。
+  // ----------------------------------------------------------
+
+  SELECT_MIGRATION_LEDGER: 'SELECT author, id, filename, exectype, order_executed FROM schema_migration',
+  WRITE_MIGRATION_LEDGER: `INSERT INTO schema_migration (author, id, filename, title, exectype, order_executed, applied_at, execution_ms)
+  VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'), ?)
+  ON CONFLICT(author, id, filename) DO UPDATE SET
+    title = excluded.title,
+    exectype = excluded.exectype,
+    order_executed = excluded.order_executed,
+    applied_at = excluded.applied_at,
+    execution_ms = excluded.execution_ms`,
 };

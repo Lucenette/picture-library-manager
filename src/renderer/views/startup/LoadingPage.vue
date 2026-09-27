@@ -60,14 +60,14 @@ function apply(next: MigrationProgress): void {
 
 /** 失败页的退出：交给主进程决定何时结束进程 */
 function quit(): void {
-  void ipcRenderer.invoke(IPC.CHANGESET_QUIT);
+  void ipcRenderer.invoke(IPC.UPS_QUIT);
 }
 
 // 先订阅再取快照：升级比页面加载更快时，快照里已经是终态
-useIpcListener(IPC.CHANGESET_PROGRESS, (next: MigrationProgress) => apply(next));
+useIpcListener(IPC.UPS_PROGRESS, (next: MigrationProgress) => apply(next));
 
 onMounted(async () => {
-  const snapshot = (await ipcRenderer.invoke(IPC.CHANGESET_STATE)) as MigrationProgress | null;
+  const snapshot = (await ipcRenderer.invoke(IPC.UPS_STATE)) as MigrationProgress | null;
   if (snapshot) {
     apply(snapshot);
   }

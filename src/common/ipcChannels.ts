@@ -75,8 +75,8 @@ export const IPC = {
   POPUP_STATE: 'popup:state',
   POPUP_HIDE: 'popup:hide',
 
-  // 数据库升级
-  CHANGESET_STATE: 'changeset:state',
-  CHANGESET_PROGRESS: 'changeset:progress',
-  CHANGESET_QUIT: 'changeset:quit',
+  // 升级模块（ups）：升级页的状态、进度与退出
+  UPS_STATE: 'ups:state',
+  UPS_PROGRESS: 'ups:progress',
+  UPS_QUIT: 'ups:quit',
 } as const;

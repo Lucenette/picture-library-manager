@@ -19,10 +19,10 @@ let settle: (() => void) | null = null;
 // 对外
 // ------------------------------------------------------------
 
-/** 注册数据库升级用的通道；必须在主窗口加载之前调用 */
-export function initChangesetIpc(): void {
-  ipcMain.handle(IPC.CHANGESET_STATE, () => latest);
-  ipcMain.handle(IPC.CHANGESET_QUIT, () => {
+/** 注册升级页的两条通道；由 initUps() 调用，不单独出现在启动流程里 */
+export function initUpsIpc(): void {
+  ipcMain.handle(IPC.UPS_STATE, () => latest);
+  ipcMain.handle(IPC.UPS_QUIT, () => {
     const current = settle;
     settle = null;
     current?.();
@@ -30,16 +30,16 @@ export function initChangesetIpc(): void {
 }
 
 /** 推送进度并记下快照，供后加载的加载页补齐 */
-export function sendChangesetProgress(progress: MigrationProgress): void {
+export function sendUpsProgress(progress: MigrationProgress): void {
   latest = progress;
   const mainWindow = get('main');
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(IPC.CHANGESET_PROGRESS, progress);
+    mainWindow.webContents.send(IPC.UPS_PROGRESS, progress);
   }
 }
 
 /** 等待用户在失败页点「退出」 */
-export function waitForChangesetQuit(): Promise<void> {
+export function waitUpsQuit(): Promise<void> {
   return new Promise((resolve) => {
     settle = resolve;
   });
