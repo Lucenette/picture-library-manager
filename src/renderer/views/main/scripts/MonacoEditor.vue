@@ -84,7 +84,10 @@ onMounted(() => {
     fontSize: 13,
     tabSize: 4,
     insertSpaces: true,
-    scrollBeyondLastLine: false,
+    // 滚到底之后还能继续滚：最后一行可以升到视口顶部，改文件末尾时不用挤在屏幕最下边
+    scrollBeyondLastLine: true,
+    // 平滑滚动：滚轮推一下带一点缓动，不是一格一格跳
+    smoothScrolling: true,
     // 问题面板在编辑器外面，浮动控件要允许溢出容器，否则提示会被裁掉
     fixedOverflowWidgets: true,
     // 120 列竖线：一行的长度是否超了，扫一眼就知道（写数字即可，颜色用 Monaco 的默认值）
