@@ -3,6 +3,14 @@ import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 
 // ------------------------------------------------------------
+// 常量
+// ------------------------------------------------------------
+
+/** 系统窗口按钮的字形色：失焦时跟标题栏一起压暗（Windows / Linux 的 WCO 需要显式设置） */
+const SYMBOL_COLOR_ACTIVE = '#d8dadd';
+const SYMBOL_COLOR_INACTIVE = '#8e9196';
+
+// ------------------------------------------------------------
 // 类型
 // ------------------------------------------------------------
 
@@ -22,6 +30,19 @@ interface WindowConfig {
   modal?: boolean;
   /** 是否显示系统边框，false 为无边框 */
   frame?: boolean;
+  /**
+   * 自绘标题栏：去掉系统画的标题栏，但**保留系统的窗口按钮**。
+   *
+   * Windows / Linux 靠 `titleBarOverlay`（Window Controls Overlay）让系统继续画最小化 / 最大化 / 关闭，
+   * macOS 保留左上角的红绿灯。渲染进程那边要自己画一条标题栏（拖拽区、安全区），
+   * 见 docs/design/window-management.md 第 7 节。
+   */
+  titleBar?: {
+    /** 标题栏高度（px），必须与渲染进程那条栏相等：系统按钮在这一段里垂直居中 */
+    height: number;
+    /** 系统按钮那一段的底色，要与渲染进程标题栏的底色一致；省略则取 backgroundColor */
+    color?: string;
+  };
   minimizable?: boolean;
   maximizable?: boolean;
   resizable?: boolean;
@@ -63,6 +84,13 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   const isControl = config.isControl ?? false;
   const showWhenReady = config.showWhenReady ?? false;
   const visible = config.visible ?? true;
+  // 自绘标题栏与无边框窗口都要摘掉系统标题栏，区别在后者连窗口按钮一并不要
+  const titleBar = config.titleBar;
+  const hideTitleBar = !frame || titleBar !== undefined;
+  // 窗口按钮由 Windows / Linux 的 Window Controls Overlay 提供；macOS 的红绿灯是原生控件，不需要它
+  const hasOverlay = hideTitleBar && !isControl && process.platform !== 'darwin';
+  const overlayColor = titleBar?.color ?? config.backgroundColor ?? '#1e1f22';
+  const overlayHeight = titleBar?.height ?? 36;
 
   const window = new BrowserWindow({
     show: visible,
@@ -75,9 +103,9 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     parent,
     modal: Boolean(parent && config.modal),
     frame,
-    titleBarStyle: frame ? 'default' : 'hidden',
-    titleBarOverlay: !frame && !isControl
-      ? { color: config.backgroundColor || '#1e1f22', symbolColor: '#d8dadd', height: 36 }
+    titleBarStyle: hideTitleBar ? 'hidden' : 'default',
+    titleBarOverlay: hasOverlay
+      ? { color: overlayColor, symbolColor: SYMBOL_COLOR_ACTIVE, height: overlayHeight }
       : undefined,
     minWidth: config.minWidth,
     minHeight: config.minHeight,
@@ -86,6 +114,20 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     resizable: config.resizable ?? true,
     webPreferences: createWebPreferences(),
   });
+
+  if (hasOverlay) {
+    // 窗口按钮画在系统那一层，压暗它只能走这个接口；标题栏的图标与文字在渲染进程，
+    // 由它自己监听 focus/blur（见 App.vue）。macOS 的红绿灯由系统自己变灰，这里不用管。
+    const syncSymbolColor = (focused: boolean): void => {
+      window.setTitleBarOverlay({
+        color: overlayColor,
+        symbolColor: focused ? SYMBOL_COLOR_ACTIVE : SYMBOL_COLOR_INACTIVE,
+        height: overlayHeight,
+      });
+    };
+    window.on('focus', () => syncSymbolColor(true));
+    window.on('blur', () => syncSymbolColor(false));
+  }
 
   if (showWhenReady && visible) {
     window.once('ready-to-show', () => window.show());
@@ -151,6 +193,8 @@ export function createMain(route = '/'): BrowserWindow {
     height: 900,
     backgroundColor: '#1e1f22',
     route,
+    // 高度与 App.vue 的 --title-bar-height 相等，底色与 .title-bar 的 #26282c 相等
+    titleBar: { height: 40, color: '#26282c' },
   });
   // 主窗口是应用的生命周期锚点：它一关，其余窗口（查看器、各类弹窗、常驻的浮窗宿主）都不该再存在。
   // 由注册表统一关掉（此时 main 已被 create() 的 closed 回调移出注册表）——只关查看器是不够的：

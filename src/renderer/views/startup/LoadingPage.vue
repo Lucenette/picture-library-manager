@@ -82,7 +82,7 @@ onMounted(async () => {
 }
 
 .loading {
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   background: #1e1f22;
   color: #d8dadd;

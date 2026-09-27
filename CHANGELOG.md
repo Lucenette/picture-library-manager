@@ -16,6 +16,11 @@
 - **Electron 40 → 44**：同时补上 `postinstall` 显式安装二进制——Electron 42 起官方不再在 install 时下载，
   改为首次运行时按需拉取；我们仍在 `yarn install` 阶段装好，免得开发或 CI 在第一次运行时才去下载。
   `@types/node` 跟着提到 24（Electron 44 自身依赖 ^24.9.0）。
+- **主窗口改成自绘标题栏**：去掉系统画的标题栏（它和应用自己的顶栏重复），系统的最小化 / 最大化 / 关闭
+  仍然保留——Windows / Linux 走 Window Controls Overlay，macOS 用原生红绿灯。顶栏同时是拖拽区，
+  系统按钮的位置用 `env(titlebar-area-*)` 让出，macOS 由 `platform-mac` 补红绿灯的内边距。
+  窗口失焦时图标、标题文字与系统窗口按钮一起压暗（macOS 的红绿灯由系统自己变灰）。
+  标题栏左端的 40×40 图标槽只画在 Windows / Linux 上：macOS 那一段归红绿灯，只留标题文字。
 - 页面改名：**角色确认 → 角色管理**、**图组确认 → 图组管理**（只是名字，页签顺序与职责不变）。
 - 示例脚本不再随安装包铺到安装目录：源码进了 `src/static/default-script.js`，构建时内联进主进程。
 
