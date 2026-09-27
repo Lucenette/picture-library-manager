@@ -1,6 +1,6 @@
 import { app, dialog, Menu } from 'electron';
 import { sendChangesetProgress, waitForChangesetQuit } from '@/database/changeset-ipc';
-import { closeDatabase, initDbIpc, initDatabase, runMigrations } from '@/database/db';
+import { closeDatabase, initDbIpc, initDatabase, runMigrations, seedBuiltinScript } from '@/database/db';
 import { initDialogs } from '@/dialogs';
 import { warmPopup } from '@/dialogs/control/popup';
 import { initTaskIpc } from '@/task/ipc';
@@ -60,6 +60,7 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
+  seedBuiltinScript();
   taskManager.init(mainWindow);
 
   // 预先建好仿原生浮窗（隐藏）：点开时只剩换内容、定位与 show()，不必再等一个渲染进程启动

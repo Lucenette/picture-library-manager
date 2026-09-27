@@ -25,7 +25,7 @@ description: 使用者说「发布」「发版」「release」（可能带版本
 
 ## 前置检查
 
-1. 工作区干净（`git status`）。`data/single.js` 是本仓库长期未跟踪的文件，可以忽略；其它未提交改动先问清楚再动。
+1. 工作区干净（`git status`）；有未提交改动先问清楚再动。
 2. 在 `develop` 上，且不落后于 `origin/develop`（`git fetch` 后看 `git status -sb`）。
 3. gitflow 配置齐全：`gitflow.branch.master=master`、`gitflow.branch.develop=develop`。
 4. **`gitflow.prefix.versiontag` 必须是 `v`**。它是空的时候 tag 会叫 `1.0.0`，而 CD 只认 `v*`，既有 tag 也是 `v0.0.1`。

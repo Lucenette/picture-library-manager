@@ -16,6 +16,6 @@ trim_trailing_whitespace = false
 [*.{yml,yaml}]
 indent_size = 2
 
-# 示例脚本沿用 4 空格缩进，与用户自行编写的脚本风格一致
-[data/*.js]
+# 内置默认脚本沿用 4 空格缩进，与用户自行编写的脚本风格一致
+[src/static/default-script.js]
 indent_size = 4

@@ -21,7 +21,12 @@
       >
         <el-table-column type="selection" width="45" />
         <el-table-column prop="name" label="名称" width="160" sortable="custom" show-overflow-tooltip />
-        <el-table-column prop="filePath" label="文件路径" min-width="250" sortable="custom" show-overflow-tooltip />
+        <el-table-column prop="filePath" label="文件路径" min-width="250" sortable="custom" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="!row.filePath">--</span>
+            <span v-else>{{ row.filePath }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="类型" width="180">
           <template #default="{ row }">
             <el-tag
@@ -33,7 +38,7 @@
             >
               {{ typeLabel(type) }}
             </el-tag>
-            <span v-if="!row.types?.length" style="color: #5e6065">-</span>
+            <span v-if="!row.types?.length">--</span>
           </template>
         </el-table-column>
         <el-table-column prop="brief" label="代码" min-width="260" show-overflow-tooltip />
@@ -41,8 +46,9 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text @click="openRename(row)">重命名</el-button>
-            <el-button size="small" text @click="reloadScriptFile(row)">重载</el-button>
-            <el-button size="small" text type="danger" @click="removeScript(row)">删除</el-button>
+            <el-button v-if="row.builtin" size="small" text @click="resetBuiltin(row)">恢复默认</el-button>
+            <el-button v-else size="small" text @click="reloadScriptFile(row)">重载</el-button>
+            <el-button v-if="!row.builtin" size="small" text type="danger" @click="removeScript(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -73,6 +79,7 @@ import {
   getAllScripts,
   importScript,
   reloadScriptFromFile,
+  resetBuiltinScript,
   renameScript as dbRenameScript,
 } from '@/db/database';
 
@@ -175,16 +182,41 @@ async function reloadScriptFile(script: ProcessScript): Promise<void> {
   }
 }
 
+/** 内置脚本没有磁盘来源，「恢复默认」是把随应用发布的那份源码覆盖回去 */
+async function resetBuiltin(script: ProcessScript): Promise<void> {
+  try {
+    await resetBuiltinScript(script.id);
+    await loadData();
+  } catch (error) {
+    await alertDialog({ title: '恢复默认失败', message: (error as Error).message, danger: true });
+  }
+}
+
 async function batchReload(): Promise<void> {
-  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id));
+  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id) && !script.builtin);
+  if (targets.length === 0) {
+    await alertDialog({ title: '批量重载', message: '选中的都是内置脚本；内置脚本请用行内的「恢复默认」。' });
+    return;
+  }
+
+  const failed: string[] = [];
   for (const script of targets) {
     try {
       await reloadScriptFromFile(script.filePath);
     } catch (error) {
+      failed.push(script.name);
       console.error(`重载失败 [${script.name}]：`, error);
     }
   }
   await loadData();
+
+  if (failed.length > 0) {
+    await alertDialog({
+      title: '部分脚本重载失败',
+      message: `以下脚本重载失败：${failed.join('、')}`,
+      danger: true,
+    });
+  }
 }
 
 async function removeScript(script: ProcessScript): Promise<void> {
@@ -202,17 +234,24 @@ async function removeScript(script: ProcessScript): Promise<void> {
 }
 
 async function batchDelete(): Promise<void> {
+  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id) && !script.builtin);
+  const skipped = selectedIds.value.length - targets.length;
+  if (targets.length === 0) {
+    await alertDialog({ title: '批量删除脚本', message: '内置脚本不能删除。', danger: true });
+    return;
+  }
+
   const confirmed = await confirmDialog({
     title: '批量删除脚本',
-    message: `确定删除选中的 ${selectedIds.value.length} 个脚本？`,
+    message: `确定删除选中的 ${targets.length} 个脚本？${skipped > 0 ? `（${skipped} 个内置脚本不能删除，已跳过）` : ''}`,
     confirmText: '删除',
     danger: true,
   });
   if (!confirmed) {
     return;
   }
-  for (const id of selectedIds.value) {
-    await deleteScript(id);
+  for (const script of targets) {
+    await deleteScript(script.id);
   }
   await loadData();
 }

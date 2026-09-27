@@ -41,9 +41,9 @@
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
 | `src/main/database/` | 开库、CRUD、changelog 迁移与账本、DB 的 IPC 调度 | 业务编排；建表语句——结构写在 `changesets/*.xml` 里 |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
-| `src/main/script/` | 处理脚本的编译与调用 | |
+| `src/main/script/` | 处理脚本的编译与调用 | 脚本的存储与查询——那是 `database` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
-| `src/static/` | 构建资源：应用图标等供打包工具读取的静态文件（`yarn icon` 生成到 `dist/icons`） | 被代码 `import` 的模块——代码放 `main/`、`renderer/`、`common/` |
+| `src/static/` | 构建资源：应用图标、内置默认脚本源码等**只当资源用**的静态文件（图标由 `yarn icon` 生成到 `dist/icons`） | 可执行的主进程 / 渲染进程模块——代码放 `main/`、`renderer/`、`common/`；这里的文件只能以 `?raw` 这类资源方式引入 |
 | `docs/` | 设计说明、不变量、排障；**已落地**的子系统说明放 `docs/design/` | 尚未实施的方案——放进 `docs/roadmap/` |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** 一个模块只有一个调用方，不构成把它塞进调用方目录的理由（`database` 也只被少数模块用，但它独立存在）。
@@ -228,7 +228,8 @@ function upsertScript(...) {}
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
 3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
 4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
-5. 导入解析：确认所有 `@/` 与 `@common/` 路径都能落到真实文件（`?nodeWorker` 除外）。
+5. 导入解析：确认所有 `@/`、`@common/` 与相对路径都能落到真实文件（`?nodeWorker`、`?raw` 除外——
+   它们由 electron-vite / Vite 接管）。
 6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
 7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
 
@@ -240,7 +241,7 @@ function upsertScript(...) {}
 
 - 不要擅自 `git commit` / `git push`，除非明确要求。
 - 不要顺手改动目录结构或文件位置（见开头"动手前的边界"）。
-- 不要改动 `data/` 下示例脚本的语义。
+- 不要改动 `src/static/default-script.js`（内置默认脚本）的语义：它随应用发布，改了等于改所有新库的默认行为。
 - **不要改动 `package.json`、不要自行安装或卸载依赖**（包括 `yarn add`）：需要新依赖时说明理由与命令，等使用者执行。
 - **不要结束进程、不要改系统状态**（杀他人的进程、改环境变量、动用户目录）：只报告现象，由使用者决定。
 - 不要把"静默降级"当作容错：功能性失败要能被看见（写进任务错误、日志或界面提示），而不是悄悄退回慢路径。

@@ -5,6 +5,7 @@ import { basename, join } from 'path';
 import { app, ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import { compileScriptModule } from '@/script/compile';
+import { BUILTIN_SCRIPT } from '@/script/defaults';
 import type {
   Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
@@ -496,9 +497,13 @@ function getScriptTypes(scriptId: number): ScriptType[] {
   return queryAll<{ type: ScriptType }>(SQL.SELECT_SCRIPT_TYPES, [scriptId]).map((row) => row.type);
 }
 
-/** 补齐脚本记录上的类型字段 */
+/** 补齐脚本记录上的派生字段 */
 function enrichScript(script: ProcessScript): ProcessScript {
-  return { ...script, types: getScriptTypes(script.id) };
+  return {
+    ...script,
+    types: getScriptTypes(script.id),
+    builtin: script.filePath === BUILTIN_SCRIPT.path,
+  };
 }
 
 /** 按文件路径查询脚本并补齐类型 */
@@ -545,6 +550,28 @@ export function reloadScriptFromFile(filePath: string): ProcessScript {
   return reloadScript(filePath, readFileSync(filePath, 'utf-8'));
 }
 
+/**
+ * 播种内置默认脚本：库里还没有这一条时插入，已有则原样不动。
+ *
+ * 它不允许删除，所以插过一次就一直在——不需要额外的「已播种」标记，
+ * 也不会覆盖使用者改过的代码。
+ */
+export function seedBuiltinScript(): void {
+  if (queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [BUILTIN_SCRIPT.path])) {
+    return;
+  }
+  upsertScript(BUILTIN_SCRIPT.name, BUILTIN_SCRIPT.path, BUILTIN_SCRIPT.source);
+}
+
+/** 用随应用发布的内置源码覆盖内置脚本；名字是使用者的，不动 */
+export function resetBuiltinScript(id: number): ProcessScript {
+  const script = getScriptById(id);
+  if (!script?.builtin) {
+    throw new Error('只有内置脚本可以恢复默认');
+  }
+  return reloadScript(BUILTIN_SCRIPT.path, BUILTIN_SCRIPT.source);
+}
+
 /** 查询全部脚本，按名称升序 */
 export function getAllScripts(): ProcessScript[] {
   return queryAll<ProcessScript>(SQL.SELECT_SCRIPTS_ALL).map(enrichScript);
@@ -566,8 +593,11 @@ export function renameScript(id: number, name: string): void {
   run(SQL.RENAME_SCRIPT, [name, id]);
 }
 
-/** 删除脚本及其类型关联 */
+/** 删除脚本及其类型关联；内置脚本不允许删除 */
 export function deleteScript(id: number): void {
+  if (getScriptById(id)?.builtin) {
+    throw new Error('内置脚本不能删除');
+  }
   run(SQL.DELETE_SCRIPT_TYPES, [id]);
   run(SQL.DELETE_SCRIPT, [id]);
 }
@@ -737,6 +767,7 @@ const DB_METHODS: Record<string, DbMethod> = {
   getScriptsByType,
   renameScript,
   deleteScript,
+  resetBuiltinScript,
 
   upsertProcessedImage,
   getAllProcessedImages,

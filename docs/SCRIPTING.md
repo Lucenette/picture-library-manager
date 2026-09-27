@@ -10,6 +10,8 @@
 - 在「脚本管理」页导入后，**源码会被存进数据库**，因此源文件丢了也不影响已入库的脚本。
 - 框架按导出函数的**名字**识别类型，导入时自动检测并打标签。
 - 脚本在**主进程**执行，拥有完整 Node 权限。
+- **新库自带一份内置默认脚本**（脚本列表里名为「默认」）：三种方法齐全，装完就能直接扫描。
+  它没有磁盘来源（列表里「文件路径」为空）、**不能删除**；行内的**「恢复默认」**会用随应用发布的源码覆盖回出厂版本。
 
 ```javascript
 module.exports = {
@@ -29,7 +31,7 @@ module.exports = {
 | `select-image` | 批量选图任务中，每个图片组一次 | `({ characterName, groupDirPath, files })` | 文件的 `uuid`（字符串） |
 | `identify-character` | **框架不直接调用** | `(dirName)` | 角色名（字符串） |
 
-> `identify-character` 会被检测、会显示在脚本列表里，但框架从不调用它。惯例做法是把它定义成普通函数，由 `identify-structure` 内部自己调用（见 `data/default.js`）。这样做的好处是同一套命名清洗逻辑只写一次。
+> `identify-character` 会被检测、会显示在脚本列表里，但框架从不调用它。惯例做法是把它定义成普通函数，由 `identify-structure` 内部自己调用（见 `src/static/default-script.js`）。这样做的好处是同一套命名清洗逻辑只写一次。
 
 ---
 
@@ -68,7 +70,7 @@ Array<{
 
 ### 示例：第一层是角色、第二层是图片组
 
-这是附带脚本 `data/default.js` 的做法，适配「角色目录 / 图片组目录 / 图片」结构：
+这是内置默认脚本 `default-script.js` 的做法，适配「角色目录 / 图片组目录 / 图片」结构：
 
 ```javascript
 const identifyCharacter = (dirName) => {

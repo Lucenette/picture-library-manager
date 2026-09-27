@@ -67,6 +67,8 @@ export interface ProcessScript {
   brief: string;
   /** 脚本导出的方法类型 */
   types: ScriptType[];
+  /** 内置脚本：源码随应用发布、没有磁盘来源，不能删除，只能「恢复默认」 */
+  builtin: boolean;
   loadedAt: string;
   createdAt: string;
 }

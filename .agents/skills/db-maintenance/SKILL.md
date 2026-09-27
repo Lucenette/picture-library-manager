@@ -55,8 +55,8 @@ description: 在本仓库改动数据库结构或订正库内数据时使用—�
 清空整个安装目录，库放那儿等于每次更新都可能丢；Linux 的 deb 装在 root 所有的 `/opt/PLManager`、
 macOS 的 exe 在 `.app` 内部，也都不是能写库的地方。
 
-打包时 `electron-builder.yml` 的 `extraFiles` 会把仓库的 `data/` 复制到安装目录，那只是给人参考的示例脚本，
-**不是数据目录**。数据目录只有 `getDataDir()` 一个来源。
+示例脚本不落安装目录：内置默认脚本的源码在 `src/static/default-script.js`，构建时由 `?raw` 内联进主进程。
+数据目录只有 `getDataDir()` 一个来源。
 
 ## 改名与改键名
 

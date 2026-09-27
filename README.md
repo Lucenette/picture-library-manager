@@ -147,14 +147,13 @@ yarn build:linux
 
 ```
 picture-library-manager/
-├── data/            # 示例处理脚本，打包时随附（用户数据在 ~/.plmanager/data/）
 ├── docs/            # 设计说明、路线图、排障（入口见 docs/README.md）
 ├── scripts/         # 仓库自检脚本（文档与 skill）
 ├── src/
 │   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本
 │   ├── renderer/    # 渲染进程：Vue 3 界面，不引用任何 Node 内置模块
-│   └── static/      # 构建资源：应用图标与安装脚本（图标构建时生成 dist/icons）
+│   └── static/      # 构建资源：应用图标、内置默认脚本源码（图标构建时生成 dist/icons）
 └── .agents/skills/  # 编码代理的工作流（文档规范）
 ```
 
@@ -163,6 +162,8 @@ picture-library-manager/
 ## 📝 脚本系统
 
 脚本以 CommonJS 源码字符串存储在数据库中，**在主进程执行**：录入时自动检测导出了哪些方法，执行时按需编译。因此源文件丢失也不影响已入库的脚本。
+
+新库自带一份**内置默认脚本**（名为「默认」），装完即可直接扫描；它不能删除，行内的「恢复默认」会把它还原成随应用发布的版本。
 
 ### 脚本格式
 
@@ -189,7 +190,7 @@ module.exports = {
 | `select-image` | `(ctx) => uuid` | 从图片组文件列表中选一张 | 批量选图任务 |
 | `identify-character` | `(dirName) => string` | 从目录名提取角色名称 | 结构脚本内部自行调用 |
 
-> `identify-character` 目前不作为独立脚本被框架调用：它的逻辑通常由结构脚本在映射目录时自己调用（见 `data/default.js`）。
+> `identify-character` 目前不作为独立脚本被框架调用：它的逻辑通常由结构脚本在映射目录时自己调用（见内置默认脚本 `src/static/default-script.js`）。
 
 ### 选图上下文
 

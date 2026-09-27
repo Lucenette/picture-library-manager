@@ -91,6 +91,11 @@ export function reloadScriptFromFile(filePath: string): Promise<ProcessScript> {
   return call('reloadScriptFromFile', filePath);
 }
 
+/** 用内置源码覆盖内置脚本 */
+export function resetBuiltinScript(id: number): Promise<ProcessScript> {
+  return call('resetBuiltinScript', id);
+}
+
 /** 查询全部脚本 */
 export function getAllScripts(): Promise<ProcessScript[]> {
   return call('getAllScripts');
