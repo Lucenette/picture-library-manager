@@ -158,18 +158,22 @@
 
 ### 3.9 Monaco
 
-固定 `monaco-editor@^0.55.0`：0.56 起 `exports` 把 `./*` 映射成 `./esm/vs/*.js`，`monaco-editor/esm/vs/...` 这类经典深导入全部失效，0.57 的入口还换成了注册全部语言的 barrel。
+固定 **0.57**（当前最新，不用旧版本）。它的 `exports` 是 `{ ".": ..., "./*": "./esm/vs/*.js" }`，于是：
+
+- 深导入**省掉 `esm/vs` 前缀**：`monaco-editor/editor/editor.worker`，不再是 0.55 那种 `monaco-editor/esm/vs/...`（后者在 0.57 会解析成 `./esm/vs/esm/vs/...`，找不到）；
+- **不用手动引 CSS**：`esm/vs/index.js` 自己 `import` 了需要的 `.css`，Vite 会把它们打进页面样式；0.57 里也没有能按路径引到的 `min/vs/editor/editor.main.css`；
+- 入口用裸包名 `import * as monaco from 'monaco-editor'`（→ `esm/vs/index.js`）：注册全部语言定义与 JS/TS 语言服务，并把语言服务另导出成 `typescript`。
 
 ```ts
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline';
+import * as monaco from 'monaco-editor';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker&inline';
 ```
 
 再挂 **JavaScript 语言服务**：Monaco 的 JS/TS 其实是**同一个 worker**（`ts.worker`），没有单独的 JS worker；我们能做的是只配置 `javascriptDefaults`、不碰 `typescriptDefaults`，文件语言固定 `javascript`：
 
 ```ts
-import 'monaco-editor/esm/vs/language/typescript/monaco.contribution';
-import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker&inline';
+// 语言服务随裸包名的入口一起注册，不需要单独 import contribution
+import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker&inline';
 
 monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,   // require('sharp') 这种解析不到的模块不该报错

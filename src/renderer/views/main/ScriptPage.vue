@@ -1,284 +1,441 @@
 <template>
   <div class="script-page">
-    <div class="toolbar">
-      <el-button type="primary" @click="addScript">
-        <el-icon><Plus /></el-icon> 加载脚本文件
-      </el-button>
-      <el-button :disabled="selectedIds.length === 0" @click="batchReload">
-        批量重载 ({{ selectedIds.length }})
-      </el-button>
-      <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
-        批量删除 ({{ selectedIds.length }})
-      </el-button>
-    </div>
+    <ScriptSideList
+      :items="sideItems"
+      :active-key="activeKey"
+      @select="selectKey"
+      @create="createScript"
+      @import="importFiles"
+      @refresh="refreshAll"
+    />
 
-    <div class="table-wrap">
-      <el-table
-        :data="pagedScripts"
-        row-key="id"
-        @sort-change="onSortChange"
-        @selection-change="onSelectionChange"
-      >
-        <el-table-column type="selection" width="45" />
-        <el-table-column prop="name" label="名称" width="160" sortable="custom" show-overflow-tooltip />
-        <el-table-column prop="filePath" label="文件路径" min-width="250" sortable="custom" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span v-if="!row.filePath">--</span>
-            <span v-else>{{ row.filePath }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="180">
-          <template #default="{ row }">
-            <el-tag
-              v-for="type in row.types"
-              :key="type"
-              size="small"
-              :type="tagType(type)"
-              style="margin-right: 4px"
-            >
-              {{ typeLabel(type) }}
-            </el-tag>
-            <span v-if="!row.types?.length">--</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="brief" label="代码" min-width="260" show-overflow-tooltip />
-        <el-table-column prop="loadedAt" label="加载时间" width="170" sortable="custom" />
-        <el-table-column label="操作" width="220" fixed="right">
-          <template #default="{ row }">
-            <el-button v-if="row.builtin" size="small" text @click="resetBuiltin(row)">恢复默认</el-button>
-            <el-button v-else size="small" text @click="reloadScriptFile(row)">重载</el-button>
-            <el-button v-if="!row.builtin" size="small" text type="danger" @click="removeScript(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <div class="pager">
-      <el-pagination
-        v-model:current-page="page"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="sortedScripts.length"
-        layout="total, sizes, prev, pager, next, jumper"
-      />
-    </div>
+    <ScriptEditor
+      v-if="activeKey !== ''"
+      v-model:name="name"
+      v-model:code="code"
+      :types="types"
+      :error="error"
+      :dirty="dirty"
+      :builtin="builtin"
+      :file-path="filePath"
+      @save="save"
+      @discard="discard"
+      @remove="removeScript"
+      @reset="resetBuiltin"
+    />
+    <div v-else class="empty">用左边的「新增脚本」或「加载文件」开始</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
-import { Plus } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { IPC } from '@common/ipcChannels';
-import type { ProcessScript, ScriptType } from '@common/types';
+import type { ProcessScript, ScriptCompileError, ScriptDraft, ScriptType } from '@common/types';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import {
-  deleteScript,
-  getAllScripts,
-  importScript,
-  reloadScriptFromFile,
-  resetBuiltinScript,
-} from '@/db/database';
+  deleteScript, deleteScriptDraft, getScriptUsage, importScripts, listScriptDrafts, listScripts,
+  putScriptDraft, readScript, refreshAllScripts, resetBuiltinScript, saveScript,
+} from '@/services/script-service';
+import ScriptEditor from './scripts/ScriptEditor.vue';
+import ScriptSideList from './scripts/ScriptSideList.vue';
 
-/** 脚本类型对应的标签配色 */
-const TAG_TYPES: Record<ScriptType, 'success' | 'warning' | 'danger'> = {
-  'select-image': 'success',
-  'identify-character': 'warning',
-  'identify-structure': 'danger',
+/** 新增脚本的起始正文：给个最小骨架，省得对着空文件发呆 */
+const NEW_SCRIPT_TEMPLATE = `// 处理脚本：CommonJS，module.exports 导出要用的方法
+//   identify-structure({ rootPath, tree }) → [{ name, groups }]
+//   select-image({ characterName, groupDirPath, files }) → 某个文件的 uuid
+module.exports = {
+  'select-image': () => {
+    throw new Error('还没有实现选图逻辑');
+  },
 };
+`;
 
-/** 脚本类型的中文名 */
-const TYPE_LABELS: Record<ScriptType, string> = {
-  'select-image': '图片',
-  'identify-character': '角色',
-  'identify-structure': '结构',
-};
+/** 草稿防抖：1 秒。VS Code 的 hot exit 也是这个量级（默认 1000ms，开 autosave 时 2000ms） */
+const DRAFT_DEBOUNCE_MS = 1000;
 
 // ------------------------------------------------------------
 // 状态
 // ------------------------------------------------------------
 
 const scripts = ref<ProcessScript[]>([]);
-const selectedIds = ref<number[]>([]);
-const page = ref(1);
-const pageSize = ref(20);
-const sortProp = ref<string | null>(null);
-const sortOrder = ref<'ascending' | 'descending' | null>(null);
+/** 全部未保存的草稿，key 是 `script-<id>` 或 `new-<uuid>` */
+const drafts = ref<Record<string, ScriptDraft>>({});
+/** 编译不过（或文件缺失）的脚本 key：左栏据此标红点 */
+const brokenKeys = ref<Record<string, true>>({});
+
+const activeKey = ref('');
+const name = ref('');
+const code = ref('');
+const types = ref<ScriptType[]>([]);
+const error = ref<ScriptCompileError | null>(null);
+const filePath = ref('');
+const builtin = ref(false);
+/** 磁盘上的那一份：用来判断「改了没有」 */
+const baseline = ref({ name: '', code: '' });
+const saving = ref(false);
+
+/** 防抖用的定时器；切脚本、失焦、卸载时都要把它立即结算掉 */
+let draftTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ------------------------------------------------------------
-// 计算属性
+// 派生
 // ------------------------------------------------------------
 
-const sortedScripts = computed(() => {
-  const prop = sortProp.value;
-  const order = sortOrder.value;
-  if (!prop || !order) {
-    return [...scripts.value].sort((a, b) => a.name.localeCompare(b.name));
+const dirty = computed(
+  () => name.value !== baseline.value.name || code.value !== baseline.value.code,
+);
+
+const sideItems = computed(() =>
+  scripts.value.map((script) => {
+    const key = keyOfScript(script.id);
+    return {
+      key,
+      name: drafts.value[key]?.name ?? script.name,
+      dirty: key === activeKey.value ? dirty.value : drafts.value[key] !== undefined,
+      broken: brokenKeys.value[key] === true,
+    };
+  }),
+);
+
+// ------------------------------------------------------------
+// 生命周期
+// ------------------------------------------------------------
+
+onMounted(async () => {
+  await loadScripts();
+  await loadDrafts();
+  const first = scripts.value[0];
+  if (first) {
+    await openKey(keyOfScript(first.id));
   }
-
-  const direction = order === 'ascending' ? 1 : -1;
-  return [...scripts.value].sort((a, b) => {
-    const left = String((a as Record<string, unknown>)[prop] ?? '');
-    const right = String((b as Record<string, unknown>)[prop] ?? '');
-    return left.localeCompare(right) * direction;
-  });
 });
 
-const pagedScripts = computed(() => {
-  const start = (page.value - 1) * pageSize.value;
-  return sortedScripts.value.slice(start, start + pageSize.value);
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('blur', onBlur);
+  void flushDraft();
 });
 
-function tagType(type: ScriptType): 'success' | 'warning' | 'danger' {
-  return TAG_TYPES[type];
+window.addEventListener('keydown', onKeydown);
+window.addEventListener('blur', onBlur);
+
+/** 页面级 Ctrl/Cmd+S：焦点在编辑器里时由 Monaco 的命令兜底 */
+function onKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    void save();
+  }
 }
 
-function typeLabel(type: ScriptType): string {
-  return TYPE_LABELS[type];
+function onBlur(): void {
+  void flushDraft();
 }
+
+/** 名称与正文改了才排草稿；载入脚本时它们与基线一致，不会误写 */
+watch([name, code], () => {
+  if (activeKey.value === '' || !dirty.value) {
+    return;
+  }
+  if (draftTimer !== null) {
+    clearTimeout(draftTimer);
+  }
+  draftTimer = setTimeout(() => {
+    void flushDraft();
+  }, DRAFT_DEBOUNCE_MS);
+});
 
 // ------------------------------------------------------------
-// 列表操作
+// 草稿
 // ------------------------------------------------------------
 
-async function loadData(): Promise<void> {
-  scripts.value = await getAllScripts();
+function setDraft(key: string, draft: ScriptDraft): void {
+  drafts.value = { ...drafts.value, [key]: draft };
 }
 
-function onSortChange({ prop, order }: { prop: string | null; order: string | null }): void {
-  sortProp.value = prop;
-  sortOrder.value = order as 'ascending' | 'descending' | null;
+function clearDraft(key: string): void {
+  const next = { ...drafts.value };
+  delete next[key];
+  drafts.value = next;
 }
 
-function onSelectionChange(rows: ProcessScript[]): void {
-  selectedIds.value = rows.map((row) => row.id);
-}
-
-/** 从磁盘加载脚本文件：源码同时写入数据库，文件丢失后仍可执行 */
-async function addScript(): Promise<void> {
-  const filePaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_SCRIPT);
-  if (!filePaths?.length) {
+/** 把当前编辑内容写进草稿；失败要让人看见，不能静默丢 */
+async function flushDraft(): Promise<void> {
+  if (draftTimer !== null) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  const key = activeKey.value;
+  if (key === '' || !dirty.value) {
     return;
   }
 
-  for (const filePath of filePaths) {
-    await importScript(filePath);
-  }
-  await loadData();
-}
-
-async function reloadScriptFile(script: ProcessScript): Promise<void> {
   try {
-    await reloadScriptFromFile(script.filePath);
-    await loadData();
-  } catch (error) {
-    await alertDialog({ title: '重载失败', message: (error as Error).message, danger: true });
+    await putScriptDraft(key, { name: name.value, code: code.value });
+    setDraft(key, { key, name: name.value, code: code.value, updatedAt: new Date().toISOString() });
+  } catch (caught) {
+    await alertDialog({ title: '草稿保存失败', message: (caught as Error).message, danger: true });
   }
 }
 
-/** 内置脚本没有磁盘来源，「恢复默认」是把随应用发布的那份源码覆盖回去 */
-async function resetBuiltin(script: ProcessScript): Promise<void> {
-  try {
-    await resetBuiltinScript(script.id);
-    await loadData();
-  } catch (error) {
-    await alertDialog({ title: '恢复默认失败', message: (error as Error).message, danger: true });
+async function loadDrafts(): Promise<void> {
+  const list = await listScriptDrafts();
+  const next: Record<string, ScriptDraft> = {};
+  for (const draft of list) {
+    next[draft.key] = draft;
   }
+  drafts.value = next;
 }
 
-async function batchReload(): Promise<void> {
-  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id) && !script.builtin);
-  if (targets.length === 0) {
-    await alertDialog({ title: '批量重载', message: '选中的都是内置脚本；内置脚本请用行内的「恢复默认」。' });
+// ------------------------------------------------------------
+// 载入
+// ------------------------------------------------------------
+
+function keyOfScript(id: number): string {
+  return `script-${id}`;
+}
+
+async function loadScripts(): Promise<void> {
+  scripts.value = await listScripts();
+}
+
+/** 切换脚本：先把上一份草稿结算掉，再载入新的 */
+async function selectKey(key: string): Promise<void> {
+  if (key === activeKey.value) {
+    return;
+  }
+  await flushDraft();
+  await openKey(key);
+}
+
+async function openKey(key: string): Promise<void> {
+  activeKey.value = key;
+  const draft = drafts.value[key];
+
+  if (key.startsWith('new-')) {
+    const row = draft ?? { key, name: '未命名脚本', code: NEW_SCRIPT_TEMPLATE, updatedAt: '' };
+    name.value = row.name;
+    code.value = row.code;
+    // 新建脚本还没落盘：基线留空，于是它一出现就是「未保存」
+    baseline.value = { name: '', code: '' };
+    filePath.value = '';
+    builtin.value = false;
+    types.value = [];
+    error.value = null;
     return;
   }
 
-  const failed: string[] = [];
-  for (const script of targets) {
-    try {
-      await reloadScriptFromFile(script.filePath);
-    } catch (error) {
-      failed.push(script.name);
-      console.error(`重载失败 [${script.name}]：`, error);
-    }
+  const id = Number(key.slice('script-'.length));
+  const row = scripts.value.find((script) => script.id === id);
+  try {
+    const result = await readScript(id);
+    name.value = draft?.name ?? row?.name ?? '';
+    code.value = draft?.code ?? result.code;
+    filePath.value = row?.filePath ?? '';
+    builtin.value = row?.builtin ?? false;
+    types.value = result.types;
+    error.value = result.compileError;
+    baseline.value = { name: row?.name ?? '', code: result.code };
+    markBroken(key, result.compileError !== null);
+  } catch (caught) {
+    await alertDialog({ title: '打开脚本失败', message: (caught as Error).message, danger: true });
   }
-  await loadData();
+}
 
-  if (failed.length > 0) {
+function markBroken(key: string, broken: boolean): void {
+  const next = { ...brokenKeys.value };
+  if (broken) {
+    next[key] = true;
+  } else {
+    delete next[key];
+  }
+  brokenKeys.value = next;
+}
+
+// ------------------------------------------------------------
+// 操作
+// ------------------------------------------------------------
+
+/** 新增脚本：只活在内存与草稿里，Ctrl+S 之后才落盘生成文件 */
+async function createScript(): Promise<void> {
+  await flushDraft();
+  // 不用 crypto.randomUUID：这里只要一个不重复的临时 key
+  const key = `new-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  name.value = '未命名脚本';
+  code.value = NEW_SCRIPT_TEMPLATE;
+  baseline.value = { name: '', code: '' };
+  filePath.value = '';
+  builtin.value = false;
+  types.value = [];
+  error.value = null;
+  activeKey.value = key;
+  // 立刻落一份草稿：保存之前，草稿是这份脚本唯一的家
+  await flushDraft();
+}
+
+async function importFiles(): Promise<void> {
+  const paths = (await ipcRenderer.invoke(IPC.DIALOG_OPEN_SCRIPT)) as string[];
+  if (paths.length === 0) {
+    return;
+  }
+
+  const result = await importScripts(paths);
+  await loadScripts();
+  for (const script of result.imported) {
+    markBroken(keyOfScript(script.id), false);
+  }
+  if (result.failed.length > 0) {
     await alertDialog({
-      title: '部分脚本重载失败',
-      message: `以下脚本重载失败：${failed.join('、')}`,
+      title: '部分脚本导入失败',
+      message: result.failed.map((item) => `${item.path}：${item.message}`).join('\n'),
       danger: true,
     });
   }
+  if (result.imported.length > 0) {
+    ElMessage.success(`已导入 ${result.imported.length} 个脚本`);
+    await openKey(keyOfScript(result.imported[0].id));
+  }
 }
 
-async function removeScript(script: ProcessScript): Promise<void> {
+async function refreshAll(): Promise<void> {
+  const results = await refreshAllScripts();
+  await loadScripts();
+  const broken: string[] = [];
+  for (const item of results) {
+    const key = keyOfScript(item.script.id);
+    markBroken(key, item.compileError !== null);
+    if (item.compileError !== null) {
+      broken.push(`${item.script.name}：${item.compileError.message}`);
+    }
+  }
+  if (activeKey.value.startsWith('script-')) {
+    const current = results.find((item) => keyOfScript(item.script.id) === activeKey.value);
+    if (current) {
+      error.value = current.compileError;
+      types.value = current.script.types;
+    }
+  }
+  if (broken.length > 0) {
+    await alertDialog({ title: '有脚本没通过编译', message: broken.join('\n'), danger: true });
+  } else {
+    ElMessage.success('全部脚本都通过编译');
+  }
+}
+
+async function save(): Promise<void> {
+  if (saving.value || activeKey.value === '') {
+    return;
+  }
+  saving.value = true;
+  try {
+    const id = activeKey.value.startsWith('script-') ? Number(activeKey.value.slice('script-'.length)) : null;
+    const result = await saveScript({
+      id,
+      name: name.value,
+      code: code.value,
+      draftKey: activeKey.value,
+    });
+
+    clearDraft(activeKey.value);
+    const key = keyOfScript(result.script.id);
+    if (key !== activeKey.value) {
+      clearDraft(activeKey.value);
+      activeKey.value = key;
+    }
+    name.value = result.script.name;
+    baseline.value = { name: result.script.name, code: code.value };
+    filePath.value = result.script.filePath;
+    builtin.value = result.script.builtin;
+    types.value = result.script.types;
+    error.value = result.compileError;
+    markBroken(key, result.compileError !== null);
+    await loadScripts();
+
+    if (result.compileError === null) {
+      ElMessage.success('已保存');
+    } else {
+      ElMessage.warning('已保存，但编译没过：看下面的问题');
+    }
+  } catch (caught) {
+    await alertDialog({ title: '保存失败', message: (caught as Error).message, danger: true });
+  } finally {
+    saving.value = false;
+  }
+}
+
+/** 放弃修改：删掉草稿，重新从磁盘读一遍 */
+async function discard(): Promise<void> {
+  if (draftTimer !== null) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+  await deleteScriptDraft(activeKey.value);
+  clearDraft(activeKey.value);
+  await openKey(activeKey.value);
+}
+
+async function removeScript(): Promise<void> {
+  const id = Number(activeKey.value.slice('script-'.length));
+  const usage = await getScriptUsage(id);
   const confirmed = await confirmDialog({
     title: '删除脚本',
-    message: `确定删除脚本「${script.name}」？`,
+    message:
+      usage > 0
+        ? `确定删除脚本「${name.value}」？图库里有 ${usage} 条记录来自它：那列会保留脚本名（历史上是它选的），脚本本身会删掉。`
+        : `确定删除脚本「${name.value}」？`,
     confirmText: '删除',
     danger: true,
   });
   if (!confirmed) {
     return;
   }
-  await deleteScript(script.id);
-  await loadData();
+
+  await deleteScript(id);
+  clearDraft(activeKey.value);
+  await loadScripts();
+  const next = scripts.value[0];
+  activeKey.value = '';
+  if (next) {
+    await openKey(keyOfScript(next.id));
+  }
 }
 
-async function batchDelete(): Promise<void> {
-  const targets = scripts.value.filter((script) => selectedIds.value.includes(script.id) && !script.builtin);
-  const skipped = selectedIds.value.length - targets.length;
-  if (targets.length === 0) {
-    await alertDialog({ title: '批量删除脚本', message: '内置脚本不能删除。', danger: true });
-    return;
-  }
-
+async function resetBuiltin(): Promise<void> {
+  const id = Number(activeKey.value.slice('script-'.length));
   const confirmed = await confirmDialog({
-    title: '批量删除脚本',
-    message: `确定删除选中的 ${targets.length} 个脚本？${skipped > 0 ? `（${skipped} 个内置脚本不能删除，已跳过）` : ''}`,
-    confirmText: '删除',
+    title: '恢复默认',
+    message: `确定把内置脚本「${name.value}」的内容恢复成随应用发布的版本？当前改动会丢。`,
+    confirmText: '恢复',
     danger: true,
   });
   if (!confirmed) {
     return;
   }
-  for (const script of targets) {
-    await deleteScript(script.id);
-  }
-  await loadData();
-}
 
-onMounted(loadData);
+  const result = await resetBuiltinScript(id);
+  clearDraft(activeKey.value);
+  name.value = result.script.name;
+  code.value = '';
+  baseline.value = { name: result.script.name, code: '' };
+  await openKey(activeKey.value);
+  ElMessage.success('已恢复默认');
+}
 </script>
 
 <style scoped>
 .script-page {
-  padding: 0 24px;
-  height: 100%;
   display: flex;
-  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
-.toolbar {
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.table-wrap {
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
-  overflow: hidden;
-}
-
-.table-wrap :deep(.el-table) {
-  height: 100%;
-}
-
-.pager {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 0 16px 0;
-  flex-shrink: 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 </style>

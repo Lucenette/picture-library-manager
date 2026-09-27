@@ -1,0 +1,111 @@
+<template>
+  <div ref="hostEl" class="monaco-host"></div>
+</template>
+
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { ScriptCompileError } from '@common/types';
+import { monaco } from './monaco-env';
+
+const props = defineProps<{
+  modelValue: string;
+  /** 当前显示内容的编译错误；行列取不到时标记退回第一行 */
+  error: ScriptCompileError | null;
+}>();
+
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: string): void;
+  (event: 'save'): void;
+}>();
+
+const hostEl = ref<HTMLElement | null>(null);
+let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+
+/** 正在把外部内容灌进编辑器：这一轮的内容变化不要再抛回去，否则会绕成环 */
+let applying = false;
+
+/** 把 props 的内容同步进编辑器（切脚本、放弃修改、保存回填都会走到这里） */
+function syncValue(): void {
+  if (!editor || editor.getValue() === props.modelValue) {
+    return;
+  }
+  applying = true;
+  editor.setValue(props.modelValue);
+  applying = false;
+}
+
+/** 把编译错误画成行内标记 */
+function applyMarkers(): void {
+  const model = editor?.getModel();
+  if (!model) {
+    return;
+  }
+
+  const error = props.error;
+  if (error === null) {
+    monaco.editor.setModelMarkers(model, 'plmanager', []);
+    return;
+  }
+
+  const line = error.line ?? 1;
+  const column = error.column ?? 1;
+  monaco.editor.setModelMarkers(model, 'plmanager', [
+    {
+      severity: monaco.MarkerSeverity.Error,
+      message: error.message,
+      startLineNumber: line,
+      startColumn: column,
+      endLineNumber: line,
+      endColumn: column + 1,
+    },
+  ]);
+  editor?.revealLineInCenterIfOutsideViewport(line);
+}
+
+onMounted(() => {
+  if (!hostEl.value) {
+    return;
+  }
+
+  editor = monaco.editor.create(hostEl.value, {
+    value: props.modelValue,
+    language: 'javascript',
+    theme: 'plmanager-dark',
+    // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: 13,
+    tabSize: 4,
+    insertSpaces: true,
+    scrollBeyondLastLine: false,
+    // 问题面板在编辑器外面，浮动控件要允许溢出容器，否则提示会被裁掉
+    fixedOverflowWidgets: true,
+  });
+
+  editor.onDidChangeModelContent(() => {
+    if (!applying && editor) {
+      emit('update:modelValue', editor.getValue());
+    }
+  });
+
+  // 焦点在编辑器里时 Monaco 先吃到按键，所以页面的 Ctrl+S 之外这里也注册一份
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => emit('save'));
+
+  applyMarkers();
+});
+
+watch(() => props.modelValue, syncValue);
+watch(() => props.error, applyMarkers, { deep: true });
+
+onBeforeUnmount(() => {
+  editor?.dispose();
+  editor = null;
+});
+</script>
+
+<style scoped>
+.monaco-host {
+  height: 100%;
+  min-height: 0;
+}
+</style>

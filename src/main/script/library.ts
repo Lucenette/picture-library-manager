@@ -76,7 +76,7 @@ export async function readScript(id: number): Promise<ScriptReadResult> {
   const exists = await scriptFileExists(script.filePath);
   if (!exists && draft === null) {
     setScriptTypes(id, []);
-    return { code: '', compileError: missingFileError(script.filePath), draft: null };
+    return { code: '', compileError: missingFileError(script.filePath), types: [], draft: null };
   }
 
   const code = exists ? await readScriptSource(script.filePath) : '';
@@ -84,7 +84,8 @@ export async function readScript(id: number): Promise<ScriptReadResult> {
   if (draft === null) {
     setScriptTypes(id, inspected.types);
   }
-  return { code, compileError: inspected.compileError, draft };
+  // types 取库里那一份：显示草稿时它仍然是磁盘版本的关联
+  return { code, compileError: inspected.compileError, types: getScriptById(id)!.types, draft };
 }
 
 /**

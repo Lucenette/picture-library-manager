@@ -98,6 +98,8 @@ export interface ScriptReadResult {
   code: string;
   /** **将要显示的那一版**的编译结果：有草稿就是草稿，没有就是磁盘上的文件 */
   compileError: ScriptCompileError | null;
+  /** 库里记着的类型关联：**永远描述磁盘上的那一版**，显示草稿时不要拿它当真 */
+  types: ScriptType[];
   /** 这一个脚本的未保存草稿 */
   draft: ScriptDraft | null;
 }
