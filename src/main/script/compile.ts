@@ -39,17 +39,28 @@ export function compileScriptModule(code: string, filename = ''): Record<string,
 }
 
 /**
- * 检测脚本导出了哪些可识别的方法。
+ * 编译一份脚本并报告结果：导出了哪些方法，以及编译失败的原因。
  *
- * 编译不过时返回空数组——错误本身由 {@link describeCompileError} 呈现，这里不吞掉它该被看见的事实。
+ * 两者只会有一个非空：编译不过时 types 为空、compileError 有值（错误必须被看见，不能静默当没导出）。
  */
-export function detectScriptTypes(code: string, filename = ''): ScriptType[] {
+export function inspectScript(
+  code: string,
+  filename = '',
+): { types: ScriptType[]; compileError: ScriptCompileError | null } {
   try {
     const scriptExports = compileScriptModule(code, filename);
-    return ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function');
-  } catch {
-    return [];
+    return {
+      types: ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function'),
+      compileError: null,
+    };
+  } catch (error) {
+    return { types: [], compileError: describeCompileError(error) };
   }
+}
+
+/** 只关心「导出了哪些方法」时的简写 */
+export function detectScriptTypes(code: string, filename = ''): ScriptType[] {
+  return inspectScript(code, filename).types;
 }
 
 /**

@@ -96,7 +96,7 @@ export interface ScriptDraft {
 export interface ScriptReadResult {
   /** 磁盘上的正文；文件缺失时为空串 */
   code: string;
-  /** 磁盘上那一版编译的结果 */
+  /** **将要显示的那一版**的编译结果：有草稿就是草稿，没有就是磁盘上的文件 */
   compileError: ScriptCompileError | null;
   /** 这一个脚本的未保存草稿 */
   draft: ScriptDraft | null;

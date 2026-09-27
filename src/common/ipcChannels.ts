@@ -40,13 +40,26 @@ export const IPC = {
   PROMPT_CONFIRM: 'prompt:confirm',
   BATCH_RENAME_CONFIRMED: 'character:rename-batch-confirmed',
   SINGLE_RENAME_CONFIRMED: 'character:rename-single-confirmed',
-  SCRIPT_RENAME_CONFIRMED: 'script:rename-confirmed',
 
   // 文件查看窗口
   FILE_VIEWER_OPEN: 'file-viewer:open',
   FILE_VIEWER_INIT: 'file-viewer:init',
   FILE_VIEWER_SELECT: 'file-viewer:select',
   FILE_VIEWER_SELECTED: 'file-viewer:selected',
+
+  // 处理脚本子系统：正文在用户目录的 scripts/ 下，操作不只是查库，所以不挂在 DB 通道上
+  SCRIPT_LIST: 'script:list',
+  SCRIPT_LIST_BY_TYPE: 'script:listByType',
+  SCRIPT_READ: 'script:read',
+  SCRIPT_IMPORT: 'script:import',
+  SCRIPT_SAVE: 'script:save',
+  SCRIPT_DELETE: 'script:delete',
+  SCRIPT_USAGE: 'script:usage',
+  SCRIPT_RESET_BUILTIN: 'script:resetBuiltin',
+  SCRIPT_REFRESH_ALL: 'script:refreshAll',
+  SCRIPT_DRAFT_LIST: 'script:draftList',
+  SCRIPT_DRAFT_PUT: 'script:draftPut',
+  SCRIPT_DRAFT_DELETE: 'script:draftDelete',
 
   // 后台任务
   TASK_SUBMIT: 'task:submit',

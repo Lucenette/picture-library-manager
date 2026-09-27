@@ -45,7 +45,6 @@
         <el-table-column prop="loadedAt" label="加载时间" width="170" sortable="custom" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" text @click="openRename(row)">重命名</el-button>
             <el-button v-if="row.builtin" size="small" text @click="resetBuiltin(row)">恢复默认</el-button>
             <el-button v-else size="small" text @click="reloadScriptFile(row)">重载</el-button>
             <el-button v-if="!row.builtin" size="small" text type="danger" @click="removeScript(row)">删除</el-button>
@@ -71,8 +70,7 @@ import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
 import { Plus } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
-import type { ProcessScript, PromptInitData, PromptResult, ScriptType } from '@common/types';
-import { useIpcListener } from '@/composables/useIpcListener';
+import type { ProcessScript, ScriptType } from '@common/types';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import {
   deleteScript,
@@ -80,7 +78,6 @@ import {
   importScript,
   reloadScriptFromFile,
   resetBuiltinScript,
-  renameScript as dbRenameScript,
 } from '@/db/database';
 
 /** 脚本类型对应的标签配色 */
@@ -107,9 +104,6 @@ const page = ref(1);
 const pageSize = ref(20);
 const sortProp = ref<string | null>(null);
 const sortOrder = ref<'ascending' | 'descending' | null>(null);
-
-/** 等待输入窗口返回的重命名目标 */
-const pendingRenameId = ref<number | null>(null);
 
 // ------------------------------------------------------------
 // 计算属性
@@ -255,30 +249,6 @@ async function batchDelete(): Promise<void> {
   }
   await loadData();
 }
-
-// ------------------------------------------------------------
-// 重命名
-// ------------------------------------------------------------
-
-function openRename(script: ProcessScript): void {
-  pendingRenameId.value = script.id;
-  const payload: PromptInitData = {
-    title: '重命名脚本',
-    placeholder: '新名称',
-    value: script.name,
-    channel: IPC.SCRIPT_RENAME_CONFIRMED,
-  };
-  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
-}
-
-useIpcListener(IPC.SCRIPT_RENAME_CONFIRMED, async (result: PromptResult) => {
-  if (pendingRenameId.value === null || !result.value) {
-    return;
-  }
-  await dbRenameScript(pendingRenameId.value, result.value);
-  pendingRenameId.value = null;
-  await loadData();
-});
 
 onMounted(loadData);
 </script>

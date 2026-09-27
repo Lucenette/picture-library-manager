@@ -2,6 +2,7 @@ import { app, dialog, Menu } from 'electron';
 import { closeDatabase, initDatabase } from '@/database/db';
 import { initDialogs } from '@/dialogs';
 import { warmPopup } from '@/dialogs/control/popup';
+import { initScriptIpc } from '@/script/ipc';
 import { initTaskIpc } from '@/task/ipc';
 import { taskManager } from '@/task/manager';
 import { initUps, waitUpsQuit } from '@/ups';
@@ -62,6 +63,7 @@ async function bootstrap(): Promise<void> {
 
   initTaskIpc();
   initDialogs();
+  initScriptIpc();
 
   taskManager.init(mainWindow);
 
