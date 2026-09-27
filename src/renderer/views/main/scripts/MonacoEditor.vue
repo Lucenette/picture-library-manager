@@ -18,8 +18,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void;
   (event: 'save'): void;
-  /** Monaco 自己的诊断条数变化（含我们设的编译标记），界面上的状态图标据此变色 */
+  /** Monaco 自己的诊断条数变化（不算我们设的编译标记）：状态图标与状态栏据此变色 */
   (event: 'problems', count: number): void;
+  /** 状态栏里的光标位置；有选区时是选区的行数与字符数 */
+  (event: 'caret', text: string): void;
+  /** 状态栏里的行结束符与缩进 */
+  (event: 'format', text: string): void;
 }>();
 
 const hostEl = ref<HTMLElement | null>(null);
@@ -87,6 +91,8 @@ function switchDocument(): void {
   }
   applyMarkers();
   reportProblems();
+  reportCaret();
+  reportFormat();
 }
 
 /**
@@ -154,6 +160,48 @@ function applyMarkers(): void {
   // 那一行有整行染色与概览标尺，找得到
 }
 
+/**
+ * 报出光标位置：有选区时报选区的行数与字符数，没有就报行列。
+ *
+ * 文案在这里定，因为模型与光标都在这边；外面只把它摆进状态栏。
+ */
+function reportCaret(): void {
+  const current = editor;
+  const model = current?.getModel();
+  const position = current?.getPosition();
+  if (!current || !model || !position) {
+    emit('caret', '');
+    return;
+  }
+
+  const selection = current.getSelection();
+  if (selection && !selection.isEmpty()) {
+    const chars = model.getValueInRange(selection).length;
+    const lines = selection.endLineNumber - selection.startLineNumber + 1;
+    emit('caret', lines > 1 ? `已选 ${lines} 行 ${chars} 字符` : `已选 ${chars} 字符`);
+    return;
+  }
+  emit('caret', `行 ${position.lineNumber}，列 ${position.column}`);
+}
+
+/**
+ * 报出行的结束符与缩进。
+ *
+ * 缩进取模型解析后的值：`detectIndentation` 默认开着，所以它反映的是这份文件的实际缩进
+ * （内置脚本是 2 个空格，编辑器默认值是 4），而不是我们创建编辑器时给的那个默认数。
+ */
+function reportFormat(): void {
+  const model = editor?.getModel();
+  if (!model) {
+    emit('format', '');
+    return;
+  }
+  const options = model.getOptions();
+  const eol = model.getEOL() === '\r\n' ? 'CRLF' : 'LF';
+  const indent = options.insertSpaces ? `${options.tabSize} 个空格` : `Tab ${options.tabSize}`;
+  emit('format', `${eol} · ${indent}`);
+}
+
 onMounted(() => {
   if (!hostEl.value) {
     return;
@@ -185,6 +233,8 @@ onMounted(() => {
     if (!applying && editor) {
       emit('update:modelValue', editor.getValue());
     }
+    // 缩进是探测出来的：改完正文要重报一次
+    reportFormat();
   });
 
   // 焦点在编辑器里时 Monaco 先吃到按键，所以页面的 Ctrl+S 之外这里也注册一份
@@ -195,6 +245,12 @@ onMounted(() => {
   // 我们设的编译标记与 Monaco 的语法诊断都会触发它，状态图标因此能实时反映问题
   markerSubscription = monaco.editor.onDidChangeMarkers(() => reportProblems());
   reportProblems();
+
+  // 状态栏那两栏：光标一动就报，行结束符/缩进随模型走
+  editor.onDidChangeCursorPosition(() => reportCaret());
+  editor.onDidChangeCursorSelection(() => reportCaret());
+  reportCaret();
+  reportFormat();
 });
 
 watch(() => props.documentKey, switchDocument);

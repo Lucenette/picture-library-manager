@@ -18,7 +18,6 @@
       :problem-count="problemCount"
       :dirty="dirty"
       :builtin="builtin"
-      :file-path="filePath"
       @save="save"
       @discard="discard"
       @problems="problemCount = $event"
