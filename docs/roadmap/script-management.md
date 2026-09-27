@@ -1,7 +1,7 @@
 # 脚本管理：数据目录里的脚本文件库 + 常驻编辑器
 
 **状态**：待评审
-**关联**：[ups.md](./ups.md)——「接管旧脚本」要挂在版本目录的 preups 上，先有那个机制才能删 `code` 列
+**关联**：[升级模块 ups](../design/ups.md)——「接管旧脚本」挂在版本目录的 `preups.ts` 上（机制已落地）；先有它才能删 `code` 列
 
 ---
 
@@ -57,7 +57,11 @@
 
 ### 3.3 接管旧脚本（`1.0.1/preups.ts`）
 
-用 [ups.md](./ups.md) 的 preups 时机，在删列之前把 `code` 写成文件：
+用 [升级模块 ups](../design/ups.md) 的 preups 时机，在删列之前把 `code` 写成文件。
+
+**注意开发机上的账本**：1.0.1 的 preups 目前只做内置脚本入库，很可能已经跑过（账本里记着 `(script, preups, 1.0.1)`）。
+按身份记账的规则下，往同一个 preups 里追加接管逻辑不会自动重跑，动手前先删掉那一行：
+`DELETE FROM schema_migration WHERE author = 'script' AND filename = '1.0.1';`
 
 1. 靠「`process_script` 是否还有 `code` 列」判断要不要接管——这一列的存在本身就是幂等标记。
 2. 跳过 `file_path = ''`（内置，见 3.4）与已经在 `scripts/` 下的行（防止崩在中间后重复接管）。
@@ -74,7 +78,7 @@
 |---|---|
 | **新增** `src/main/script/files.ts` | 数据目录布局：`scriptsDir()`、`draftsPath()`、`newScriptPath()`（`randomUUID() + '.js'`）、`writeFileAtomic()`（tmp + rename）、读写删脚本文件、读写草稿。纯文件 IO，不碰数据库 |
 | **新增** `src/main/script/library.ts` | 编排：接管、内置落盘、读取、导入、保存、全部重新检测、删除、恢复默认、草稿；`readScriptSource()` 按 path + mtime + size 缓存文件内容 |
-| **新增** `src/main/script/ipc.ts` | 注册 `SCRIPT_*` 通道，在 `src/main/index.ts` 里与 `initDbIpc()` 并列 |
+| **新增** `src/main/script/ipc.ts` | 注册 `SCRIPT_*` 通道（`initScriptIpc()`），在 `src/main/index.ts` 的「其余初始化」里与 `initTaskIpc()` 并列 |
 | `src/main/script/compile.ts` | `compileScriptModule(code, filename)` 加文件名参数；新增 `describeCompileError()` 把异常转成「消息 + 行列」 |
 | `src/main/script/script-service.ts` | `executeScript` 改走 `readScriptSource`（读文件 + 每次编译），错误信息带脚本名与路径 |
 | `src/main/database/db.ts` | 脚本行 CRUD 重做，删掉 `code`/`brief` 相关的一切；`DB_METHODS` 移除脚本项 |
@@ -139,7 +143,7 @@ worker 用 inline（blob）是为了绕开打包后 `file://` 页面构造 Worke
 
 | 位置 | 改动 |
 |---|---|
-| **新增** `src/main/ups/changesets/1.0.1/` | `index.ts`（版本号）+ `preups.ts`（接管旧脚本）+ `dbups.xml`（加列删列）+ `postups.ts`（内置脚本落盘）——见 [ups.md](./ups.md) |
+| **新增** `src/main/ups/changesets/1.0.1/` | `index.ts`（版本号）+ `preups.ts`（接管旧脚本）+ `dbups.xml`（加列删列）+ `postups.ts`（内置脚本落盘）——见 [升级模块 ups](../design/ups.md) |
 | `src/main/ups/changesets/index.ts` | 登记 1.0.1 的三份文件 |
 | `src/main/database/sql.ts` / `db.ts` | 脚本语句与 CRUD 重做，`DB_METHODS` 移除脚本项 |
 | **新增** `src/main/script/files.ts` / `library.ts` / `ipc.ts` | 3.5 |
