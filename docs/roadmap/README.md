@@ -21,6 +21,8 @@
 | 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
 | 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
+| 测试系统 | 待评审 | [test-system.md](./test-system.md) |
+| 构建目标：32 位与 arm 架构 | 待评审 | [build-targets.md](./build-targets.md) |
 
 ## 状态取值
 
