@@ -382,11 +382,7 @@ body {
   color: #3871e1;
 }
 
-/* ======== 应用头部 ======== */
-.app-header {
-  background: #26282c;
-  border-bottom-color: #323438 !important;
-}
+/* ======== 应用主区域 ======== */
 .app-main {
   background: #1e1f22 !important;
 }

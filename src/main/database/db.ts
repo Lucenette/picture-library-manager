@@ -371,7 +371,7 @@ interface SimilarRow {
   distance: number;
 }
 
-/** 第四页签的图片（每个图片组选定的那一张）及其感知哈希 */
+/** 「图库」页的图片（每个图片组选定的那一张）及其感知哈希 */
 export function getSimilarInputRows(): SimilarInputRow[] {
   return queryAll<SimilarInputRow>(SQL.SELECT_SIMILAR_INPUT);
 }

@@ -9,56 +9,32 @@
       <span class="title-bar-text">角色图库管理器</span>
     </div>
 
-    <el-header v-if="!isLoading" class="app-header">
-      <div class="header-wrap">
-        <el-menu :default-active="activeMenu" mode="horizontal" router class="app-menu">
-          <el-menu-item index="/">
-            <el-icon><FolderOpened /></el-icon>
-            <span>来源管理</span>
-          </el-menu-item>
-          <el-menu-item index="/characters">
-            <el-icon><User /></el-icon>
-            <span>角色管理</span>
-          </el-menu-item>
-          <el-menu-item index="/process">
-            <el-icon><Grid /></el-icon>
-            <span>图组管理</span>
-          </el-menu-item>
-          <el-menu-item index="/library">
-            <el-icon><PictureFilled /></el-icon>
-            <span>图库</span>
-          </el-menu-item>
-        </el-menu>
-
-        <router-link
-          to="/tasks"
-          class="header-scripts-link"
-          :class="{ active: activeMenu === '/tasks' }"
+    <div class="app-body">
+      <nav v-if="!isLoading" class="app-rail">
+        <div
+          v-for="(item, index) in NAV_ITEMS"
+          :key="item.path"
+          class="rail-slot"
+          :class="{ 'is-bottom-start': index === bottomStartIndex }"
         >
-          <el-icon><List /></el-icon>
-          <span>任务管理</span>
-          <span v-if="activeTaskCount > 0" class="task-badge">{{ activeTaskCount }}</span>
-        </router-link>
+          <el-tooltip :content="item.label" placement="right" :show-after="300">
+            <router-link :to="item.path" class="rail-link" :class="{ active: activeMenu === item.path }">
+              <el-icon><component :is="item.icon" /></el-icon>
+              <span v-if="item.badge && activeTaskCount > 0" class="task-badge">{{ activeTaskCount }}</span>
+            </router-link>
+          </el-tooltip>
+        </div>
+      </nav>
 
-        <router-link
-          to="/scripts"
-          class="header-scripts-link"
-          :class="{ active: activeMenu === '/scripts' }"
-        >
-          <el-icon><Setting /></el-icon>
-          <span>脚本管理</span>
-        </router-link>
-      </div>
-    </el-header>
-
-    <el-main class="app-main" :class="{ 'is-loading': isLoading }">
-      <router-view />
-    </el-main>
+      <el-main class="app-main" :class="{ 'is-loading': isLoading }">
+        <router-view />
+      </el-main>
+    </div>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type Component } from 'vue';
 import { useRoute } from 'vue-router';
 import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
 import appIcon from '@static/icon.png';
@@ -86,6 +62,30 @@ function syncWindowBlurred(): void {
 window.addEventListener('focus', syncWindowBlurred);
 window.addEventListener('blur', syncWindowBlurred);
 syncWindowBlurred();
+
+/** 导航栏一项：40px 宽的栏放不下文字，名称走 tooltip */
+interface NavItem {
+  path: string;
+  label: string;
+  icon: Component;
+  /** 任务管理要在图标右上角挂运行中的数量 */
+  badge?: boolean;
+  /** 贴到栏底（脚本与任务），最后一项在最下面 */
+  bottom?: boolean;
+}
+
+/** 左侧导航栏，顺序即视觉顺序：上面是数据流的四个页面，脚本与任务贴底 */
+const NAV_ITEMS: NavItem[] = [
+  { path: '/', label: '来源管理', icon: FolderOpened },
+  { path: '/characters', label: '角色管理', icon: User },
+  { path: '/process', label: '图组管理', icon: Grid },
+  { path: '/library', label: '图库', icon: PictureFilled },
+  { path: '/scripts', label: '脚本管理', icon: Setting, bottom: true },
+  { path: '/tasks', label: '任务管理', icon: List, badge: true, bottom: true },
+];
+
+/** 栏底那组的起点：它上面撑开弹性空白，把这组顶到底部 */
+const bottomStartIndex = NAV_ITEMS.findIndex((item) => item.bottom === true);
 
 /** 这些路由是独立子窗口：不套主窗口的标题栏与导航骨架 */
 const POPUP_ROUTES = [
@@ -174,8 +174,10 @@ body {
   user-select: none;
 }
 
-/* 失焦：图标与文字压暗，与系统窗口按钮同一档 */
-.window-blurred .title-bar-icon {
+/* 失焦：整条 chrome（标题栏 + 左侧导航栏）一起压暗，与系统窗口按钮同一档。
+   导航栏压的是 link 而不是 .app-rail——底色不跟着淡，否则和标题栏的底色会在接缝处对不齐 */
+.window-blurred .title-bar-icon,
+.window-blurred .rail-link {
   opacity: 0.5;
 }
 
@@ -183,57 +185,76 @@ body {
   color: var(--el-text-color-disabled);
 }
 
-.app-header {
-  padding: 0;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-.header-wrap {
+/* 标题栏下面那一条：左边 40px 导航栏，右边内容区 */
+.app-body {
   display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-.app-menu {
-  border-bottom: none !important;
   flex: 1;
+  min-height: 0;
 }
 
-.header-scripts-link {
+/* 导航栏：40px 宽、图标竖排；文字放不下，名称由 tooltip 给 */
+.app-rail {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 40px;
+  background: #26282c;
+  border-right: 1px solid #323438;
+}
+
+.rail-slot {
+  flex: none;
+}
+
+/* 栏底那一组（脚本、任务）靠一段弹性空白顶到最下面 */
+.rail-slot.is-bottom-start {
+  margin-top: auto;
+}
+
+.rail-link {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 20px;
-  height: 100%;
-  text-decoration: none;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
   color: #a0a3a9;
-  font-size: 14px;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s, border-color 0.2s;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
-.header-scripts-link:hover {
+.rail-link:hover {
   color: #d8dadd;
+  background: #2b2d30;
 }
 
-.header-scripts-link.active {
+/* 激活态：左边一道竖条 + 提亮 */
+.rail-link.active {
   color: #3871e1;
-  border-bottom-color: #3871e1;
+  background: #2b2d30;
+  border-left-color: #3871e1;
 }
 
+/* 任务角标：贴在图标右上角 */
 .task-badge {
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 9px;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: #3871e1;
   color: #fff;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 10px;
+  line-height: 14px;
 }
 
 .app-main {
   background: #1e1f22;
   flex: 1;
+  /* 横排里的 flex 项要显式允许收缩，否则宽表格会把整页撑出横向滚动 */
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: 16px 0 0 0;

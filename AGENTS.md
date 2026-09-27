@@ -204,17 +204,18 @@ function upsertScript(...) {}
 
 ### 9. 自绘标题栏
 
-主窗口没有系统标题栏，**单独一条 `.title-bar`（40px）就是它**，导航行在它下面；**系统窗口按钮保留**：
+主窗口没有系统标题栏，**单独一条 `.title-bar`（40px）就是它**，导航是它下面**左侧**那条 40px 竖栏（`.app-rail`）；**系统窗口按钮保留**：
 Windows / Linux 靠 `titleBarOverlay`（Window Controls Overlay），macOS 靠原生红绿灯。
 Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不画这个槽**（左端归红绿灯，只留标题文字）。
 改这条栏时几条一起看：
 
-- `.title-bar` 是拖拽区，导航行不是；要在标题栏里放可点元素就得补 `no-drag`，否则表现为「点不动」。
+- `.title-bar` 是拖拽区，左侧导航栏不是；要在标题栏里放可点元素就得补 `no-drag`，否则表现为「点不动」。
 - `--title-bar-height`（CSS）与 `createMain()` 的 `titleBar.height` 必须相等；
   `titleBar.color` 要与 `.title-bar` 的底色一致。
 - 系统按钮占的位置由 `env(titlebar-area-*)` 让出；macOS 没有 WCO，靠 `html.platform-mac` 补左内边距。
-- **失焦时标题栏要与系统按钮一起压暗**：渲染进程挂 `html.window-blurred`（DOM focus / blur），
-  主进程换 `setTitleBarOverlay` 的字形色——两端都挂在同一个窗口焦点事件上，别只改一边。
+- **失焦时整条 chrome 要一起压暗**（标题栏的图标与文字、左侧导航栏的图标）：渲染进程挂
+  `html.window-blurred`（DOM focus / blur），主进程换 `setTitleBarOverlay` 的字形色——
+  两端都挂在同一个窗口焦点事件上，别只改一边。
 
 细节与取舍见 [docs/design/window-management.md](docs/design/window-management.md)。
 

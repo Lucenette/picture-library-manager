@@ -300,7 +300,7 @@ export interface ExportTaskPayload {
   targetDir: string;
 }
 
-/** 识别相似图片：没有入参，比对的是第四页签里的全部图片 */
+/** 识别相似图片：没有入参，比对的是「图库」页里的全部图片 */
 export type SimilarTaskPayload = Record<string, never>;
 
 /** 识别相似图片的结果统计 */
