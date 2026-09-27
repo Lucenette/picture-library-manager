@@ -15,7 +15,6 @@ import { join } from 'path';
 import { DOMParser, type Element } from '@xmldom/xmldom';
 
 import type { MigrationLedgerEntry, MigrationLedgerRow } from '@/database/db';
-import type { MigrationProgress } from '@common/types';
 
 // ------------------------------------------------------------
 // 常量
@@ -114,6 +113,27 @@ interface ChangeStep {
   title: string;
   sql?: string;
   run?: ChangeScript;
+}
+
+/**
+ * 一轮升级的进度。
+ *
+ * 只给升级自己用：加载页看的是加载服务的 LoadProgress，两者的转换在 ups/index.ts。
+ */
+export interface MigrationProgress {
+  status: 'running' | 'succeeded' | 'failed';
+  /** 待执行的步骤总数 */
+  total: number;
+  /** 已完成的条数 */
+  done: number;
+  /** 整体百分比，0-100 */
+  percent: number;
+  /** 当前（或最后一条）步骤的标题 */
+  currentTitle: string;
+  /** 失败原因；成功时为空串 */
+  error: string;
+  /** 升级前的备份路径；没有产生备份时为空串 */
+  backupPath: string;
 }
 
 /** 一次升级的结果 */

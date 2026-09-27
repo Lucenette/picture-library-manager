@@ -24,7 +24,7 @@
         </div>
       </nav>
 
-      <div class="app-main" :class="{ 'is-loading': isLoading }">
+      <div class="app-main">
         <router-view />
       </div>
     </div>
@@ -110,7 +110,7 @@ body {
   display: flex;
   align-items: center;
   height: var(--title-bar-height);
-  background: #26282c;
+  background: var(--el-fill-color-light);
   -webkit-app-region: drag;
   app-region: drag;
   /* 系统按钮占的位置由 WCO 的 titlebar-area 让出来（Windows / Linux）；
@@ -165,8 +165,7 @@ body {
   flex-direction: column;
   flex: none;
   width: 40px;
-  background: #26282c;
-  border-right: 1px solid #323438;
+  background: var(--el-fill-color-light);
 }
 
 .rail-slot {
@@ -224,11 +223,6 @@ body {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 0 0 0;
-}
-
-/* 迁移页自带 60px 页头，让它从主区域顶部铺开 */
-.app-main.is-loading {
-  padding: 0;
+  /* 这里不留白：页边距归页面自己，用 --page-padding（见 styles/theme.css） */
 }
 </style>

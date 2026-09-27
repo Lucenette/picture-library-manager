@@ -2,6 +2,8 @@ import { app, BrowserWindow, type WebPreferences } from 'electron';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 
+import { IPC } from '@common/ipcChannels';
+
 // ------------------------------------------------------------
 // 常量
 // ------------------------------------------------------------
@@ -139,7 +141,15 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
       });
     };
     window.on('focus', () => syncSymbolColor(true));
-    window.on('blur', () => syncSymbolColor(false));
+    window.on('blur', () => {
+      // 自己拥有的浮窗弹出来时不算「切到别处去了」：字形色保持激活态。
+      // 判据要落到「这个浮窗是这个窗口的」，否则别的窗口开下拉会把这里的压暗也去掉
+      const popup = get('popup');
+      if (popup?.isVisible() === true && popup.getParentWindow() === window) {
+        return;
+      }
+      syncSymbolColor(false);
+    });
   }
 
   if (showWhenReady && visible) {
@@ -260,6 +270,17 @@ export function ensurePopup(): BrowserWindow {
   });
   // 失焦即收起。可见性由主进程掌握，渲染进程不销毁这个窗口
   window.on('blur', () => window.hide());
+
+  // 浮窗一出现它所属的窗口就失焦，但整条 chrome 不该跟着压暗。
+  // 只通知**拥有这个浮窗的那个窗口**：在弹窗上开下拉，主窗口该保持压暗，别被点亮
+  const notifyVisible = (visible: boolean): void => {
+    const owner = window.getParentWindow();
+    if (owner !== null && !owner.isDestroyed()) {
+      owner.webContents.send(IPC.POPUP_VISIBLE, visible);
+    }
+  };
+  window.on('show', () => notifyVisible(true));
+  window.on('hide', () => notifyVisible(false));
   return window;
 }
 

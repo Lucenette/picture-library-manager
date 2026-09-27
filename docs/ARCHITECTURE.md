@@ -16,7 +16,7 @@
 │  window-manager.ts   窗口工厂与注册表                            │
 │  dialogs/            每个辅助窗口一个模块 + 其 IPC               │
 │  image/              图片处理流水线                              │
-│  script/             用户脚本的编译与调用                        │
+│  script/             用户脚本的文件、草稿、编译与调用            │
 │  task/               后台任务编排                                │
 │                                                                  │
 │       ┌─────────── worker 线程池（min(4, cpus-1)）───────────┐   │
@@ -35,7 +35,7 @@
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**每类窗口一份渲染进程入口**（`src/renderer/entries/`）：主窗口 `index.html` 用 vue-router 管六个页面；六个弹窗、图片查看器、仿原生浮窗各有更小的一份（`dialogs.html` / `viewer.html` / `popup.html`），按 hash 直接挂载单个页面、不引 vue-router。入口里只 import 这个窗口要用的东西——Element Plus 只出现在主窗口与弹窗入口里；图片查看器与浮窗入口连 vue-router 都不引。主窗口一律先落在 `/loading`，加载页读到 changelog 的终态后用 `router.replace('/')` 切回主界面——正常启动时它什么都不画，所以不会闪。缘由与约束见 `docs/design/window-management.md` 第 4 节。
+**每类窗口一份渲染进程入口**（`src/renderer/entries/`）：主窗口 `index.html` 用 vue-router 管六个页面；六个弹窗、图片查看器、仿原生浮窗各有更小的一份（`dialogs.html` / `viewer.html` / `popup.html`），按 hash 直接挂载单个页面、不引 vue-router。入口里只 import 这个窗口要用的东西——Element Plus 只出现在主窗口与弹窗入口里；图片查看器与浮窗入口连 vue-router 都不引。主窗口一律先落在 `/loading`，加载页读到加载服务公布的终态后用 `router.replace('/')` 切回主界面——正常启动时它什么都不画，所以不会闪。启动阶段要做的事（升级、其余初始化、脚本页预热）都登记给加载服务，见 [design/loading.md](./design/loading.md)。缘由与约束见 `docs/design/window-management.md` 第 4 节。
 
 辅助窗口目前包括图片查看器、扫描配置、批量处理、输入框、确认框、文件查看、下拉浮窗，每一个都对应 `main/dialogs/` 下的一个模块与一条 hash 路由。
 
@@ -51,9 +51,10 @@
 |---|---|---|
 | `image/` | 图库目录 → 可入库的图片记录 | 任务、进度、图库等业务概念 |
 | `task/` | 队列、状态机、取消、进度、事件推送 | 具体重计算（交给 `image/` 的线程） |
-| `script/` | 用户脚本的编译与方法调用 | 业务规则 |
+| `script/` | 用户脚本的文件与草稿（`scripts/`、`temp/scripts/`）、编译与方法调用 | SQL 与表结构——那是 `database/` 的事 |
 | `dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC |
-| `ups/` | 升级模块：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎、升级页 IPC | 反向依赖业务模块 |
+| `ups/` | 升级模块：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎 | 反向依赖业务模块 |
+| `loading/` | 启动加载服务：任务登记与调度、加载页状态、渲染进程任务下发 | 具体任务本身——升级在 `ups/` |
 | `database/` | 开库、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** `database` 也只被少数模块使用，但它独立存在。
@@ -146,7 +147,7 @@ RGBA 位图——一张 15360×8640 的 JPEG 按整图解码要 530 MB。**没�
 账本表本身由引擎用代码创建：账本不存在时，没有任何地方能记录「创建账本」这件事。
 需要重建表（SQLite 改列类型只能「建新表 → 搬数据 → 换名」）时，同样写成一条 changeSet，而不是在启动代码里判断列名后 `DROP`。
 
-主窗口启动时先落在加载页；升级跑完（或判定没有待执行的）后自动切回主界面。
+主窗口启动时先落在加载页；加载服务把所有「必须」的启动任务跑完（升级是其中之一，没有待执行步骤时它空转）后自动切回主界面。
 
 ---
 

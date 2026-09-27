@@ -1,25 +1,20 @@
 import {
-  execSql, getDataDir, getDbPath, readMigrationLedger, runInMigrationTransaction, writeMigrationLedger,
+  execSql, getDbPath, readMigrationLedger, runInMigrationTransaction, writeMigrationLedger,
 } from '@/database/db';
+import type { LoadTaskReport } from '@/loading';
+import { getDataDir } from '@/paths';
 import { CHANGELOG_VERSIONS } from '@/ups/changesets';
-import type { MigrationOutcome } from '@/ups/engine';
 import { runUps } from '@/ups/engine';
-import { initUpsIpc, sendUpsProgress } from '@/ups/progress';
 import { get } from '@/window-manager';
 
-/** 失败页要等用户点「退出」；启动流程用它决定什么时候 app.quit() */
-export { waitUpsQuit } from '@/ups/progress';
-
 /**
- * 初始化升级模块并执行本轮升级。
+ * 升级任务：登记给加载服务的一步（见 docs/design/loading.md）。
  *
- * 启动流程只调这一个函数：升级页的通道注册与升级本身都归它，数据库那边只提供被调用的能力
- * （见 database/db.ts 暴露的那几个函数）。返回结果供启动流程决定失败后是否等用户点「退出」。
+ * 成败不再靠返回值表达：失败时把备份路径放进附注再抛出，由加载服务公布终态、让加载页停在错误上。
+ * 主窗口被关掉时升级主动收手，那不算失败——应用本来就要退出了。
  */
-export async function initUps(): Promise<MigrationOutcome> {
-  initUpsIpc();
-
-  return runUps({
+export async function initUps(report: LoadTaskReport): Promise<void> {
+  const outcome = await runUps({
     store: {
       getDataDir,
       getDbPath,
@@ -29,8 +24,27 @@ export async function initUps(): Promise<MigrationOutcome> {
       writeMigrationLedger,
     },
     versions: CHANGELOG_VERSIONS,
-    onProgress: sendUpsProgress,
+    onProgress: (progress) => {
+      // 升级自己的终态不转发：切主界面还是停在这一页，由加载服务在所有必须任务之后统一公布
+      if (progress.status !== 'running') {
+        return;
+      }
+      report({
+        step: progress.currentTitle,
+        done: progress.done,
+        total: progress.total,
+        percent: progress.percent,
+      });
+    },
     // 主窗口被关掉就不必再升级了：关窗即退出应用
     shouldAbort: () => !get('main'),
   });
+
+  if (outcome.ok || outcome.aborted) {
+    return;
+  }
+  if (outcome.backupPath !== '') {
+    report({ note: `升级前的备份：${outcome.backupPath}` });
+  }
+  throw new Error(outcome.error);
 }

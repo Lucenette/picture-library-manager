@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
+  <changeSet id="20260927220000000001" author="powerinv">
+    <comment>process_script | 处理脚本表：新增内置标记</comment>
+    <sql>
+      ALTER TABLE process_script ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0;
+      UPDATE process_script SET builtin = 1 WHERE file_path = '';
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260927220000000002" author="powerinv">
+    <comment>processed_image | 图库表：内联当时的脚本名</comment>
+    <sql>
+      ALTER TABLE processed_image ADD COLUMN script_name TEXT;
+      UPDATE processed_image SET script_name = (
+        SELECT name FROM process_script WHERE id = processed_image.script_id
+      ) WHERE script_id IS NOT NULL;
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260927220000000003" author="powerinv">
+    <comment>process_script | 处理脚本表：源码改由脚本文件承担，去掉库内副本</comment>
+    <sql>
+      ALTER TABLE process_script DROP COLUMN code;
+      ALTER TABLE process_script DROP COLUMN brief;
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260927220000000004" author="powerinv">
+    <comment>script_group | 脚本分组表</comment>
+    <sql>
+      CREATE TABLE IF NOT EXISTS script_group (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        collapsed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260927220000000005" author="powerinv">
+    <comment>process_script | 处理脚本表：新增分组列</comment>
+    <sql>
+      ALTER TABLE process_script ADD COLUMN group_id INTEGER;
+    </sql>
+  </changeSet>
+</databaseChangeLog>

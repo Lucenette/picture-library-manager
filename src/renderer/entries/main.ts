@@ -1,8 +1,13 @@
 import { createApp } from 'vue';
+import { ipcRenderer } from 'electron';
 import { createRouter, createWebHashHistory } from 'vue-router';
+
+import { IPC, LOAD_TASK } from '@common/ipcChannels';
+
 import App from '@/App.vue';
 import { installElementPlus } from '@/entries/shell/element-plus';
-import { initWindowChrome } from '@/entries/shell/window-chrome';
+import { initWindowChrome, setPopupOpen } from '@/entries/shell/window-chrome';
+import { initRendererLoading, registerRendererTask } from '@/loading';
 import '@/styles/theme.css';
 import LoadingPage from '@/views/startup/LoadingPage.vue';
 
@@ -32,9 +37,39 @@ const router = createRouter({
 
 initWindowChrome();
 
+// 浮窗弹出时主窗口会失焦，但那是主界面自己在展开：标题栏不跟着压暗（见 shell/window-chrome.ts）
+ipcRenderer.on(IPC.POPUP_VISIBLE, (_event, visible: boolean) => setPopupOpen(visible));
+
 const app = createApp(App);
 app.use(router);
 installElementPlus(app);
+
+/**
+ * 预热脚本管理页：它把整个 Monaco 连同两个 worker 一起吞进自己的 chunk（十几 MB），
+ * 第一次点进去要现场下载、求值，肉眼可见地卡一下。主进程的加载服务在启动阶段下发这一步。
+ *
+ * 分两段跑、中间各让一次空闲：求值 Monaco 与解码内联的 worker 各要占住主线程几百毫秒，
+ * 抢在首屏之前跑就是白屏，分段之后加载页至少能在两段之间重画一次。
+ * 第二段把 TypeScript 语言服务也点着（见 monaco-env.ts），那原本要等第一次打开编辑器才付。
+ */
+function warmUpEditor(): Promise<unknown> {
+  return nextIdle()
+    .then(() => import('@/views/main/ScriptPage.vue'))
+    .then(() => nextIdle())
+    .then(() => import('@/views/main/scripts/monaco-env'))
+    .then((env) => env.warmUpTypeScript());
+}
+
+/** 等一次渲染进程的空闲；超时兜底，别让预热永远排不上 */
+function nextIdle(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    requestIdleCallback(() => resolve(), { timeout: 2000 });
+  });
+}
+
+registerRendererTask(LOAD_TASK.EDITOR, warmUpEditor);
+// 告诉主进程「可以下发任务了」，顺带取回当前状态
+void initRendererLoading();
 
 // 等首次导航完成再挂载。vue-router 的首次导航是异步的，提前挂载时 App.vue 拿到的 route.path
 // 还是初始的 "/"，于是会先按「主界面」渲染出导航骨架，再切成加载页——肉眼可见地闪一下。

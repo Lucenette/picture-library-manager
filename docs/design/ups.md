@@ -76,9 +76,8 @@ XML 正文里只有 `<` 与 `&` 需要转义，写成 `&lt;` 与 `&amp;`；引�
 
 ```
 src/main/ups/                 升级模块（上层）
-  index.ts                    initUps()：注册升级页通道 + 执行本轮升级，模块的唯一入口
+  index.ts                    initUps()：登记给加载服务的一项任务（报进展、失败抛错）
   engine.ts                   引擎：解析、计划、执行、备份与清理；不依赖 electron
-  progress.ts                 升级页的 IPC 与进度推送
   changesets/
     index.ts                  版本清单：只 import 各版本目录的 index.ts
     1.0.0/  index.ts + dbups.xml
@@ -147,24 +146,22 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 
 `execSql()` 一次可执行多条语句，因此一条 changeset 就是一段文本，不做分号切分。
 
-### 3.7 启动加载页
+### 3.7 作为加载任务运行
 
-启动顺序是固定的：
+升级是加载服务的一项「必须」任务（模块在 `src/main/loading/`，见 [loading.md](./loading.md)）：
 
 ```
 createMain('/loading')
-initDatabase()         ① 建数据目录、开库（没有就建文件）、注册 DB 通道
-await initUps()        ② 注册升级页通道 + 执行本轮升级
-initTaskIpc() initDialogs() …           ③ 其余初始化
-taskManager.init(mainWindow); warmPopup()   ④
+initLoadingIpc()       ① 加载服务的通道：状态快照、进度推送、退出、渲染进程任务下发
+initDatabase()         ② 建数据目录、开库（没有就建文件）、注册 DB 通道
+registerLoadTask(…)    ③ 登记「数据库升级」「初始化」「编辑器预热」
+await startLoading()   ④ 按登记顺序跑必须的任务，最后公布终态
 ```
 
-- 窗口排在开库与升级**之前**：窗口的显示、渲染进程的启动、升级的执行三者重叠。`initDatabase()` 与通道注册都是同步的，排在第一个 `await` 之前——渲染进程发来的 invoke 要等主进程回到事件循环才会被派发，所以先建窗口再注册通道不存在竞态。
-- 升级模块的入口只有 `initUps()` 一个：升级页的通道注册与升级本身都归它。数据库那边同理只有 `initDatabase()`。
-- **不变量：升级终态发出之后到所有通道注册完成之间不许有 `await`。** 加载页收到终态就 `router.replace('/')` 回主界面，而它发来的 invoke 要等主进程回到事件循环才会被派发；只要 ③④ 全是同步调用，就不会出现「通道还没注册就开始 invoke」。
-- 页面显示进度条、当前步骤的标题、已完成与总数；失败时显示错误原因与备份路径，并提供「退出」。
-- 主进程推送 `UPS_PROGRESS`；渲染进程挂载时先订阅推送、再 `invoke(UPS_STATE)` 取一次快照，因此「升级比页面加载还快」时也能拿到终态。
-- 读到终态后用 `router.replace('/')` 切回主界面——是 replace 不是 push，加载页不会留在历史里，后退键回不去。
+- 窗口排在开库与升级**之前**：窗口的显示、渲染进程的启动、升级的执行三者重叠。`initLoadingIpc()` 与 `initDatabase()` 都是同步的，排在第一个 `await` 之前——渲染进程发来的 invoke 要等主进程回到事件循环才会被派发，所以先建窗口再注册通道不存在竞态。
+- `initUps(report)` 只做三件事：接上 `MigrationStore`、把引擎报的进度转成加载服务的 `report({ step, done, total, percent })`、失败时把备份路径写进附注再抛错。**升级自己的终态不转发**——切主界面还是停在错误页，由加载服务在所有「必须」任务之后统一公布。
+- 主窗口被关掉时升级收手（`shouldAbort`），返回的 `aborted` 不算失败：应用本来就要退出了。
+- **原先那条时序不变量已经消失**：升级与它之后的其余初始化都是任务表里的「必须」任务，终态排在两者之后才公布，所以「加载页收到终态时通道必然已经注册好」是登记表的结论，不再是需要人守的约定。
 - 升级期间关掉窗口即退出应用：`before-quit` 会关库，正在执行的那一步随事务回滚。
 
 ### 3.8 什么会停下，什么不会
@@ -202,7 +199,7 @@ taskManager.init(mainWindow); warmPopup()   ④
 3. **大库建表或表重建耗时** → 在启动阶段执行，由升级页给出进度，不阻塞界面。
 4. **XML 转义遗漏** → 漏写 `&` 是解析错误，漏写 `<` 可能被当成标签吞掉；解析器不校验这两条（见 3.1），由写 changelog 的人负责。
 5. **复制版本目录忘了改 `VERSION`** → 清单里重复版本号直接抛错，启动就看得见。
-6. **往升级终态之后加了 await** → 渲染进程可能在通道注册前 invoke；这条不变量写在 3.7 与 `AGENTS.md` 里，评审时盯着。
+6. **新增的启动步骤绕过任务表**（在 `startLoading()` 之后直接 `await` 做事）→ 渲染进程可能在通道注册前 invoke；应该登记成加载服务的一项任务，见 3.7 与 [loading.md](./loading.md)。
 7. **解析器默认不抛错** → 必须接 `onError`，否则错误会变成静默的不完整 SQL。
 
 ## 5. 验证方法
@@ -210,7 +207,7 @@ taskManager.init(mainWindow); warmPopup()   ④
 1. **静态检查**：`tsc -p tsconfig.node.json`、`vue-tsc -p tsconfig.web.json`、`node scripts/check-docs.mjs`、以及「`database/` 里不出现 `@/ups`」这条依赖方向检查。
 2. **迁移预演**：`node .agents/skills/db-maintenance/scripts/verify-migration.mjs` —— 全新库与现有库两条路径必须结构收敛。它**只重放 `dbups.xml`**，并会打印哪些版本带 preups/postups 而未被预演；带脚本的版本必须另外在库副本上冒烟。
 3. **引擎验证**：引擎不依赖 electron，可以用内存库或临时库在纯 Node 下直接跑 `runUps()`：三段顺序、已记账的不再执行、脚本抛错时回滚且只记 `failed`、缺文件被跳过、重复版本号被拒绝、备份只保留 3 份。
-4. **人工冒烟**（静态检查通过不等于功能正常）：在库副本上启动应用，确认升级页出现「1.0.1 预升级脚本」；再次启动不再出现该步骤；人为让脚本抛错，确认失败页显示原因、数据未受影响。
+4. **人工冒烟**（静态检查通过不等于功能正常）：在库副本上启动应用，确认加载页出现「1.0.1 预升级脚本」；再次启动不再出现该步骤；人为让脚本抛错，确认加载页显示原因、数据未受影响。
 5. **目录改名验证**：把某个版本目录改个名（`index.ts` 里的 `VERSION` 不动），确认账本里已执行的 changeset 仍被认作已执行。
 
 ## 6. 已知代价
