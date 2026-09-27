@@ -1,6 +1,7 @@
 import {
-  execSql, getDataDir, getDbPath, readMigrationLedger, runInMigrationTransaction, writeMigrationLedger,
+  execSql, getDbPath, readMigrationLedger, runInMigrationTransaction, writeMigrationLedger,
 } from '@/database/db';
+import { getDataDir } from '@/paths';
 import { CHANGELOG_VERSIONS } from '@/ups/changesets';
 import type { MigrationOutcome } from '@/ups/engine';
 import { runUps } from '@/ups/engine';

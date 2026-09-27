@@ -1,11 +1,8 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
-import { homedir } from 'os';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { DatabaseSync } from 'node:sqlite';
 import { basename, join } from 'path';
-import { app, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import { compileScriptModule } from '@/script/compile';
-import { BUILTIN_SCRIPT } from '@/script/defaults';
 import type {
   Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
   ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptType,
@@ -13,6 +10,7 @@ import type {
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
 import { SQL } from '@/database/sql';
+import { getDataDir } from '@/paths';
 
 // ------------------------------------------------------------
 // 常量
@@ -21,17 +19,11 @@ import { SQL } from '@/database/sql';
 /** 数据库文件名 */
 const DB_FILE_NAME = 'picture-lib.db';
 
-/** 脚本类型全集，用于检测脚本导出了哪些方法 */
-const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
-
 /** 备份最小间隔：避免每次写入都复制整个数据库文件 */
 const BACKUP_INTERVAL_MS = 30_000;
 
 /** 可以绑定到语句上的值 */
 type SqlValue = null | number | bigint | string | Uint8Array;
-
-/** 脚本摘要长度 */
-const BRIEF_MAX_LENGTH = 120;
 
 // ------------------------------------------------------------
 // 状态
@@ -139,18 +131,6 @@ function backupDatabase(): void {
 // ------------------------------------------------------------
 // 生命周期
 // ------------------------------------------------------------
-
-/**
- * 数据库目录：打包后在用户主目录的 `.plmanager/data/`，开发时在项目的 `dist/data/`。
- *
- * 打包态不能用 exe 同级：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录；
- * Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部——都不是能写库的地方。
- */
-export function getDataDir(): string {
-  return app.isPackaged
-    ? join(homedir(), '.plmanager', 'data')
-    : join(process.cwd(), 'dist', 'data');
-}
 
 /**
  * 打开（必要时创建）数据库文件。
@@ -523,24 +503,8 @@ export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
 // ProcessScript
 // ------------------------------------------------------------
 
-/** 生成脚本列表展示用的代码摘要 */
-function makeBrief(code: string): string {
-  const brief = code.replace(/\n/g, '\\n').slice(0, BRIEF_MAX_LENGTH);
-  return brief.length >= BRIEF_MAX_LENGTH ? `${brief}…` : brief;
-}
-
-/** 检测脚本导出了哪些可识别的方法 */
-function detectScriptTypes(code: string): ScriptType[] {
-  try {
-    const scriptExports = compileScriptModule(code);
-    return ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function');
-  } catch {
-    return [];
-  }
-}
-
-/** 覆盖脚本的类型关联 */
-function replaceScriptTypes(scriptId: number, types: ScriptType[]): void {
+/** 覆盖脚本的类型关联；类型由上层（script/library.ts）编译检测后传进来 */
+export function setScriptTypes(scriptId: number, types: ScriptType[]): void {
   run(SQL.DELETE_SCRIPT_TYPES, [scriptId]);
   for (const type of types) {
     run(SQL.INSERT_SCRIPT_TYPE, [scriptId, type]);
@@ -552,97 +516,103 @@ function getScriptTypes(scriptId: number): ScriptType[] {
   return queryAll<{ type: ScriptType }>(SQL.SELECT_SCRIPT_TYPES, [scriptId]).map((row) => row.type);
 }
 
-/** 补齐脚本记录上的派生字段 */
-function enrichScript(script: ProcessScript): ProcessScript {
-  return {
-    ...script,
-    types: getScriptTypes(script.id),
-    builtin: script.filePath === BUILTIN_SCRIPT.path,
-  };
+/** 行原始形态：SQLite 把 builtin 存成 0/1，视图要的是 boolean */
+interface ScriptRow {
+  id: number;
+  name: string;
+  filePath: string;
+  builtin: number;
+  loadedAt: string;
+  createdAt: string;
 }
 
-/** 按文件路径查询脚本并补齐类型；升级脚本用它判断「这一条是不是已经在了」 */
-export function getScriptByPath(filePath: string): ProcessScript {
-  return enrichScript(queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath])!);
-}
-
-/**
- * 新增或更新脚本，按文件路径去重；导出的方法类型自动检测。
- *
- * 升级脚本（`ups/changesets/`）用它把内置默认脚本写进库。
- */
-export function upsertScript(name: string, filePath: string, code: string): ProcessScript {
-  const resolvedTypes = detectScriptTypes(code);
-  const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
-
-  if (existing) {
-    run(SQL.UPDATE_SCRIPT, [name, code, makeBrief(code), filePath]);
-    replaceScriptTypes(existing.id, resolvedTypes);
-  } else {
-    const id = insert(SQL.INSERT_SCRIPT, [name, filePath, code, makeBrief(code)]);
-    replaceScriptTypes(id, resolvedTypes);
-  }
-  return getScriptByPath(filePath);
-}
-
-/** 用新源码覆盖已入库的脚本，并重新检测类型 */
-function reloadScript(filePath: string, code: string): ProcessScript {
-  const existing = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
-  run(SQL.RELOAD_SCRIPT, [code, makeBrief(code), filePath]);
-  if (existing) {
-    replaceScriptTypes(existing.id, detectScriptTypes(code));
-  }
-  return getScriptByPath(filePath);
-}
-
-/** 从磁盘导入脚本：主进程读取源码并入库，名称取文件名 */
-export function importScript(filePath: string): ProcessScript {
-  return upsertScript(basename(filePath), filePath, readFileSync(filePath, 'utf-8'));
-}
-
-/** 用磁盘上的最新内容重新载入已入库的脚本 */
-export function reloadScriptFromFile(filePath: string): ProcessScript {
-  return reloadScript(filePath, readFileSync(filePath, 'utf-8'));
-}
-
-/** 用随应用发布的内置源码覆盖内置脚本；名字是使用者的，不动 */
-export function resetBuiltinScript(id: number): ProcessScript {
-  const script = getScriptById(id);
-  if (!script?.builtin) {
-    throw new Error('只有内置脚本可以恢复默认');
-  }
-  return reloadScript(BUILTIN_SCRIPT.path, BUILTIN_SCRIPT.source);
+/** 补齐脚本记录上的派生字段：类型关联与内置标记 */
+function enrichScript(row: ScriptRow): ProcessScript {
+  return { ...row, builtin: row.builtin === 1, types: getScriptTypes(row.id) };
 }
 
 /** 查询全部脚本，按名称升序 */
 export function getAllScripts(): ProcessScript[] {
-  return queryAll<ProcessScript>(SQL.SELECT_SCRIPTS_ALL).map(enrichScript);
+  return queryAll<ScriptRow>(SQL.SELECT_SCRIPTS_ALL).map(enrichScript);
 }
 
 /** 按 id 查询脚本 */
 export function getScriptById(id: number): ProcessScript | undefined {
-  const script = queryOne<ProcessScript>(SQL.SELECT_SCRIPT_BY_ID, [id]);
-  return script ? enrichScript(script) : undefined;
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BY_ID, [id]);
+  return row ? enrichScript(row) : undefined;
 }
 
-/** 查询能处理指定类型的脚本，按名称升序 */
+/** 按文件路径查询脚本；升级脚本用它判断「这一条是不是已经在了」 */
+export function getScriptByPath(filePath: string): ProcessScript | undefined {
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BY_PATH, [filePath]);
+  return row ? enrichScript(row) : undefined;
+}
+
+/** 查询内置脚本；「恢复默认」与内置落盘都靠它 */
+export function getBuiltinScript(): ProcessScript | undefined {
+  const row = queryOne<ScriptRow>(SQL.SELECT_SCRIPT_BUILTIN);
+  return row ? enrichScript(row) : undefined;
+}
+
+/** 按类型查询脚本，按名称升序 */
 export function getScriptsByType(type: ScriptType): ProcessScript[] {
-  return queryAll<ProcessScript>(SQL.SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
+  return queryAll<ScriptRow>(SQL.SELECT_SCRIPTS_BY_TYPE, [type]).map(enrichScript);
 }
 
-/** 重命名脚本 */
+/** 插入一个脚本行；正文不进库，所以这里只收名称与文件路径 */
+export function insertScript(name: string, filePath: string, builtin: boolean): ProcessScript {
+  const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0]);
+  return getScriptById(id)!;
+}
+
+/**
+ * 改名。
+ *
+ * 同一个事务里把图库里的名字副本一起改掉：那一列存的是「这个脚本叫什么」，
+ * 改名后图库必须跟着显示新名字（删除时则不动，名字成为最后一份记录）。
+ */
 export function renameScript(id: number, name: string): void {
-  run(SQL.RENAME_SCRIPT, [name, id]);
+  beginBatch();
+  try {
+    run(SQL.RENAME_SCRIPT, [name, id]);
+    run(SQL.RENAME_PROCESSED_SCRIPT_NAME, [name, id]);
+  } finally {
+    endBatch();
+  }
 }
 
-/** 删除脚本及其类型关联；内置脚本不允许删除 */
-export function deleteScript(id: number): void {
-  if (getScriptById(id)?.builtin) {
-    throw new Error('内置脚本不能删除');
-  }
+/** 回填脚本文件路径：接管旧脚本与内置脚本落盘用 */
+export function setScriptFilePath(id: number, filePath: string): void {
+  run(SQL.SET_SCRIPT_FILE_PATH, [filePath, id]);
+}
+
+/** 只更新时间戳：用同一份文件重新载入时用 */
+export function touchScriptLoadedAt(id: number): void {
+  run(SQL.TOUCH_SCRIPT_LOADED_AT, [id]);
+}
+
+/** 图库里有几条记录来自这个脚本 */
+export function countProcessedByScript(id: number): number {
+  return queryOne<{ processed: number }>(SQL.COUNT_PROCESSED_BY_SCRIPT, [id])?.processed ?? 0;
+}
+
+/** 删脚本行与它的类型关联；内置能不能删由上层判断——那是编排，不归这里 */
+export function deleteScriptRows(id: number): void {
   run(SQL.DELETE_SCRIPT_TYPES, [id]);
   run(SQL.DELETE_SCRIPT, [id]);
 }
+
+/** 老库接管：库里还有没有 code 列——这一列的存在本身就是「还没接管」的标记 */
+export function hasScriptCodeColumn(): boolean {
+  const columns = queryAll<{ name: string }>('PRAGMA table_info(process_script)');
+  return columns.some((column) => column.name === 'code');
+}
+
+/** 老库接管：把每一条的旧源码读出来 */
+export function listLegacyScriptSources(): { id: number; name: string; filePath: string; code: string }[] {
+  return queryAll<{ id: number; name: string; filePath: string; code: string }>(SQL.SELECT_LEGACY_SCRIPTS);
+}
+
 
 // ------------------------------------------------------------
 // ProcessedImage
@@ -659,10 +629,10 @@ export function upsertProcessedImage(
 ): ProcessedImage {
   const existing = queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId]);
   if (existing) {
-    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, imageGroupId]);
+    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptId, imageGroupId]);
   } else {
     run(SQL.INSERT_PROCESSED, [
-      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId,
+      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptId,
     ]);
   }
   run(SQL.UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
@@ -803,13 +773,9 @@ const DB_METHODS: Record<string, DbMethod> = {
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
 
-  importScript,
-  reloadScriptFromFile,
   getAllScripts,
   getScriptsByType,
   renameScript,
-  deleteScript,
-  resetBuiltinScript,
 
   upsertProcessedImage,
   getAllProcessedImages,

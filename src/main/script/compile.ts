@@ -1,17 +1,16 @@
 // ============================================================
-// 处理脚本的编译
+// 处理脚本的编译与检查
 //
-// 脚本以 CommonJS 源码字符串存放在数据库中：录入时用它检测脚本导出了哪些
-// 方法，执行时用它把源码编译成模块再取出方法。两处都在主进程，所以这个模块
-// 也留在主进程的脚本目录里，不与渲染进程共享。
+// 脚本以 CommonJS 源码存在磁盘上（用户目录的 `scripts/` 下）：检测导出了什么、执行它，
+// 都要先把它编译成模块。两处都在主进程，所以这个模块留在主进程的脚本目录里，不与渲染进程共享。
 // ============================================================
 
-/**
- * Node 的 Module 实例。
- *
- * `Module#_compile` 是 Node 的内部 API，@types/node 未公开，
- * 这里按实际用到的形状补一份声明。
- */
+import type { ScriptCompileError, ScriptType } from '@common/types';
+
+/** 脚本类型全集：检测导出了哪些方法时按它过滤 */
+const ALL_SCRIPT_TYPES: ScriptType[] = ['select-image', 'identify-character', 'identify-structure'];
+
+/** Node 的 Module 实例；@types/node 没公开 _compile，按用到的形状补一份 */
 interface CompilableModule extends NodeJS.Module {
   _compile(code: string, filename: string): void;
 }
@@ -27,16 +26,54 @@ const NodeModule = require('module') as ModuleConstructor;
 /**
  * 编译一段处理脚本源码，返回其 `module.exports`。
  *
- * 编译本身会执行脚本的顶层代码；语法错误或顶层抛错都会原样抛出，
- * 由调用方决定如何提示。脚本的 `filePath` 为空串，因此相对的
- * `require` 只能解析到 `process.cwd()` 下的 `node_modules`。
+ * 编译本身会执行脚本的顶层代码；语法错误或顶层抛错都会原样抛出，由调用方决定如何提示。
  *
  * @param code 脚本源码
- * @returns 脚本导出的对象
+ * @param filename 脚本文件路径；传了它，堆栈与 `require('./x')` 都指向真实文件
  */
-export function compileScriptModule(code: string): Record<string, unknown> {
+export function compileScriptModule(code: string, filename = ''): Record<string, unknown> {
   const scriptModule = new NodeModule('');
   scriptModule.paths = NodeModule._nodeModulePaths(process.cwd());
-  scriptModule._compile(code, '');
+  scriptModule._compile(code, filename);
   return scriptModule.exports as Record<string, unknown>;
+}
+
+/**
+ * 检测脚本导出了哪些可识别的方法。
+ *
+ * 编译不过时返回空数组——错误本身由 {@link describeCompileError} 呈现，这里不吞掉它该被看见的事实。
+ */
+export function detectScriptTypes(code: string, filename = ''): ScriptType[] {
+  try {
+    const scriptExports = compileScriptModule(code, filename);
+    return ALL_SCRIPT_TYPES.filter((type) => typeof scriptExports[type] === 'function');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 把编译或运行期的异常变成「消息 + 行列」，供编辑器的行内标记与问题面板用。
+ *
+ * 语法错误的 `stack` 首行是 `<路径>:<行号>`、第三行是插入符；顶层抛错的堆栈里带
+ * `(<路径>:<行>:<列>)`。都取不到就只给消息，行列留 null——界面退回第一行标记，
+ * 至少让人看见有错，而不是静默当它没问题。
+ */
+export function describeCompileError(error: unknown): ScriptCompileError {
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? (error.stack ?? '') : '';
+  const lines = stack.split('\n');
+
+  const syntax = /:(\d+)$$/.exec(lines[0] ?? '');
+  if (error instanceof SyntaxError && syntax !== null) {
+    const caret = (lines[2] ?? '').indexOf('^');
+    return { message, line: Number(syntax[1]), column: caret >= 0 ? caret + 1 : null };
+  }
+
+  const thrown = /\(([^()]*):(\d+):(\d+)\)/.exec(stack);
+  if (thrown !== null) {
+    return { message, line: Number(thrown[2]), column: Number(thrown[3]) };
+  }
+
+  return { message, line: null, column: null };
 }

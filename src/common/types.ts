@@ -57,20 +57,62 @@ export interface ImageFile {
 /** 处理脚本类型 */
 export type ScriptType = 'select-image' | 'identify-character' | 'identify-structure';
 
-/** 处理脚本：存放在数据库中、由扫描与选图流程调用的 CommonJS 模块 */
+/**
+ * 处理脚本：正文存在用户目录的 `scripts/` 下，库里只留这一行索引。
+ *
+ * 运行时重新读文件并编译（见 `script/script-service.ts`），所以这里不带正文。
+ */
 export interface ProcessScript {
   id: number;
   name: string;
+  /** 用户目录里那份脚本文件的绝对路径 */
   filePath: string;
-  code: string;
-  /** 代码摘要，供列表展示 */
-  brief: string;
-  /** 脚本导出的方法类型 */
+  /** 脚本导出的方法类型：永远描述磁盘上的那一版 */
   types: ScriptType[];
-  /** 内置脚本：源码随应用发布、没有磁盘来源，不能删除，只能「恢复默认」 */
+  /** 内置脚本：源码随应用发布、不能删除，只能「恢复默认」 */
   builtin: boolean;
   loadedAt: string;
   createdAt: string;
+}
+
+/** 编译失败的位置；行或列取不到时为 null */
+export interface ScriptCompileError {
+  message: string;
+  line: number | null;
+  column: number | null;
+}
+
+/** 没保存的编辑草稿：一稿一文件存在 `temp/scripts/` 下 */
+export interface ScriptDraft {
+  /** `script-<id>`（已入库）或 `new-<uuid>`（新建未保存） */
+  key: string;
+  /** 名称也是可编辑可未保存的，所以跟着草稿走 */
+  name: string;
+  code: string;
+  updatedAt: string;
+}
+
+/** 打开一个脚本时读到的东西 */
+export interface ScriptReadResult {
+  /** 磁盘上的正文；文件缺失时为空串 */
+  code: string;
+  /** 磁盘上那一版编译的结果 */
+  compileError: ScriptCompileError | null;
+  /** 这一个脚本的未保存草稿 */
+  draft: ScriptDraft | null;
+}
+
+/** 保存一个脚本的结果 */
+export interface ScriptSaveResult {
+  script: ProcessScript;
+  /** 刚写下去的那一版编译的结果；失败时类型关联为空 */
+  compileError: ScriptCompileError | null;
+}
+
+/** 一次导入的结果：成功的逐条列出，失败的也要能看见 */
+export interface ScriptImportResult {
+  imported: ProcessScript[];
+  failed: { path: string; message: string }[];
 }
 
 /** 图库记录：某个图片组最终确认下来的那张图 */
