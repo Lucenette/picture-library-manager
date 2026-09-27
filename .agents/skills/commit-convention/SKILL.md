@@ -13,6 +13,9 @@ description: 在本仓库执行 git 提交、撰写提交信息，或审阅、�
 
 硬性约定以 [AGENTS.md](../../../AGENTS.md) 为准：提交信息用中文、形如 `范围：做了什么`、不擅自 `commit` / `push`。
 
+提交信息是给**程序员**看的——可以写文件、表、通道与根因；**面向使用者的变更另写进 `CHANGELOG.md`**（一行一条、使用者视角），
+写法见 [gitflow-release](../gitflow-release/SKILL.md) 的「更新日志怎么写」。
+
 ## Table of Contents
 
 - [实测数据](#实测数据)

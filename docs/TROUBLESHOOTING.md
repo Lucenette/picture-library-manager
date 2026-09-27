@@ -124,7 +124,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 | 运行方式 | 路径 |
 |---|---|
 | 开发（`yarn dev`） | `dist/data/picture-lib.db` |
-| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<你>\.plmanager\data\picture-lib.db`） |
+| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<用户名>\.plmanager\data\picture-lib.db`） |
 
 打包后固定落在用户主目录，**不放安装目录**：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录，
 库放那儿等于每次更新都可能丢；而 Linux 的 deb 装在 root 所有的 `/opt/PLManager`、macOS 的 exe 在 `.app` 内部，
