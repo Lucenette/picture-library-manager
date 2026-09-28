@@ -11,10 +11,11 @@ import { mkdirSync } from 'node:fs';
 import { readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { app } from 'electron';
+import { app, ipcMain } from 'electron';
 import log4js from 'log4js';
 import type { Appender, Configuration, DateFileAppender, Layout, Logger as Log4jsLogger } from 'log4js';
 
+import { IPC } from '@common/ipcChannels';
 import { formatPlaceholders, type LogLevel, type LogRecord } from '@common/log';
 
 import { getLogsDir } from '@/paths';
@@ -277,6 +278,24 @@ function write(target: Log4jsLogger, level: LogLevel, message: string): void {
   } finally {
     consoleWriting = false;
   }
+}
+
+/**
+ * 渲染进程的记录入口。
+ *
+ * 只收记录、不落自己的文件：文件由主进程独占写入。级别与 category 做一次粗校验，
+ * 免得脏数据在 log4js 里建出一堆没意义的 category。
+ */
+export function initLogIpc(): void {
+  ipcMain.on(IPC.LOG_WRITE, (_event, record: LogRecord) => {
+    if (typeof record?.category !== 'string' || record.category === '') {
+      return;
+    }
+    if (!LEVELS.includes(record.level)) {
+      return;
+    }
+    writeRecord(record);
+  });
 }
 
 /** 三个来源的 category 前缀，给捕获层拼 category 用 */
