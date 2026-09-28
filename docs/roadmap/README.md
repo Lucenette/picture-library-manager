@@ -27,6 +27,7 @@
 | 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
 | 测试系统 | 待评审 | [test-system.md](./test-system.md) |
 | 构建目标：32 位与 arm 架构 | 待评审 | [build-targets.md](./build-targets.md) |
+| 开源就绪 | 待评审 | [open-source-readiness.md](./open-source-readiness.md) |
 
 ## 状态取值
 
