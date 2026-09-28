@@ -323,12 +323,24 @@ useIpcListener(IPC.BATCH_PROCESS_CONFIRMED, (scriptId: number) => {
   void submitProcessTask(scriptId);
 });
 
-/** 选图任务结束后刷新列表，让处理状态立刻反映出来 */
-useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => {
-  if (task.type !== 'process') {
+/** 本次要等的那条选图任务；0 表示当前没有在等 */
+const watchedProcessTaskId = ref(0);
+
+/**
+ * 选图任务结束后刷新列表，让处理状态立刻反映出来。
+ *
+ * `task:changed` 推的是**整张列表**，要按 id 认自己那条（早期按单条任务写的判断永远不成立）。
+ */
+useIpcListener(IPC.TASK_CHANGED, (list: TaskView[]) => {
+  if (watchedProcessTaskId.value === 0) {
+    return;
+  }
+  const task = list.find((item) => item.id === watchedProcessTaskId.value);
+  if (!task) {
     return;
   }
   if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
+    watchedProcessTaskId.value = 0;
     void loadData();
   }
 });
@@ -363,7 +375,7 @@ async function submitProcessTask(scriptId: number): Promise<void> {
     return;
   }
 
-  await actions.submit('process', { groupIds: targets.map((group) => group.id), scriptId });
+  watchedProcessTaskId.value = await actions.submit('process', { groupIds: targets.map((group) => group.id), scriptId });
   ElMessage.success(`已提交 ${targets.length} 个图片组的选图任务，可在「任务」页查看进度`);
 }
 
