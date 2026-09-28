@@ -139,7 +139,7 @@ export async function dispatchLoadTask(id: string): Promise<void> {
 
   const mainWindow = get('main');
   if (!mainWindow || mainWindow.isDestroyed()) {
-    throw new Error('主窗口已关闭，渲染进程任务无法执行');
+    throw new Error('main window is closed, cannot run renderer tasks');
   }
 
   const requestId = nextRequestId;
@@ -185,7 +185,7 @@ function markRendererGone(): void {
   }
   for (const [requestId, settle] of pendingTasks) {
     pendingTasks.delete(requestId);
-    settle('主窗口已关闭，任务没有回执');
+    settle('main window is closed, task got no reply');
   }
 }
 
@@ -195,12 +195,12 @@ async function waitRendererReady(): Promise<void> {
     return;
   }
   if (rendererGone) {
-    throw new Error('主窗口已关闭，渲染进程任务无法执行');
+    throw new Error('main window is closed, cannot run renderer tasks');
   }
   await new Promise<void>((resolve) => {
     readyWaiters.push(resolve);
   });
   if (!rendererReady) {
-    throw new Error('主窗口已关闭，渲染进程任务无法执行');
+    throw new Error('main window is closed, cannot run renderer tasks');
   }
 }

@@ -10,7 +10,11 @@ import type {
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
 import { SQL } from '@/database/sql';
+import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
+
+/** 本模块的日志（category `main.db`） */
+const log = createLogger('db');
 
 // ------------------------------------------------------------
 // 常量
@@ -131,7 +135,7 @@ function backupDatabase(): void {
     copyFileSync(dbPath, `${dbPath}.bak`);
     lastBackupAt = now;
   } catch (error) {
-    console.error('[db] 备份失败：', error);
+    log.error('database backup failed', error);
   }
 }
 
@@ -147,22 +151,23 @@ function backupDatabase(): void {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  console.log('[db] 数据目录：', dataDir);
+  log.info(`data dir: ${dataDir}`);
 
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch (error) {
-    throw new Error(`数据目录不可用：${dataDir}（${error instanceof Error ? error.message : String(error)}）`);
+    throw new Error(`data dir is not usable: ${dataDir} (${error instanceof Error ? error.message : String(error)})`);
   }
   dbPath = join(dataDir, DB_FILE_NAME);
 
   try {
     db = new DatabaseSync(dbPath);
   } catch (error) {
-    throw new Error(`打不开数据库：${dbPath}（${error instanceof Error ? error.message : String(error)}）`);
+    throw new Error(`cannot open database: ${dbPath} (${error instanceof Error ? error.message : String(error)})`);
   }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
+  log.info(`database opened: ${dbPath}`);
 
   // 数据库相关的初始化只在这一个函数里：开库 + 注册 DB 通道
   registerDbIpc();
@@ -175,8 +180,9 @@ export function closeDatabase(): void {
   }
   try {
     db.close();
+    log.info('database closed');
   } catch (error) {
-    console.error('[db] 关闭数据库失败：', error);
+    log.error('failed to close database', error);
   }
   db = null;
 }
@@ -225,7 +231,7 @@ export function execSql(sql: string): void {
 export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
   if (batchDepth > 0) {
     // 迁移只应该是最外层（它在启动阶段跑，那时还没有任何任务）；跑在别的批里说明用错了地方
-    throw new Error('迁移事务不能嵌套在别的事务里：先结束那次批处理再升级');
+    throw new Error('migration transaction cannot be nested in another transaction: finish that batch first');
   }
 
   const handle = db!;
@@ -881,7 +887,7 @@ function registerDbIpc(): void {
   ipcMain.handle(IPC.DB, (_event, method: string, ...args: unknown[]) => {
     const handler = DB_METHODS[method];
     if (!handler) {
-      throw new Error(`未知的数据库方法：${method}`);
+      throw new Error(`unknown database method: ${method}`);
     }
     return handler(...args);
   });

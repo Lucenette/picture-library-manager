@@ -1,7 +1,7 @@
+import { ipcRenderer } from 'electron';
 import { computed, ref } from 'vue';
 import { IPC } from '@common/ipcChannels';
 import type { TaskMoveDirection, TaskPayload, TaskProgressEvent, TaskType, TaskView } from '@common/types';
-import { useIpcListener } from '@/composables/useIpcListener';
 import {
   cancelTask, clearFinishedTasks, forceStopTask, listTasks, moveTask, pauseTask,
   resumeTask, retryTask, submitTask,
@@ -20,7 +20,14 @@ function applyProgress(event: TaskProgressEvent): void {
   tasks.value[index] = { ...tasks.value[index], progress: event.progress, message: event.message };
 }
 
-/** 订阅主进程推送并拉取一次初始列表，重复调用只会订阅一次 */
+/**
+ * 订阅主进程推送并拉取一次初始列表，重复调用只会订阅一次。
+ *
+ * 订阅**挂在模块上**，刻意不用 `useIpcListener`：任务列表是全局单例（见上），
+ * 而 `useIpcListener` 是页面级的——它跟着第一个调用 `useTasks()` 的页面一起注销，
+ * `subscribed` 这道守卫又不会再订阅第二次，于是切走那个页面之后整个窗口的任务
+ * 列表就永远停在最后一帧（表现为「任务一直卡在 5%」「导航栏徽标不动」）。
+ */
 function ensureSubscribed(): void {
   if (subscribed) {
     return;
@@ -29,10 +36,12 @@ function ensureSubscribed(): void {
 
   // 推送就是整张排好序的列表，直接替换：既不会本地顺序漂移，
   // 也不用为每次状态变化再拉一次列表
-  useIpcListener(IPC.TASK_CHANGED, (list: TaskView[]) => {
+  ipcRenderer.on(IPC.TASK_CHANGED, (_event, list: TaskView[]) => {
     tasks.value = list;
   });
-  useIpcListener(IPC.TASK_PROGRESS, (event: TaskProgressEvent) => applyProgress(event));
+  ipcRenderer.on(IPC.TASK_PROGRESS, (_event, event: TaskProgressEvent) => {
+    applyProgress(event);
+  });
   void refresh();
 }
 

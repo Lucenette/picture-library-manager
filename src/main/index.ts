@@ -6,11 +6,15 @@ import { closeDatabase, initDatabase } from '@/database/db';
 import { initDialogs } from '@/dialogs';
 import { warmPopup } from '@/dialogs/control/popup';
 import { initLoadingIpc, registerLoadTask, startLoading, waitLoadQuit } from '@/loading';
+import { createLogger, flushLogging, setupLogging } from '@/log';
 import { initScriptIpc } from '@/script/ipc';
 import { initTaskIpc } from '@/task/ipc';
 import { taskManager } from '@/task/manager';
 import { initUps } from '@/ups';
 import { closeAll, createMain, get } from '@/window-manager';
+
+/** 启动阶段的日志：窗口与库都还没建起来时的失败要能被记录 */
+const log = createLogger('app');
 
 // ------------------------------------------------------------
 // 运行时配置
@@ -52,6 +56,8 @@ function configureCommandLine(): void {
  * 通道必然已经注册好」不再是一条要人守的约定，而是这张登记表的结论。
  */
 async function bootstrap(): Promise<void> {
+  log.info('bootstrap started');
+
   const mainWindow = createMain('/loading');
 
   // 通道先挂上：渲染进程一挂载就会 invoke 状态快照，那同时是它的「就绪」信号
@@ -66,7 +72,9 @@ async function bootstrap(): Promise<void> {
   if (!(await startLoading())) {
     await waitLoadQuit();
     app.quit();
+    return;
   }
+  log.info('startup finished');
 }
 
 /** 升级之后的其余初始化：全是同步注册，跑完主界面才允许进来 */
@@ -93,6 +101,10 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
+// 日志排在最前面：它要能记录「开库失败」「窗口没建起来」这类事。
+// 这是启动顺序里唯一的例外——它不能登记成加载服务的任务，因为加载服务自己还在初始化它。
+setupLogging();
+
 configureCommandLine();
 
 // Windows 的 AppUserModelID：必须与 electron-builder.yml 的 appId 一致，
@@ -106,13 +118,27 @@ if (app.requestSingleInstanceLock()) {
     .then(bootstrap)
     .catch((error: unknown) => {
       // 走到这里说明库还没打开、窗口也还没建，只能用系统原生提示框兜底
-      dialog.showErrorBox('启动失败', error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      log.error('bootstrap failed', error instanceof Error ? error : message);
+      dialog.showErrorBox('启动失败', message);
       app.quit();
     });
-  app.on('before-quit', () => {
+  // 退出时先 flush 日志：dateFile 是异步写，不等它落完就会丢掉最后几行。
+  // 拦一次 quit、收尾完再退，用 `quitting` 守卫避免二次进入
+  let quitting = false;
+  app.on('before-quit', (event) => {
+    if (quitting) {
+      return;
+    }
+    quitting = true;
+    event.preventDefault();
+    log.info('app quitting');
     // 先终止进行中的任务，再落盘；未开始的 pending 会保留到下次启动
     taskManager.shutdown();
-    closeDatabase();
+    flushLogging(() => {
+      closeDatabase();
+      app.quit();
+    });
   });
   // 所有窗口关闭后退出。主窗口关闭时窗口管理器会先关掉其余窗口，所以这条一定会等到
   app.on('window-all-closed', () => {
@@ -125,5 +151,6 @@ if (app.requestSingleInstanceLock()) {
     }
   });
 } else {
+  log.warn('another instance is already running, quitting');
   app.quit();
 }

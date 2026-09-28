@@ -2,7 +2,11 @@ import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import type { ExportTaskPayload, ExportTaskResult } from '@common/types';
 import { getProcessedForExport, type ProcessedExportRow } from '@/database/db';
+import { createLogger } from '@/log';
 import type { TaskContext } from '@/task/manager';
+
+/** 本模块的日志（category `main.export`） */
+const log = createLogger('export');
 
 /**
  * 把一批图库记录导出到目标目录。
@@ -29,13 +33,14 @@ export async function runExport(ctx: TaskContext): Promise<ExportTaskResult> {
       copied += 1;
     } catch (error) {
       failed += 1;
-      console.error(`导出失败 [${row.selectedFile}]：`, error);
+      log.error(`export failed [${row.selectedFile}]`, error);
     }
 
     ctx.report(((index + 1) / Math.max(total, 1)) * 100, `已导出 ${index + 1}/${total}`);
     await ctx.checkpoint();
   }
 
+  log.info(`export finished: ${copied} copied, ${failed} failed`);
   return { copied, failed };
 }
 

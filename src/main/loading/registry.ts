@@ -10,6 +10,10 @@
 import {
   beginLoadTask, dispatchLoadTask, finishLoad, reportLoadProgress, type LoadTaskReport,
 } from '@/loading/progress';
+import { createLogger } from '@/log';
+
+/** 本模块的日志（category `main.loading`） */
+const log = createLogger('loading');
 
 /** 任务的调度种类 */
 export type LoadTaskKind = 'essential' | 'warmup';
@@ -42,7 +46,7 @@ let started = false;
 /** 登记一个加载任务；必须在 startLoading() 之前 */
 export function registerLoadTask(task: LoadTask): void {
   if (started) {
-    throw new Error('加载已经开始，不能再登记任务');
+    throw new Error('loading already started, cannot register more tasks');
   }
   tasks.push(task);
 }
@@ -60,8 +64,9 @@ export async function startLoading(): Promise<boolean> {
     if (task.kind !== 'warmup') {
       continue;
     }
+    log.info(`warmup task started: ${task.title}`);
     void runTask(task).catch((error: unknown) => {
-      console.warn(`[loading] 预热任务「${task.title}」失败：${describeError(error)}`);
+      log.warn(`warmup task failed: ${task.title}`, error);
     });
   }
 
@@ -69,15 +74,19 @@ export async function startLoading(): Promise<boolean> {
     if (task.kind !== 'essential') {
       continue;
     }
+    log.info(`load task started: ${task.title}`);
     beginLoadTask(task.title);
     try {
       await runTask(task);
     } catch (error: unknown) {
+      log.error(`load task failed: ${task.title}`, error);
       finishLoad('failed', describeError(error));
       return false;
     }
+    log.info(`load task done: ${task.title}`);
   }
 
+  log.info('startup load finished');
   finishLoad('succeeded', '');
   return true;
 }

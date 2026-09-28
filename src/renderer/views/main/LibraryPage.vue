@@ -369,12 +369,24 @@ async function batchDelete(): Promise<void> {
 // 导出
 // ------------------------------------------------------------
 
-/** 导出任务结束后刷新列表，让新增的失败记录可见 */
-useIpcListener(IPC.TASK_CHANGED, (task: TaskView) => {
-  if (task.type !== 'export') {
+/** 本次要等的那条导出任务；0 表示当前没有在等 */
+const watchedExportTaskId = ref(0);
+
+/**
+ * 导出任务结束后刷新列表，让新增的失败记录可见。
+ *
+ * `task:changed` 推的是**整张列表**，要按 id 认自己那条（早期按单条任务写的判断永远不成立）。
+ */
+useIpcListener(IPC.TASK_CHANGED, (list: TaskView[]) => {
+  if (watchedExportTaskId.value === 0) {
+    return;
+  }
+  const task = list.find((item) => item.id === watchedExportTaskId.value);
+  if (!task) {
     return;
   }
   if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
+    watchedExportTaskId.value = 0;
     void loadData();
   }
 });
@@ -393,7 +405,7 @@ async function exportImages(): Promise<void> {
     return;
   }
 
-  await actions.submit('export', { imageIds: images.map((image) => image.id), targetDir });
+  watchedExportTaskId.value = await actions.submit('export', { imageIds: images.map((image) => image.id), targetDir });
   ElMessage.success(`已提交 ${images.length} 张图片的导出任务，可在「任务」页查看进度`);
 }
 

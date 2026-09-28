@@ -4,7 +4,11 @@ import {
   insertSimilarGroup, insertSimilarMember, insertSimilarRun,
 } from '@/database/db';
 import { buildSimilarGroups } from '@/image/similar';
+import { createLogger } from '@/log';
 import type { TaskContext } from '@/task/manager';
+
+/** 本模块的日志（category `main.similar`） */
+const log = createLogger('similar');
 
 /**
  * 识别相似图片。
@@ -36,6 +40,8 @@ export async function runSimilar(ctx: TaskContext): Promise<SimilarTaskResult> {
   } finally {
     endBatch();
   }
+
+  log.info(`similar detection finished: ${data.compared} compared, ${data.skipped} skipped, ${data.same.length} same and ${data.similar.length} similar groups`);
 
   return {
     compared: data.compared,

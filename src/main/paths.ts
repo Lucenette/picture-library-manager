@@ -30,3 +30,8 @@ export function getScriptsDir(): string {
 export function getTempDir(): string {
   return join(getUserDir(), 'temp');
 }
+
+/** 日志目录：运行日志（root / external / script 三个文件），与库、脚本分开存放 */
+export function getLogsDir(): string {
+  return join(getUserDir(), 'logs');
+}

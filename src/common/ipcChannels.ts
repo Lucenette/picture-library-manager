@@ -76,6 +76,9 @@ export const IPC = {
   /** 分组输入弹框确认后的回发通道：带 groupId 是改名，不带是新建 */
   SCRIPT_GROUP_CONFIRMED: 'script:groupConfirmed',
 
+  // 日志：渲染进程把记录交给主进程落盘（文件只有主进程一个写者）
+  LOG_WRITE: 'log:write',
+
   // 后台任务
   TASK_SUBMIT: 'task:submit',
   TASK_CANCEL: 'task:cancel',

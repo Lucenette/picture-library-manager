@@ -9,7 +9,7 @@
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
 - **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<用户名>\.plmanager`），里面分三份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
+- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<用户名>\.plmanager`），里面分四份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿、`logs/` 放三个日志文件（`root.log` / `external.log` / `script.log`，位置与读法见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
@@ -188,6 +188,9 @@ function upsertScript(...) {}
 - **状态变化推送整张列表**（`task:changed` 携带排好序的完整列表），渲染进程整表替换、不自行插入；
   高频进度只发 `{ id, progress, message }` 就地打补丁（`task:progress`）。顺序的唯一来源是主进程。
   曾经的实现让渲染进程把新任务插到列表末尾，导致顺序漂移与"卡在识别中"。
+- **任务列表的订阅挂在模块上**（`useTasks.ts`），不要改成页面级的 `useIpcListener`：那样它会跟着第一个调用它的页面一起注销，
+  而 `subscribed` 守卫不会再订阅一次——切换页面之后整个窗口的任务列表就不再更新（表现为「任务一直卡在 5%」）。
+  页面自己订阅 `task:changed` 时，收到的是**整张列表**，要按 id 找自己那条，不要按单条任务写判断。
 - **提交命令额外返回新任务 id**（`TaskSubmitResult`）：它是唯一带额外返回值的命令，调用方不应去列表里猜。
 - **取消与强制结束必须经 `ctx.onAbort(...)` 立刻释放资源**（线程池、句柄），不能等 runner 走到下一个检查点：
   worker 线程会阻止主进程退出，等待检查点会让"关窗不退出"复发。
@@ -242,6 +245,17 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 
 细节与取舍见 [docs/design/window-management.md](docs/design/window-management.md)。
 
+### 10. 日志
+
+- **一律用封装，不直接 `console.*`**：主进程 `import { createLogger } from '@/log'`、渲染进程 `import { createLogger } from '@/services/log-service'`，
+  一个模块一个 logger（category 为 `main.<模块>` / `renderer.<模块>`，模块名自取、能认出是哪个文件）。直接 `console.*` 会被 stdout 补丁当成第三方输出记进 `external.log`，来源与级别都是错的。
+- 消息用模板字符串就地拼好：`log.warn(`failed to open file: ${path}`)`；要附带错误对象时作为第二个参数传入（`log.error(msg, error)`，Error 记栈、对象记 JSON），**不要用占位符**。
+- **日志消息一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）可以是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码。
+- **异常消息按去向定语言**：会进日志的用英文——任务失败、加载失败、升级校验与升级脚本、脚本执行、DB 打不开都会作为 `cause` 落进 `root.log`；不会进日志的纯界面文案（任务状态词、输入校验、对话框标题、进度标题）保持中文。
+- **关键节点用 `info` 落盘**：启动与退出、窗口开关、开库、加载任务的开始与结束、升级步骤、任务的提交与终态、各 runner 的汇总。文件侧只收 INFO 及以上，写成 `debug` 等于只在控制台可见。
+- worker 线程（`image/` 里的解码）够不着日志文件、也没有 electron：它不写日志，失败靠返回值交给调用方记录。
+- 三个文件在哪、级别怎么调，见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节；不变量与改动注意点见 [docs/design/logging.md](docs/design/logging.md)。
+
 ---
 
 ## 已知环境限制
@@ -253,7 +267,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
   本仓库在 `package.json` 的 `postinstall` 里显式跑 `node node_modules/electron/install.js`（幂等，装过就跳过），
   让 `yarn install` 之后直接就能开发。GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指镜像——
   别再往 `.npmrc` 写 `electron_mirror`，npm 已警告这类未知配置下个大版本会失效。
-- **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
+- **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，中文在终端显示为乱码；`chcp 65001` 后正常，文件内容不受影响。应用自己写出的日志消息已改成英文（见运行时约定第 10 节），仍会乱码的是第三方库自己打的中文。
 - **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
   要清理只点具体产物：`dist/icons`、`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。

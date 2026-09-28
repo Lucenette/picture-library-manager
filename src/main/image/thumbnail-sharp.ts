@@ -89,7 +89,7 @@ try {
 /** 取 sharp 实例；没装或加载失败时抛出带修复方式的错误 */
 function requireSharp(): SharpFactory {
   if (!sharpFactory) {
-    throw new Error(`sharp 不可用（${loadError}），缩略图解码依赖它，请先安装：yarn add sharp`);
+    throw new Error(`sharp is unavailable (${loadError}); thumbnail decoding needs it, install with: yarn add sharp`);
   }
   return sharpFactory;
 }
@@ -111,8 +111,8 @@ export async function generateThumbnail(filePath: string): Promise<ThumbnailResu
     const metadata = await sharp(filePath, { failOn: 'none' }).metadata();
     width = metadata.width ?? 0;
     height = metadata.height ?? 0;
-  } catch (error) {
-    console.error(`读取图片尺寸失败：${filePath}`, (error as Error).message);
+  } catch {
+    // 只是拿不到尺寸，退回 0；真正读不出来的图会在下面那次解码里失败并报给调用方
   }
 
   try {
@@ -151,8 +151,9 @@ export async function generateThumbnail(filePath: string): Promise<ThumbnailResu
       .toBuffer();
 
     return { thumbnail, phash: perceptualHash(grey), width, height };
-  } catch (error) {
-    console.error(`sharp 生成缩略图失败：${filePath}`, (error as Error).message);
+  } catch {
+    // 这里在 worker 线程里、够不着主进程的日志文件（见 docs/design/logging.md 3.5）：
+    // 退回 null，由调用方（扫描器）连同路径与像素数记一条「这张图解码失败」
     return { thumbnail: null, phash: null, width, height };
   }
 }
