@@ -1,8 +1,8 @@
 // ============================================================
 // 日志：跨进程共用的部分
 //
-// 这里只有类型与纯函数——主进程要用它拼消息，渲染进程也要（两边 API 一致）。
-// 落盘、轮转、级别控制都在主进程（见 src/main/log/）。
+// 这里只有契约与纯函数：`Logger` 是主进程与渲染进程共用的 API，`formatCause()` 把附带的
+// 原因拼成文本。落盘、轮转、级别控制都在主进程（见 src/main/log/）。
 // ============================================================
 
 /** 日志级别；与 log4js 的级别名一致（小写） */
@@ -13,44 +13,31 @@ export interface LogRecord {
   /** 完整 category，形如 `main.scan`、`renderer.editor`、`external.console-renderer` */
   category: string;
   level: LogLevel;
-  /** 已经替换过占位符的最终文本 */
+  /** 已经拼好的最终文本 */
   message: string;
 }
 
-/** 占位符：Java 那一套 `{}`，按顺序吃参数 */
-const PLACEHOLDER = '{}';
-
 /**
- * 把 `{}` 逐个替换成参数。
+ * 两边一致的 logger：消息自己拼，`cause` 只用来附带一个原因对象。
  *
- * 参数多于占位符时忽略多余项（与 SLF4J 一致）；少于占位符时原样留下 `{}`，
- * 拼错了能一眼看出来，而不是悄悄少一段。
+ * 消息用模板字符串就地拼好（`log.error(`open failed: ${path}`, error)`），不引入占位符——
+ * 位置参数那一套是 Java 的习惯；`cause` 也不是位置替换，它只是在消息后面补一段
+ * （Error 给栈，对象给 JSON）。
  */
-export function formatPlaceholders(template: string, args: readonly unknown[]): string {
-  let index = 0;
-  let result = '';
-  let cursor = 0;
-
-  while (cursor < template.length) {
-    const at = template.indexOf(PLACEHOLDER, cursor);
-    if (at < 0) {
-      result += template.slice(cursor);
-      break;
-    }
-    result += template.slice(cursor, at);
-    if (index < args.length) {
-      result += stringify(args[index]);
-      index += 1;
-    } else {
-      result += PLACEHOLDER;
-    }
-    cursor = at + PLACEHOLDER.length;
-  }
-  return result;
+export interface Logger {
+  error(message: string, cause?: unknown): void;
+  warn(message: string, cause?: unknown): void;
+  info(message: string, cause?: unknown): void;
+  debug(message: string, cause?: unknown): void;
 }
 
-/** 参数转文本：Error 给消息与栈，对象给 JSON，其余交给 String() */
-function stringify(value: unknown): string {
+/**
+ * 把附带的「原因」拼成一行文本。
+ *
+ * Error 给栈：打包态没有文件行号，栈是唯一能说明「从哪抛出来的」的东西；
+ * 其它对象给 JSON，其余交给 String()。
+ */
+export function formatCause(value: unknown): string {
   if (value instanceof Error) {
     return value.stack ?? `${value.name}: ${value.message}`;
   }

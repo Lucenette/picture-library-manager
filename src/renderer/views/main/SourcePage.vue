@@ -137,7 +137,7 @@ async function addSource(): Promise<void> {
     } catch (error) {
       // 目录已添加过会命中 root_path 唯一约束，属于预期内的忽略
       if (!(error as Error).message?.includes('UNIQUE')) {
-        log.error('add source failed: {} ({})', rootPath, error);
+        log.error(`add source failed: ${rootPath}`, error);
       }
     }
   }

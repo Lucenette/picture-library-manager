@@ -33,7 +33,7 @@ export async function runExport(ctx: TaskContext): Promise<ExportTaskResult> {
       copied += 1;
     } catch (error) {
       failed += 1;
-      log.error('export failed [{}]: {}', row.selectedFile, error);
+      log.error(`export failed [${row.selectedFile}]`, error);
     }
 
     ctx.report(((index + 1) / Math.max(total, 1)) * 100, `已导出 ${index + 1}/${total}`);

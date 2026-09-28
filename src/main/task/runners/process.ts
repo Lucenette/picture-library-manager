@@ -31,7 +31,7 @@ export async function runProcess(ctx: TaskContext): Promise<ProcessTaskResult> {
         processed += 1;
       } catch (error) {
         failed += 1;
-        log.error('process group failed: {} ({})', group.dirPath, error);
+        log.error(`process group failed: ${group.dirPath}`, error);
       }
 
       ctx.report(((index + 1) / Math.max(total, 1)) * 100, `已处理 ${index + 1}/${total}`);

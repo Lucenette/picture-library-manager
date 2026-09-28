@@ -115,7 +115,7 @@ if (app.requestSingleInstanceLock()) {
     .catch((error: unknown) => {
       // 走到这里说明库还没打开、窗口也还没建，只能用系统原生提示框兜底
       const message = error instanceof Error ? error.message : String(error);
-      log.error('bootstrap failed: {}', error instanceof Error ? (error.stack ?? message) : message);
+      log.error('bootstrap failed', error instanceof Error ? error : message);
       dialog.showErrorBox('启动失败', message);
       app.quit();
     });

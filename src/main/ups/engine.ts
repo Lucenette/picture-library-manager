@@ -301,7 +301,7 @@ function planSteps(
     const key = keyOf(row.author, row.id, row.filename);
     const index = known.get(key);
     if (index === undefined) {
-      log.warn('ledger entry not found in current code, maybe from a newer version: {} / {}:{}', row.filename, row.author, row.id);
+      log.warn(`ledger entry not found in current code, maybe from a newer version: ${row.filename} / ${row.author}:${row.id}`);
       continue;
     }
     if (row.exectype === 'executed') {
@@ -316,7 +316,7 @@ function planSteps(
       return;
     }
     if (index < maxAppliedIndex) {
-      log.warn('step is ordered before an already executed one, only appending is allowed: {} / {}:{}', step.filename, step.author, step.id);
+      log.warn(`step is ordered before an already executed one, only appending is allowed: ${step.filename} / ${step.author}:${step.id}`);
     }
     pending.push(step);
   });
@@ -351,9 +351,9 @@ async function pruneBackups(backupsDir: string, log: UpsLogger): Promise<void> {
   for (const name of names.slice(0, Math.max(0, names.length - BACKUP_KEEP))) {
     try {
       await unlink(join(backupsDir, name));
-      log.info('removed old backup: {}', name);
+      log.info(`removed old backup: ${name}`);
     } catch (error) {
-      log.error('remove old backup failed: {} ({})', name, error);
+      log.error(`remove old backup failed: ${name}`, error);
     }
   }
 }

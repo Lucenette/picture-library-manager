@@ -49,7 +49,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   /** 记下写入失败但继续扫描：一个目录写不进去不该拖垮整轮 */
   const recordWriteFailure = (what: string, error: unknown): void => {
     failedWrites += 1;
-    log.error('write failed: {} ({})', what, (error as Error).message);
+    log.error(`write failed: ${what}`, error);
   };
 
   // 先清除本来源的旧数据，清除立刻提交
@@ -121,7 +121,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   updateSourceScannedAt(sourceId);
 
   if (failedWrites > 0) {
-    log.error('scan finished with {} write failures, source data may be incomplete', failedWrites);
+    log.error(`scan finished with ${failedWrites} write failures, source data may be incomplete`);
   }
 
   const thumbnails = characters.reduce(
@@ -180,13 +180,13 @@ async function generateThumbnails(
       if (outcome.thumbnail === null) {
         // 解码失败也要计数并报出来，不能只剩一个「这张图没有缩略图」
         failures += 1;
-        log.error('thumbnail generation failed: {} ({}) - decoder cannot read this image', file.filePath, size);
+        log.error(`thumbnail generation failed: ${file.filePath} (${size}) - decoder cannot read this image`);
       }
     } catch (error) {
       failures += 1;
       // 带上像素数与实际耗时，只报「超时」看不出是图太大还是解码器卡死
       const seconds = Math.round((Date.now() - startedAt) / 1000);
-      log.error('thumbnail generation failed: {} ({}, {}s) - {}', file.filePath, size, seconds, (error as Error).message);
+      log.error(`thumbnail generation failed: ${file.filePath} (${size}, ${seconds}s)`, error);
     }
 
     // 无论这张有没有缩略图都立刻入库；写失败只让它自己缺一行
@@ -194,7 +194,7 @@ async function generateThumbnails(
       insertImageFiles(group.groupId, [file]);
       storedFiles += 1;
     } catch (error) {
-      log.error('store image failed: {} ({})', file.filePath, (error as Error).message);
+      log.error(`store image failed: ${file.filePath}`, error);
     }
 
     doneFiles += 1;

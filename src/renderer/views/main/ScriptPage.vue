@@ -290,7 +290,7 @@ async function checkCurrent(): Promise<void> {
     types.value = checked.types;
     lastCheckedCode = checkedCode;
   } catch (caught) {
-    log.error('script check failed: {}', caught);
+    log.error('script check failed', caught);
   }
 }
 

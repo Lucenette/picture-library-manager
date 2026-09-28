@@ -246,7 +246,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 
 - **一律用封装，不直接 `console.*`**：主进程 `import { createLogger } from '@/log'`、渲染进程 `import { createLogger } from '@/services/log-service'`，
   一个模块一个 logger（category 为 `main.<模块>` / `renderer.<模块>`，模块名自取、能认出是哪个文件）。直接 `console.*` 会被 stdout 补丁当成第三方输出记进 `external.log`，来源与级别都是错的。
-- API 是占位符形式：`log.warn('failed to open file, path: {}, code: {}', path, code)`，`{}` 按顺序替换；参数多于占位符会被忽略、少于占位符则保留 `{}` 原样。
+- 消息用模板字符串就地拼好：`log.warn(`failed to open file: ${path}`)`；要附带错误对象时作为第二个参数传入（`log.error(msg, error)`，Error 记栈、对象记 JSON），**不要用占位符**。
 - **日志消息一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）可以是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码。
 - worker 线程（`image/` 里的解码）够不着日志文件、也没有 electron：它不写日志，失败靠返回值交给调用方记录。
 - 三个文件在哪、级别怎么调，见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节；不变量与改动注意点见 [docs/design/logging.md](docs/design/logging.md)。

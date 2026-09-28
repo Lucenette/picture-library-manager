@@ -18,7 +18,7 @@
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
-| 2026-09-28 | 首次定稿：实现用 log4js；三个日志文件；控制台始终开且带来源；消息一律英文 ASCII | — |
+| 2026-09-28 | 首次定稿：实现用 log4js；三个日志文件；控制台始终开且带来源；消息一律英文 ASCII；API 用模板字符串拼消息、不用占位符 | — |
 
 ---
 
@@ -27,7 +27,7 @@
 **目标**
 
 1. 打包后仍有可查阅的日志文件：位置与编码固定、按天滚动、旧文件压缩保留。
-2. 统一 API（占位符形式）与四个级别，行内含时间、级别、进程与模块。
+2. 统一 API 与四个级别，行内含时间、级别、进程与模块。
 3. 汇集主进程与渲染进程；用户脚本与第三方的输出各有一个独立文件。
 4. 控制台始终有输出、带来源，开发时能直接看出哪条来自我们的代码、哪条来自用户脚本、哪条来自第三方。
 5. 兜住我们没主动记录的输出：第三方库、Electron 事件、未捕获异常。
@@ -83,12 +83,13 @@ category 同时承担「来源 + 进程角色 + 模块」三件事，log4js 自�
 
 ```ts
 const log = createLogger('scan');        // main 进程 → main.scan；渲染进程 → renderer.scan
-log.warn('failed to process file, taskId: {}, code: {}', taskId, code);
-log.debug('wrote image {}/{}', done, total);
+log.warn(`failed to process file, taskId: ${taskId}, code: ${code}`);
+log.error(`thumbnail generation failed: ${filePath}`, error);   // 第二个参数是「原因」
 ```
 
-- 占位符 `{}` 按顺序替换；参数多于占位符时忽略多余项，少于占位符时保留原样（便于发现拼错）。
-- 级别过滤在拼装**之前**短路（`isLevelEnabled`），debug 关闭时不付字符串拼接的成本。
+- 消息用模板字符串就地拼好，**没有占位符**：位置参数是 Java 的习惯，TS 的模板字符串更直观，拼错时编译期就能看出来。
+- 第二个参数只用来附带原因：Error 记栈（打包态没有文件行号，栈是唯一能说明从哪抛出来的东西），对象记 JSON，字符串原样。
+- 消息在调用方就拼完了，`isLevelEnabled` 只省下落盘这一步；debug 关闭时省不下字符串拼接。
 - 模块名只用于拼 category，不另立字段（`%c` 打的就是它）。
 
 ### 3.5 多来源汇集
@@ -120,18 +121,18 @@ log.debug('wrote image {}/{}', done, total);
 
 ### 3.8 可测性
 
-- 占位符替换放在 `src/common/log.ts`：纯函数、不依赖 electron、不依赖 log4js，可在沙箱里用 `node` 直接跑断言。
+- `Logger` 契约与拼原因的 `formatCause()` 放在 `src/common/log.ts`：纯函数、不依赖 electron、不依赖 log4js，可在沙箱里用 `node` 直接跑断言。
 - log4js 的配置（三个文件、滚动与保留、category 与级别）可以在沙箱里用临时目录跑真实代码验证，不需要 electron。
 
 ## 4. 组成与落点
 
 | 位置 | 职责 |
 |---|---|
-| `src/common/log.ts` | 级别类型、占位符替换（纯函数，两个进程共用） |
+| `src/common/log.ts` | `Logger` 契约、`formatCause()`（纯函数，两个进程共用） |
 | `src/main/log/logger.ts` | log4js 配置（三个文件、控制台、category 与级别）、封装、运输层与启动清理 |
 | `src/main/log/capture.ts` | `stdout` / `stderr` 补丁（重入保护 + 通道标记）、Electron 事件、渲染进程的 `console-message` |
 | `src/main/log/index.ts` | 初始化、退出 flush、对外导出 |
-| `src/renderer/services/log-service.ts` | 渲染进程侧封装：占位符就地替换后经 IPC 汇总 |
+| `src/renderer/services/log-service.ts` | 渲染进程侧封装：消息与原因就地拼好后经 IPC 汇总 |
 | `src/common/ipcChannels.ts` | `LOG_WRITE` 通道 |
 | `src/main/paths.ts` | `getLogsDir()` |
 | `src/main/index.ts` | 顶部初始化；`before-quit` 里 flush；`bootstrap()` 的 catch 先写日志 |
@@ -150,7 +151,7 @@ log.debug('wrote image {}/{}', done, total);
 
 ## 6. 验证方法
 
-1. 占位符替换（`src/common/log.ts`）：沙箱里用 `node` 跑断言，覆盖参数过多与不足两种情况——已跑过。
+1. `formatCause()`（`src/common/log.ts`）：沙箱里用 `node` 跑断言，覆盖 Error（取栈）、对象（取 JSON）与字符串——已跑过。
 2. log4js 配置：临时目录跑真实配置，确认三个文件名、按天滚动后的重命名与压缩、`numBackups` 的实际清理数量、category 与级别过滤——已跑过（`numBackups: 20` 实测为「热文件 + 20 个 `.gz`」）。
 3. 静态检查：`tsc` / `vue-tsc` / `node scripts/check-docs.mjs`——已跑过。
 4. 需要使用者冒烟（静态检查覆盖不到）：打包态确实生成日志；关窗后最后几行不丢；人为触发一次未捕获异常与一次渲染进程报错，确认都进了 `external.log`；用户脚本里的 `console.log` 同时出现在 `script.log` 与控制台。

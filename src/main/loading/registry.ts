@@ -65,7 +65,7 @@ export async function startLoading(): Promise<boolean> {
       continue;
     }
     void runTask(task).catch((error: unknown) => {
-      log.warn('warmup task failed: {} ({})', task.title, describeError(error));
+      log.warn(`warmup task failed: ${task.title}`, error);
     });
   }
 

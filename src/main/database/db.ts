@@ -135,7 +135,7 @@ function backupDatabase(): void {
     copyFileSync(dbPath, `${dbPath}.bak`);
     lastBackupAt = now;
   } catch (error) {
-    log.error('database backup failed: {}', error);
+    log.error('database backup failed', error);
   }
 }
 
@@ -151,7 +151,7 @@ function backupDatabase(): void {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  log.info('data dir: {}', dataDir);
+  log.info(`data dir: ${dataDir}`);
 
   try {
     mkdirSync(dataDir, { recursive: true });
@@ -180,7 +180,7 @@ export function closeDatabase(): void {
   try {
     db.close();
   } catch (error) {
-    log.error('failed to close database: {}', error);
+    log.error('failed to close database', error);
   }
   db = null;
 }

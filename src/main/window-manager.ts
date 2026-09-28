@@ -456,10 +456,10 @@ function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): 
     return;
   }
   window.webContents.once('did-finish-load', () => {
-    log.debug('window {} document loaded in {}ms', id, Date.now() - startedAt);
+    log.debug(`window ${id} document loaded in ${Date.now() - startedAt}ms`);
   });
   window.once('ready-to-show', () => {
-    log.debug('window {} first frame ready in {}ms', id, Date.now() - startedAt);
+    log.debug(`window ${id} first frame ready in ${Date.now() - startedAt}ms`);
   });
 }
 

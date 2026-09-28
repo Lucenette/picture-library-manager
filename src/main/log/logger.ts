@@ -2,9 +2,9 @@
 // 日志：log4js 配置与封装（主进程）
 //
 // 三个文件（root / external / script）的落盘规则都在这里，文件只有这一个写者；
-// 其余来源把记录交过来：渲染进程走 IPC、worker 走 postMessage、用户脚本走 stdout 分流。
+// 其余来源把记录交过来：渲染进程走 IPC、用户脚本走 stdout 分流。
 //
-// 纯逻辑（占位符替换）在 common/log.ts；这个模块只做与运行环境相关的事。
+// 纯逻辑（`formatCause()` 与 `Logger` 契约）在 common/log.ts；这个模块只做与运行环境相关的事。
 // ============================================================
 
 import { mkdirSync } from 'node:fs';
@@ -16,7 +16,7 @@ import log4js from 'log4js';
 import type { Appender, Configuration, DateFileAppender, Layout, Logger as Log4jsLogger } from 'log4js';
 
 import { IPC } from '@common/ipcChannels';
-import { formatPlaceholders, type LogLevel, type LogRecord } from '@common/log';
+import { formatCause, type LogLevel, type Logger, type LogRecord } from '@common/log';
 
 import { getLogsDir } from '@/paths';
 
@@ -48,13 +48,8 @@ const EXTERNAL_CATEGORY = 'external';
 /** 用户脚本里的 console.* */
 const SCRIPT_CATEGORY = 'script';
 
-/** 主进程侧的 logger：占位符形式，与渲染进程、用户脚本看到的 API 一致 */
-export interface Logger {
-  error(message: string, ...args: unknown[]): void;
-  warn(message: string, ...args: unknown[]): void;
-  info(message: string, ...args: unknown[]): void;
-  debug(message: string, ...args: unknown[]): void;
-}
+/** 主进程侧的 logger 与渲染进程用同一份契约（见 common/log.ts），这里只是再导出 */
+export type { Logger };
 
 /** 除我们自己的日志之外的来源：第三方噪声与用户脚本 */
 export type LogChannel = 'external' | 'script';
@@ -222,7 +217,7 @@ export function initLogging(): void {
 
   void cleanupOldLogs();
 
-  log4js.getLogger('main.log').info('logging started, dir: {}', getLogsDir());
+  log4js.getLogger('main.log').info(`logging started, dir: ${getLogsDir()}`);
 }
 
 /** 退出前 flush：dateFile 是异步写，等它落完再关库 */
@@ -241,12 +236,12 @@ export function flushLogging(done: () => void): void {
 /** 按完整 category 建 logger（worker 与 IPC 转交的记录也用它） */
 function loggerOf(category: string): Logger {
   const target = log4js.getLogger(category);
-  const at = (level: LogLevel) => (message: string, ...args: unknown[]): void => {
-    // 级别短路放在拼装之前：debug 关掉时连字符串都不拼
+  const at = (level: LogLevel) => (message: string, cause?: unknown): void => {
+    // 消息已经由调用方拼好了，这里只决定要不要落盘
     if (!target.isLevelEnabled(level)) {
       return;
     }
-    write(target, level, formatPlaceholders(message, args));
+    write(target, level, cause === undefined ? message : `${message} (${formatCause(cause)})`);
   };
   return { error: at('error'), warn: at('warn'), info: at('info'), debug: at('debug') };
 }
