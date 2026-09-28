@@ -77,6 +77,7 @@ export async function startLoading(): Promise<boolean> {
     try {
       await runTask(task);
     } catch (error: unknown) {
+      log.error(`load task failed: ${task.title}`, error);
       finishLoad('failed', describeError(error));
       return false;
     }

@@ -102,7 +102,7 @@ log.error(`thumbnail generation failed: ${filePath}`, error);   // 第二个参�
 | 用户脚本 | 执行期间 `stdout` / `stderr` 分流 | `script.log` + 控制台 |
 | 第三方与噪声 | `stdout` / `stderr` 补丁与渲染进程的 `console-message` | `external.log` + 控制台 |
 
-文件由主进程独占写入；其余来源只发送记录，不自己开文件。
+文件由主进程独占写入；其余来源只发送记录，不自己开文件。失败不靠调用方自觉：任务终态（`task/manager.ts`）与必须的加载任务失败（`loading/registry.ts`）各自落一条 error，日志里一定找得到。
 
 ### 3.6 兜底
 

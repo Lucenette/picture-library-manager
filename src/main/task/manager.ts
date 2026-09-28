@@ -8,11 +8,15 @@ import {
   deleteFinishedTasks, finishTask, getAllTasks, getSourceById, getMaxQueueOrder, getTaskRow,
   insertTask, markTaskPaused, markTaskRunning, resumeTask, updateTaskProgress, updateTaskQueueOrder,
 } from '@/database/db';
+import { createLogger } from '@/log';
 import { TaskCancelledError, TaskControl } from '@/task/task-control';
 import { runExport } from '@/task/runners/export';
 import { runProcess } from '@/task/runners/process';
 import { runScan } from '@/task/runners/scan';
 import { runSimilar } from '@/task/runners/similar';
+
+/** 本模块的日志（category `main.task`） */
+const log = createLogger('task');
 
 // ------------------------------------------------------------
 // 常量与类型
@@ -257,8 +261,10 @@ class TaskManager {
       this.finish(task, 'done', '已完成', JSON.stringify(result), '');
     } catch (error) {
       if (error instanceof TaskCancelledError) {
+        // 取消是使用者的操作，任务列表里看得见，不进日志
         this.finish(task, 'cancelled', '已取消', '', '');
       } else {
+        log.error(`task ${taskId} failed: ${task.title}`, error);
         this.finish(task, 'failed', (error as Error).message, '', (error as Error).message);
       }
     } finally {
