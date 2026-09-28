@@ -17,7 +17,8 @@
 |---|---|---|
 | 任务独立进程与全任务断点续跑 | 待实施 | [task-process.md](./task-process.md) |
 | 任务剩余耗时估算 | 待实施 | [task-eta.md](./task-eta.md) |
-| 日志系统 | 待评审 | [logging.md](./logging.md) |
+| 日志系统 | 待实施 | [logging.md](./logging.md) |
+| 诊断：打开日志目录与收集日志 | 待评审 | [diagnostics.md](./diagnostics.md) |
 | 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
 | 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
