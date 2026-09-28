@@ -11,30 +11,6 @@
         @format="format = $event"
       />
 
-      <!--
-        编译状态悬浮在编辑区右上角（IDEA 那样）。
-        有错时往下让一格：Monaco 自己的 marker 计数与跳转条占着最上沿那一条。
-      -->
-      <!--
-        状态只用一个图标（IDEA 那个 widget 的做法）：没问题绿勾，有问题红叹号，细节走 tooltip。
-        两种来源合并到这里：Monaco 自带的实时语法诊断（problemCount）与主进程的编译错误（error）。
-      -->
-      <el-tooltip :content="problemTitle" placement="left" :show-after="200">
-        <div class="status" :class="{ 'has-problem': hasProblem }">
-          <!-- 对勾自己画：el-icon 的 Check 是细线，14px 下被抗锯齿磨得更淡 -->
-          <svg v-if="!hasProblem" class="status-check" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M3 8.5 L6.5 12 L13 4.5"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          <el-icon v-else><WarningFilled /></el-icon>
-        </div>
-      </el-tooltip>
     </div>
 
     <!-- 状态栏：左边是检测到的导出类型，右边是光标/选区、行结束符与缩进、问题数 -->
@@ -51,7 +27,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { WarningFilled } from '@element-plus/icons-vue';
 import type { ScriptCompileError, ScriptType } from '@common/types';
 import MonacoEditor from './MonacoEditor.vue';
 import type { ScriptLineChange } from './diff';
@@ -160,12 +135,12 @@ const problemTitle = computed(() => {
 
 .status-problem {
   flex: none;
-  color: #49794d;
+  color: var(--el-color-success-light-2);
   cursor: default;
 }
 
 .status-problem.has-problem {
-  color: var(--el-color-danger);
+  color: var(--el-color-danger-light-2);
 }
 
 .editor-body {
@@ -174,29 +149,4 @@ const problemTitle = computed(() => {
   min-height: 0;
 }
 
-/* 状态图标：像 IDEA 的 widget 那样贴住右上角、只占一行高度、没有边框 */
-/* 右边留出滚动条的宽度，免得被那条竖条压住 */
-.status {
-  position: absolute;
-  top: 0;
-  right: 16px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 6px;
-  /* IDEA 那个绿：默认的 --el-color-success 在深色底上偏暗 */
-  color: #49794d;
-  font-size: 14px;
-  cursor: default;
-}
-
-.status-check {
-  width: 16px;
-  height: 16px;
-}
-
-.status.has-problem {
-  color: var(--el-color-danger);
-}
 </style>
