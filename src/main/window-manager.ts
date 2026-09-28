@@ -164,6 +164,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   window.setMenu(null);
   window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
   window.on('closed', () => {
+    log.info(`window closed: ${id}`);
     if (windows.get(id) === window) {
       windows.delete(id);
     }
@@ -172,6 +173,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   logWindowTiming(window, id, startedAt);
 
   windows.set(id, window);
+  log.info(`window opened: ${id} (entry=${config.entry ?? 'index'}, route=${config.route})`);
   return window;
 }
 

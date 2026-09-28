@@ -427,6 +427,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
   const pending = planSteps(store.readMigrationLedger(), versions, log);
   const total = pending.length;
   if (total === 0) {
+    log.info('no pending upgrade steps');
     // 没有待执行的也要给一个终态：加载页靠它决定什么时候切回主界面
     onProgress?.(makeProgress('succeeded', 0, 0, '', '', ''));
     return { ok: true, aborted: false, applied: 0, error: '', backupPath: '' };
@@ -438,6 +439,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
   let backupPath = '';
   try {
     backupPath = await backupDatabase(store, backupsDir, log);
+    log.info(`database backed up: ${backupPath}`);
   } catch (error) {
     const text = `pre-upgrade backup failed, upgrade aborted: ${describeError(error)}`;
     onProgress?.(makeProgress('failed', total, 0, stepTitle(pending[0]), text, ''));
@@ -451,6 +453,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
       return { ok: false, aborted: true, applied: done, error: '', backupPath };
     }
     onProgress?.(makeProgress('running', total, done, stepTitle(step), '', backupPath));
+    log.info(`upgrade step started: ${step.filename} / ${step.author}:${step.id}`);
 
     const startedAt = Date.now();
     try {
@@ -473,6 +476,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
       });
     } catch (error) {
       // 事务已经回滚：脚本写进库的东西一条都不留，这里只补一行失败记录供排查
+      log.error(`upgrade step failed: ${step.filename} / ${step.author}:${step.id}`, error);
       const message = describeError(error);
       store.writeMigrationLedger({
         author: step.author,
@@ -488,6 +492,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
       return { ok: false, aborted: false, applied: done, error: text, backupPath };
     }
 
+    log.info(`upgrade step done: ${step.filename} / ${step.author}:${step.id} (${Date.now() - startedAt}ms)`);
     order += 1;
     done += 1;
     onProgress?.(makeProgress('running', total, done, stepTitle(step), '', backupPath));
@@ -496,6 +501,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
     await new Promise((resolve) => setImmediate(resolve));
   }
 
+  log.info(`upgrade finished: ${done} step(s) applied`);
   onProgress?.(makeProgress('succeeded', total, done, stepTitle(pending[total - 1]), '', backupPath));
   return { ok: true, aborted: false, applied: done, error: '', backupPath };
 }

@@ -64,6 +64,7 @@ export async function startLoading(): Promise<boolean> {
     if (task.kind !== 'warmup') {
       continue;
     }
+    log.info(`warmup task started: ${task.title}`);
     void runTask(task).catch((error: unknown) => {
       log.warn(`warmup task failed: ${task.title}`, error);
     });
@@ -73,6 +74,7 @@ export async function startLoading(): Promise<boolean> {
     if (task.kind !== 'essential') {
       continue;
     }
+    log.info(`load task started: ${task.title}`);
     beginLoadTask(task.title);
     try {
       await runTask(task);
@@ -81,8 +83,10 @@ export async function startLoading(): Promise<boolean> {
       finishLoad('failed', describeError(error));
       return false;
     }
+    log.info(`load task done: ${task.title}`);
   }
 
+  log.info('startup load finished');
   finishLoad('succeeded', '');
   return true;
 }

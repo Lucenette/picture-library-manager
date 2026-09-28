@@ -9,6 +9,7 @@
 ### 新增
 
 - **日志文件**：应用自己的日志、第三方与用户脚本的输出分别写进 `~/.plmanager/logs/` 下的 `root.log`、`external.log`、`script.log`（Windows 为 `C:\Users\<用户名>\.plmanager\logs`）。按天滚动、旧文件压缩；单文件上限 50 MB、最多 20 个文件、启动时清掉超过 14 天的。打包后不再依赖终端，排障时可以直接把日志目录发给开发者
+- **关键节点都有记录**：启动与退出、窗口开关、开库关库、升级每一步与备份、任务的提交与终态（含耗时）、扫描/导出/选图/相似识别的汇总数字都在 `root.log` 里，按时间顺序就能重建当时发生了什么
 - **日志级别可配**：环境变量 `PLM_LOG_LEVEL` / `PLM_LOG_LEVEL_EXTERNAL` / `PLM_LOG_LEVEL_SCRIPT`，取 `error` / `warn` / `info` / `debug`（默认：应用日志开发态 `debug`、打包态 `info`；第三方与用户脚本 `warn`）。控制台始终有输出
 - **脚本里的 `console.log`** 除了终端，还会写进 `script.log`
 

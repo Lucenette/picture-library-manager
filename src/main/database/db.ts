@@ -167,6 +167,7 @@ export function initDatabase(): void {
   }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
+  log.info(`database opened: ${dbPath}`);
 
   // 数据库相关的初始化只在这一个函数里：开库 + 注册 DB 通道
   registerDbIpc();
@@ -179,6 +180,7 @@ export function closeDatabase(): void {
   }
   try {
     db.close();
+    log.info('database closed');
   } catch (error) {
     log.error('failed to close database', error);
   }

@@ -249,6 +249,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 - 消息用模板字符串就地拼好：`log.warn(`failed to open file: ${path}`)`；要附带错误对象时作为第二个参数传入（`log.error(msg, error)`，Error 记栈、对象记 JSON），**不要用占位符**。
 - **日志消息一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）可以是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码。
 - **异常消息按去向定语言**：会进日志的用英文——任务失败、加载失败、升级校验与升级脚本、脚本执行、DB 打不开都会作为 `cause` 落进 `root.log`；不会进日志的纯界面文案（任务状态词、输入校验、对话框标题、进度标题）保持中文。
+- **关键节点用 `info` 落盘**：启动与退出、窗口开关、开库、加载任务的开始与结束、升级步骤、任务的提交与终态、各 runner 的汇总。文件侧只收 INFO 及以上，写成 `debug` 等于只在控制台可见。
 - worker 线程（`image/` 里的解码）够不着日志文件、也没有 electron：它不写日志，失败靠返回值交给调用方记录。
 - 三个文件在哪、级别怎么调，见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节；不变量与改动注意点见 [docs/design/logging.md](docs/design/logging.md)。
 

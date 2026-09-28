@@ -41,6 +41,7 @@ export async function runProcess(ctx: TaskContext): Promise<ProcessTaskResult> {
     endBatch();
   }
 
+  log.info(`process finished: ${processed} groups processed, ${failed} failed`);
   return { processed, failed };
 }
 

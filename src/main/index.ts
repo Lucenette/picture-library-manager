@@ -56,6 +56,8 @@ function configureCommandLine(): void {
  * 通道必然已经注册好」不再是一条要人守的约定，而是这张登记表的结论。
  */
 async function bootstrap(): Promise<void> {
+  log.info('bootstrap started');
+
   const mainWindow = createMain('/loading');
 
   // 通道先挂上：渲染进程一挂载就会 invoke 状态快照，那同时是它的「就绪」信号
@@ -70,7 +72,9 @@ async function bootstrap(): Promise<void> {
   if (!(await startLoading())) {
     await waitLoadQuit();
     app.quit();
+    return;
   }
+  log.info('startup finished');
 }
 
 /** 升级之后的其余初始化：全是同步注册，跑完主界面才允许进来 */
@@ -128,6 +132,7 @@ if (app.requestSingleInstanceLock()) {
     }
     quitting = true;
     event.preventDefault();
+    log.info('app quitting');
     // 先终止进行中的任务，再落盘；未开始的 pending 会保留到下次启动
     taskManager.shutdown();
     flushLogging(() => {
@@ -146,5 +151,6 @@ if (app.requestSingleInstanceLock()) {
     }
   });
 } else {
+  log.warn('another instance is already running, quitting');
   app.quit();
 }

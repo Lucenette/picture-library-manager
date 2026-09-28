@@ -39,6 +39,8 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     throw new Error(`source not found (id=${sourceId})`);
   }
 
+  log.info(`scan started: source ${source.name} (id=${sourceId})`);
+
   const characters: StoredCharacter[] = [];
   let collectedGroups = 0;
   let totalFiles = 0;
@@ -130,6 +132,8 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     ),
     0,
   );
+
+  log.info(`scan finished: ${characters.length} characters, ${collectedGroups} groups, ${totalFiles} files, ${thumbnails} thumbnails (${thumbnailFailures} failed, engine=${thumbnailEngine})`);
 
   return {
     characters: characters.length,

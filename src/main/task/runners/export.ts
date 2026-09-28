@@ -40,6 +40,7 @@ export async function runExport(ctx: TaskContext): Promise<ExportTaskResult> {
     await ctx.checkpoint();
   }
 
+  log.info(`export finished: ${copied} copied, ${failed} failed`);
   return { copied, failed };
 }
 

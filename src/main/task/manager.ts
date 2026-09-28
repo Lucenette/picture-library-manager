@@ -85,6 +85,7 @@ class TaskManager {
     const id = insertTask(type, getMaxQueueOrder() + 1, JSON.stringify(payload));
     const row = getTaskRow(id)!;
     this.tasks.set(id, { row, control: new TaskControl(), title: buildTitle(type, payload) });
+    log.info(`task submitted: ${id} ${type}`);
 
     this.notifyChanged();
     this.tick();
@@ -107,6 +108,7 @@ class TaskManager {
       return;
     }
 
+    log.info(`task paused: ${id}`);
     task.control.pause();
     task.row.status = 'paused';
     markTaskPaused(id);
@@ -120,6 +122,7 @@ class TaskManager {
       return;
     }
 
+    log.info(`task resumed: ${id}`);
     task.row.status = 'running';
     resumeTask(id);
     task.control.resume();
@@ -142,6 +145,7 @@ class TaskManager {
       return;
     }
 
+    log.info(`task force stopped: ${id}`);
     task.control.abort();
     this.finish(task, 'cancelled', '已强制结束', '', '');
 
@@ -220,6 +224,7 @@ class TaskManager {
   private restore(): void {
     for (const row of getAllTasks()) {
       if (row.status === 'running' || row.status === 'paused') {
+        log.warn(`interrupted task marked as failed: ${row.id} ${row.type}`);
         finishTask(row.id, 'failed', row.progress, '任务中断', '', '应用退出导致任务中断');
         row.status = 'failed';
         row.message = '任务中断';
@@ -255,13 +260,17 @@ class TaskManager {
 
   private async run(task: ActiveTask): Promise<void> {
     const taskId = task.row.id;
+    const startedAt = Date.now();
+    log.info(`task started: ${taskId} ${task.row.type}`);
 
     try {
       const result = await RUNNERS[task.row.type](this.createContext(task));
+      log.info(`task done: ${taskId} ${task.row.type} (${Date.now() - startedAt}ms)`);
       this.finish(task, 'done', '已完成', JSON.stringify(result), '');
     } catch (error) {
       if (error instanceof TaskCancelledError) {
-        // 取消是使用者的操作，任务列表里看得见，不进日志
+        // 取消是使用者的操作：任务列表里看得见，这里只留一行时间线
+        log.info(`task cancelled: ${taskId}`);
         this.finish(task, 'cancelled', '已取消', '', '');
       } else {
         log.error(`task ${taskId} failed: ${task.title}`, error);
