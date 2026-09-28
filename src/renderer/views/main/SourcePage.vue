@@ -62,6 +62,10 @@ import {
   addSource as dbAddSource, clearSourceData, deleteSource, getAllSources, getScriptsByType,
 } from '@/db/database';
 import { confirmDialog } from '@/services/dialog-service';
+import { createLogger } from '@/services/log-service';
+
+/** 本模块的日志（category `renderer.source`） */
+const log = createLogger('source');
 
 // ------------------------------------------------------------
 // 状态
@@ -133,7 +137,7 @@ async function addSource(): Promise<void> {
     } catch (error) {
       // 目录已添加过会命中 root_path 唯一约束，属于预期内的忽略
       if (!(error as Error).message?.includes('UNIQUE')) {
-        console.error(`添加来源失败：${rootPath}`, error);
+        log.error('add source failed: {} ({})', rootPath, error);
       }
     }
   }

@@ -6,7 +6,8 @@
 // 之前成功的都留下，下次启动从这一条接着来。
 //
 // 这里只依赖 Node 内置与第三方解析器：数据库能力由调用方以 MigrationStore 注入
-// （见 database/db.ts），所以引擎可以在纯 Node 下用内存库验证，完全不认识 electron。
+// （见 database/db.ts），日志能力也由调用方注入（见 UpsLogger），所以引擎可以在
+// 纯 Node 下用内存库验证，完全不认识 electron，也不认识 logger。
 // ============================================================
 
 import { copyFile, mkdir, readdir, unlink } from 'fs/promises';
@@ -146,11 +147,25 @@ export interface MigrationOutcome {
   backupPath: string;
 }
 
+/**
+ * 引擎需要的日志能力。
+ *
+ * 只声明用到的三档，注入完整 Logger 也兼容；**刻意不 import `@/log`**——那个模块依赖
+ * electron，而本引擎要能在纯 Node 下跑（见文件头）。
+ */
+export interface UpsLogger {
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+}
+
 /** 执行一次升级所需的全部外部输入 */
 export interface RunOptions {
   store: MigrationStore;
   /** 版本清单，顺序即执行顺序 */
   versions: readonly ChangeLogVersion[];
+  /** 诊断输出的去处；由调用方注入 */
+  log: UpsLogger;
   onProgress?: (progress: MigrationProgress) => void;
   /** 主窗口已经关掉时收手 */
   shouldAbort?: () => boolean;
@@ -266,7 +281,11 @@ function buildSteps(versions: readonly ChangeLogVersion[]): ChangeStep[] {
  *
  * 「跑过没有」按身份判断：账本里有这个三元组就是跑过，失败行不算。
  */
-function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly ChangeLogVersion[]): ChangeStep[] {
+function planSteps(
+  ledger: readonly MigrationLedgerRow[],
+  versions: readonly ChangeLogVersion[],
+  log: UpsLogger,
+): ChangeStep[] {
   const all = buildSteps(versions);
   const known = new Map<string, number>();
   all.forEach((step, index) => {
@@ -282,7 +301,7 @@ function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly Cha
     const key = keyOf(row.author, row.id, row.filename);
     const index = known.get(key);
     if (index === undefined) {
-      console.warn(`[ups] 账本里的「${row.filename} / ${row.author}:${row.id}」不在当前代码中，可能来自更新版本的应用`);
+      log.warn('ledger entry not found in current code, maybe from a newer version: {} / {}:{}', row.filename, row.author, row.id);
       continue;
     }
     if (row.exectype === 'executed') {
@@ -297,7 +316,7 @@ function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly Cha
       return;
     }
     if (index < maxAppliedIndex) {
-      console.warn(`[ups]「${step.filename} / ${step.author}:${step.id}」排在已执行的步骤之前，只应往后追加`);
+      log.warn('step is ordered before an already executed one, only appending is allowed: {} / {}:{}', step.filename, step.author, step.id);
     }
     pending.push(step);
   });
@@ -321,7 +340,7 @@ function backupStamp(now: Date): string {
  *
  * 每次启动都跑（见 runUps）：只在「真的备份了」的时候清，不升级的库会一直堆着旧备份。
  */
-async function pruneBackups(backupsDir: string): Promise<void> {
+async function pruneBackups(backupsDir: string, log: UpsLogger): Promise<void> {
   let names: string[];
   try {
     names = (await readdir(backupsDir)).filter((name) => name.startsWith(BACKUP_PREFIX) && name.endsWith('.db')).sort();
@@ -332,9 +351,9 @@ async function pruneBackups(backupsDir: string): Promise<void> {
   for (const name of names.slice(0, Math.max(0, names.length - BACKUP_KEEP))) {
     try {
       await unlink(join(backupsDir, name));
-      console.log(`[ups] 清理旧备份：${name}`);
+      log.info('removed old backup: {}', name);
     } catch (error) {
-      console.error(`[ups] 删除旧备份失败：${name}`, error);
+      log.error('remove old backup failed: {} ({})', name, error);
     }
   }
 }
@@ -344,12 +363,12 @@ async function pruneBackups(backupsDir: string): Promise<void> {
  *
  * 复制前先做一次 checkpoint，把 WAL 里的改动落回主文件，否则复制出来的可能缺最近几次事务。
  */
-async function backupDatabase(store: MigrationStore, backupsDir: string): Promise<string> {
+async function backupDatabase(store: MigrationStore, backupsDir: string, log: UpsLogger): Promise<string> {
   store.execSql('PRAGMA wal_checkpoint(TRUNCATE)');
   await mkdir(backupsDir, { recursive: true });
   const target = join(backupsDir, `${BACKUP_PREFIX}${backupStamp(new Date())}.db`);
   await copyFile(store.getDbPath(), target);
-  await pruneBackups(backupsDir);
+  await pruneBackups(backupsDir, log);
   return target;
 }
 
@@ -399,13 +418,13 @@ function stepTitle(step: ChangeStep): string {
  * 每一步都在自己的事务里：脚本抛错时它写进数据库的东西随事务一起回滚，账本也不会记成已执行。
  */
 export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
-  const { store, versions, onProgress, shouldAbort } = options;
+  const { store, versions, log, onProgress, shouldAbort } = options;
   const backupsDir = join(store.getDataDir(), 'backups');
 
   store.execSql(LEDGER_DDL);
-  await pruneBackups(backupsDir);
+  await pruneBackups(backupsDir, log);
 
-  const pending = planSteps(store.readMigrationLedger(), versions);
+  const pending = planSteps(store.readMigrationLedger(), versions, log);
   const total = pending.length;
   if (total === 0) {
     // 没有待执行的也要给一个终态：加载页靠它决定什么时候切回主界面
@@ -418,7 +437,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
 
   let backupPath = '';
   try {
-    backupPath = await backupDatabase(store, backupsDir);
+    backupPath = await backupDatabase(store, backupsDir, log);
   } catch (error) {
     const text = `升级前备份失败，已中止升级：${describeError(error)}`;
     onProgress?.(makeProgress('failed', total, 0, stepTitle(pending[0]), text, ''));

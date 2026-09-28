@@ -10,7 +10,11 @@ import type {
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
 import { SQL } from '@/database/sql';
+import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
+
+/** 本模块的日志（category `main.db`） */
+const log = createLogger('db');
 
 // ------------------------------------------------------------
 // 常量
@@ -131,7 +135,7 @@ function backupDatabase(): void {
     copyFileSync(dbPath, `${dbPath}.bak`);
     lastBackupAt = now;
   } catch (error) {
-    console.error('[db] 备份失败：', error);
+    log.error('database backup failed: {}', error);
   }
 }
 
@@ -147,7 +151,7 @@ function backupDatabase(): void {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  console.log('[db] 数据目录：', dataDir);
+  log.info('data dir: {}', dataDir);
 
   try {
     mkdirSync(dataDir, { recursive: true });
@@ -176,7 +180,7 @@ export function closeDatabase(): void {
   try {
     db.close();
   } catch (error) {
-    console.error('[db] 关闭数据库失败：', error);
+    log.error('failed to close database: {}', error);
   }
   db = null;
 }

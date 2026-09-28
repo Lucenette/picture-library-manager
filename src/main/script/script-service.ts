@@ -1,6 +1,7 @@
 import type { ScriptType } from '@common/types';
 
 import { getScriptById } from '@/database/db';
+import { withScriptLogChannel } from '@/log';
 import { compileScriptModule } from '@/script/compile';
 import { readScriptSource } from '@/script/files';
 
@@ -46,5 +47,6 @@ export async function executeScript<T = unknown>(
     throw new Error(`脚本未导出方法：${method}`);
   }
 
-  return (handler as (...handlerArgs: unknown[]) => T)(...args);
+  // 脚本执行期间它自己的 console.* 归到 script 通道（落 script.log 并进控制台）
+  return withScriptLogChannel(() => (handler as (...handlerArgs: unknown[]) => T)(...args));
 }

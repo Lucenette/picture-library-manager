@@ -4,6 +4,11 @@ import { pathToFileURL } from 'url';
 
 import { IPC } from '@common/ipcChannels';
 
+import { createLogger } from '@/log';
+
+/** 本模块的日志（category `main.window`） */
+const log = createLogger('window');
+
 // ------------------------------------------------------------
 // 常量
 // ------------------------------------------------------------
@@ -451,10 +456,10 @@ function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): 
     return;
   }
   window.webContents.once('did-finish-load', () => {
-    console.log(`[窗口] ${id} 文档加载完成 ${Date.now() - startedAt}ms`);
+    log.debug('window {} document loaded in {}ms', id, Date.now() - startedAt);
   });
   window.once('ready-to-show', () => {
-    console.log(`[窗口] ${id} 首帧就绪 ${Date.now() - startedAt}ms`);
+    log.debug('window {} first frame ready in {}ms', id, Date.now() - startedAt);
   });
 }
 

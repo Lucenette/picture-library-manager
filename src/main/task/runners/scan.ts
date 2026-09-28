@@ -8,9 +8,13 @@ import {
   insertCharacter, insertImageFiles, insertImageGroup, updateSourceScannedAt,
 } from '@/database/db';
 import { buildDirTree, collectImageFiles } from '@/image/walk';
+import { createLogger } from '@/log';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
 import { ThumbnailPool } from '@/image/thumbnail-pool';
+
+/** 本模块的日志（category `main.scan`） */
+const log = createLogger('scan');
 
 /** 已入库的图片组：带上 group 行 id，逐张插图时要用 */
 interface StoredGroup extends ScannedGroup {
@@ -45,7 +49,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   /** 记下写入失败但继续扫描：一个目录写不进去不该拖垮整轮 */
   const recordWriteFailure = (what: string, error: unknown): void => {
     failedWrites += 1;
-    console.error(`写入失败：${what}`, (error as Error).message);
+    log.error('write failed: {} ({})', what, (error as Error).message);
   };
 
   // 先清除本来源的旧数据，清除立刻提交
@@ -117,7 +121,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   updateSourceScannedAt(sourceId);
 
   if (failedWrites > 0) {
-    console.error(`扫描写入结束：${failedWrites} 处写入失败，来源数据可能不完整`);
+    log.error('scan finished with {} write failures, source data may be incomplete', failedWrites);
   }
 
   const thumbnails = characters.reduce(
@@ -176,13 +180,13 @@ async function generateThumbnails(
       if (outcome.thumbnail === null) {
         // 解码失败也要计数并报出来，不能只剩一个「这张图没有缩略图」
         failures += 1;
-        console.error(`缩略图生成失败：${file.filePath}（${size}）`, '解码器读不出这张图');
+        log.error('thumbnail generation failed: {} ({}) - decoder cannot read this image', file.filePath, size);
       }
     } catch (error) {
       failures += 1;
       // 带上像素数与实际耗时，只报「超时」看不出是图太大还是解码器卡死
       const seconds = Math.round((Date.now() - startedAt) / 1000);
-      console.error(`缩略图生成失败：${file.filePath}（${size}，${seconds}s）`, (error as Error).message);
+      log.error('thumbnail generation failed: {} ({}, {}s) - {}', file.filePath, size, seconds, (error as Error).message);
     }
 
     // 无论这张有没有缩略图都立刻入库；写失败只让它自己缺一行
@@ -190,7 +194,7 @@ async function generateThumbnails(
       insertImageFiles(group.groupId, [file]);
       storedFiles += 1;
     } catch (error) {
-      console.error(`图片入库失败：${file.filePath}`, (error as Error).message);
+      log.error('store image failed: {} ({})', file.filePath, (error as Error).message);
     }
 
     doneFiles += 1;

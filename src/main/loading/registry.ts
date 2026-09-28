@@ -10,6 +10,10 @@
 import {
   beginLoadTask, dispatchLoadTask, finishLoad, reportLoadProgress, type LoadTaskReport,
 } from '@/loading/progress';
+import { createLogger } from '@/log';
+
+/** 本模块的日志（category `main.loading`） */
+const log = createLogger('loading');
 
 /** 任务的调度种类 */
 export type LoadTaskKind = 'essential' | 'warmup';
@@ -61,7 +65,7 @@ export async function startLoading(): Promise<boolean> {
       continue;
     }
     void runTask(task).catch((error: unknown) => {
-      console.warn(`[loading] 预热任务「${task.title}」失败：${describeError(error)}`);
+      log.warn('warmup task failed: {} ({})', task.title, describeError(error));
     });
   }
 

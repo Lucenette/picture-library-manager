@@ -3,8 +3,12 @@ import type { ImageGroupView, ProcessTaskPayload, ProcessTaskResult } from '@com
 import {
   beginBatch, endBatch, getImageFilesByGroup, getImageGroupsViewByIds, upsertProcessedImage,
 } from '@/database/db';
+import { createLogger } from '@/log';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
+
+/** 本模块的日志（category `main.process`） */
+const log = createLogger('process');
 
 /**
  * 对一批图片组执行选图脚本。
@@ -27,7 +31,7 @@ export async function runProcess(ctx: TaskContext): Promise<ProcessTaskResult> {
         processed += 1;
       } catch (error) {
         failed += 1;
-        console.error(`图片组处理失败：${group.dirPath}`, error);
+        log.error('process group failed: {} ({})', group.dirPath, error);
       }
 
       ctx.report(((index + 1) / Math.max(total, 1)) * 100, `已处理 ${index + 1}/${total}`);
