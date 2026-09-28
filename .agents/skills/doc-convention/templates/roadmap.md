@@ -2,7 +2,7 @@
 
 用于 `docs/roadmap/<功能>.md`——尚未开始或正在进行的方案。写得最完整的参考是
 [task-eta.md](../../../../docs/roadmap/task-eta.md)，带「目标与非目标」的较短形态是
-[logging.md](../../../../docs/roadmap/logging.md)。
+[view-layouts.md](../../../../docs/roadmap/view-layouts.md)。
 
 ## 骨架
 

@@ -152,7 +152,7 @@ export async function generateThumbnail(filePath: string): Promise<ThumbnailResu
 
     return { thumbnail, phash: perceptualHash(grey), width, height };
   } catch {
-    // 这里在 worker 线程里、够不着主进程的日志文件（见 docs/roadmap/logging.md 3.5）：
+    // 这里在 worker 线程里、够不着主进程的日志文件（见 docs/design/logging.md 3.5）：
     // 退回 null，由调用方（扫描器）连同路径与像素数记一条「这张图解码失败」
     return { thumbnail: null, phash: null, width, height };
   }

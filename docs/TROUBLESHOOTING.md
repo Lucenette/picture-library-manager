@@ -150,6 +150,41 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 缩略图以 WebP 字节存放在 `image_file.thumbnail`（BLOB），是库体积里最大的一块。这是「预览零开销」的代价，属于已知取舍（见 [ARCHITECTURE](./ARCHITECTURE.md) 的关键取舍一节）。
 
+## 日志
+
+### 日志文件在哪
+
+| 运行方式 | 目录 |
+|---|---|
+| 开发（`yarn dev`） | `dist/logs/` |
+| 打包后 | `~/.plmanager/logs/`（Windows 为 `C:\Users\<用户名>\.plmanager\logs`） |
+
+三个文件各管一类来源，文件由主进程独占写入：
+
+| 文件 | 内容 |
+|---|---|
+| `root.log` | 应用自己的日志：`main.*`（主进程）与 `renderer.*`（渲染进程） |
+| `external.log` | 第三方与噪声：依赖库写到 stdout / stderr 的内容、渲染进程控制台里的框架警告、Electron 的进程异常事件 |
+| `script.log` | 用户脚本里的 `console.*` |
+
+按天滚动，前一天的写成 `root.log.<日期>.gz`。保留三条上限：单文件 50 MB（压缩前）、最多 20 个文件、启动时删掉超过 14 天的。固定 UTF-8 + LF，任何文本编辑器都能打开。
+
+### 日志消息为什么是英文
+
+**消息文本一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码；英文正文让终端、文件与检索工具都读得通。定位问题时直接搜 category（`main.scan`、`main.ups`）或消息里的关键词。
+
+### 想把日志调详细 / 调安静
+
+三个环境变量，取值 `error` / `warn` / `info` / `debug`，给了别的值一律退回默认：
+
+| 变量 | 管什么 | 默认 |
+|---|---|---|
+| `PLM_LOG_LEVEL` | 应用自己的日志（`main.*` / `renderer.*`） | 开发态 `debug`、打包态 `info` |
+| `PLM_LOG_LEVEL_EXTERNAL` | `external.log` | `warn` |
+| `PLM_LOG_LEVEL_SCRIPT` | `script.log`（含脚本的 `console.*`） | `warn` |
+
+**控制台始终输出、且不额外过滤**；文件侧的 `root.log` 套了一层 INFO 过滤，所以把 `PLM_LOG_LEVEL` 调到 `debug` 只在控制台多出调试行，不会把文件撑大。
+
 ---
 
 ## 开发 / 构建
@@ -160,9 +195,9 @@ esbuild 需要启动子进程并用命名管道通信。**受限沙箱环境会�
 
 ### 主进程日志在终端里是乱码
 
-Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文变成
-`缂╃暐鍥剧敓鎴愬け璐ワ細` 这样的一串。执行 `chcp 65001` 切到 UTF-8 即可正常显示，
-这不影响日志本身的内容。
+应用自己写出的消息已改为英文 ASCII（见「日志消息为什么是英文」），终端里仍会乱码的是**第三方库自己打的中文**。
+Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文变成 `缂╃暐鍥剧敓鎴愬け璐ワ細` 这样的一串；
+执行 `chcp 65001` 切到 UTF-8 即可正常显示，日志文件里的内容不受影响。
 
 ### `yarn typecheck` 报找不到 `vue-tsc`
 
@@ -201,7 +236,8 @@ Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文�
 
 ### 脚本里的 console.log 在窗口 DevTools 里看不到
 
-脚本运行在主进程，日志在**运行 `yarn dev` 的终端**，不在窗口的 DevTools。
+脚本运行在主进程：输出在**运行 `yarn dev` 的终端**，同时写进用户日志目录的 `script.log`（见「日志文件在哪」），
+不在窗口的 DevTools。
 
 ### 脚本里的 `require('./helper')` 报找不到模块
 

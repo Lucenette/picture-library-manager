@@ -78,7 +78,7 @@ export function getLogChannel(): LogChannel {
  * 执行用户脚本期间把通道切到 `script`。
  *
  * 脚本里 `console.*` 的输出要单独进 `script.log`，而脚本调用期间是同步的，所以用标记分流；
- * 脚本若把 `console` 存下来异步打印，那类输出会落回 `external`（见 docs/roadmap/logging.md 3.6）。
+ * 脚本若把 `console` 存下来异步打印，那类输出会落回 `external`（见 docs/design/logging.md 3.6）。
  */
 export function withScriptLogChannel<T>(action: () => T): T {
   const previous = channel;
