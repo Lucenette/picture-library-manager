@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { app } from 'electron';
 import log4js from 'log4js';
-import type { Appender, Configuration, DateFileAppender, Layout } from 'log4js';
+import type { Appender, Configuration, DateFileAppender, Layout, Logger as Log4jsLogger } from 'log4js';
 
 import { formatPlaceholders, type LogLevel, type LogRecord } from '@common/log';
 
@@ -53,6 +53,40 @@ export interface Logger {
   warn(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
   debug(message: string, ...args: unknown[]): void;
+}
+
+/** 除我们自己的日志之外的来源：第三方噪声与用户脚本 */
+export type LogChannel = 'external' | 'script';
+
+/** 日志正在写控制台：stdout/stderr 补丁看见它就只放行、不再记录，避免自我递归 */
+let consoleWriting = false;
+/** 当前通道：执行用户脚本期间切到 `script`，其余时候是 `external` */
+let channel: LogChannel = 'external';
+
+/** 补丁用：这一行控制台输出是不是日志自己写的 */
+export function isConsoleWriteFromLogger(): boolean {
+  return consoleWriting;
+}
+
+/** 补丁用：当前该记到哪个通道 */
+export function getLogChannel(): LogChannel {
+  return channel;
+}
+
+/**
+ * 执行用户脚本期间把通道切到 `script`。
+ *
+ * 脚本里 `console.*` 的输出要单独进 `script.log`，而脚本调用期间是同步的，所以用标记分流；
+ * 脚本若把 `console` 存下来异步打印，那类输出会落回 `external`（见 docs/roadmap/logging.md 3.6）。
+ */
+export function withScriptLogChannel<T>(action: () => T): T {
+  const previous = channel;
+  channel = 'script';
+  try {
+    return action();
+  } finally {
+    channel = previous;
+  }
 }
 
 // ------------------------------------------------------------
@@ -211,7 +245,7 @@ function loggerOf(category: string): Logger {
     if (!target.isLevelEnabled(level)) {
       return;
     }
-    target[level](formatPlaceholders(message, args));
+    write(target, level, formatPlaceholders(message, args));
   };
   return { error: at('error'), warn: at('warn'), info: at('info'), debug: at('debug') };
 }
@@ -227,7 +261,22 @@ export function writeRecord(record: LogRecord): void {
   if (!target.isLevelEnabled(record.level)) {
     return;
   }
-  target[record.level](record.message);
+  write(target, record.level, record.message);
+}
+
+/**
+ * 真正落一条记录。
+ *
+ * 写之前把「日志正在写控制台」的标记立起来：控制台 appender 会写 stdout，而 stdout 补丁正盯着它，
+ * 不立标记就会自己收自己、同一行进两个文件。
+ */
+function write(target: Log4jsLogger, level: LogLevel, message: string): void {
+  consoleWriting = true;
+  try {
+    target[level](message);
+  } finally {
+    consoleWriting = false;
+  }
 }
 
 /** 三个来源的 category 前缀，给捕获层拼 category 用 */

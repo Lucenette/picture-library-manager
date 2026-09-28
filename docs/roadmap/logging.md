@@ -106,7 +106,7 @@ log.debug('wrote image {}/{}', done, total);
 - 补 `process.stdout.write` / `process.stderr.write`：原输出照旧，同时往 `external` 类别记一条。**必须做重入保护**：日志自己写控制台时置位旁路，否则开发态的 `console` appender 会被再抓一次、同一行进两个文件（这也是「补丁与 log4js 是否兼容」的答案：兼容，但保护不可省）。
 - 渲染进程的 `webContents.on('console-message')`：框架警告、Vue 的提示、第三方输出 → `external.console-renderer`。
 - **用户脚本的 `console.*`**：在 `executeScript()` 执行期间置一个「当前通道 = script」的标记，`stdout` / `stderr` 补丁据此把这期间的输出写进 `script.log`（同时也进控制台）。脚本调用期间是同步执行，标记不会串台；脚本若把 `console` 存下来异步打印，那类输出会落回常规通道。
-- `process.on('uncaughtException')` / `unhandledRejection`：记 error 进 `root.log` 并落盘后再按既有策略处理。
+- **不接管 `uncaughtException` / `unhandledRejection`**：Node 与 Electron 本来就会把堆栈打到 stderr，补丁已经能把它收进日志；自己加处理器反而会改掉「未捕获异常即退出」的既有行为。
 - Electron 的 `render-process-gone`、`child-process-gone`、`preload-error`：进 `root.log`（它们是我们的诊断依据，不是第三方噪声）。
 - `bootstrap()` 的 catch 也要先写日志再弹原生错误框（现在那条路径除了弹框什么都不留）。
 
