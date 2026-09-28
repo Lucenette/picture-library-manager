@@ -55,7 +55,7 @@ async function runTask(request: LoadTaskRequest): Promise<void> {
   let error = '';
   try {
     if (run === undefined) {
-      throw new Error(`渲染进程不认识的加载任务：${request.id}`);
+      throw new Error(`unknown load task in renderer: ${request.id}`);
     }
     await run();
   } catch (caught: unknown) {

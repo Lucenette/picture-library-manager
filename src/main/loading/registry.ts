@@ -46,7 +46,7 @@ let started = false;
 /** 登记一个加载任务；必须在 startLoading() 之前 */
 export function registerLoadTask(task: LoadTask): void {
   if (started) {
-    throw new Error('加载已经开始，不能再登记任务');
+    throw new Error('loading already started, cannot register more tasks');
   }
   tasks.push(task);
 }

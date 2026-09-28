@@ -112,7 +112,7 @@ export class ThumbnailPool {
     this.closed = true;
 
     // 等待中的请求必须立刻失败，否则 terminate 之后它们永远不结算
-    this.failWaiters(new Error('缩略图线程池已关闭'));
+    this.failWaiters(new Error('thumbnail pool is closed'));
 
     for (const slot of this.slots) {
       slot.alive = false;
@@ -138,7 +138,7 @@ export class ThumbnailPool {
       worker.unref();
       slot = { worker, alive: true };
     } catch (error) {
-      const failure = new Error(`缩略图工作线程启动失败：${(error as Error).message}`);
+      const failure = new Error(`thumbnail worker failed to start: ${(error as Error).message}`);
       this.failWaiters(failure);
       // 一个都不剩才算池子报废；否则交给其它存活线程继续跑
       if (this.slots.length === 0) {
@@ -186,7 +186,7 @@ export class ThumbnailPool {
 
     this.replacementCount += 1;
     if (this.replacementCount > MAX_REPLACEMENTS) {
-      this.broken = new Error('缩略图工作线程反复退出，已停止补位');
+      this.broken = new Error('thumbnail worker kept exiting, giving up on respawning');
       this.failWaiters(this.broken);
       return;
     }
@@ -258,7 +258,7 @@ export class ThumbnailPool {
 
       const timer = setTimeout(() => {
         this.markDead(slot);
-        finish(new Error(`缩略图处理超时（${REQUEST_TIMEOUT_MS / 1000}s）`));
+        finish(new Error(`thumbnail processing timed out (${REQUEST_TIMEOUT_MS / 1000}s)`));
       }, REQUEST_TIMEOUT_MS);
 
       const onMessage = (response: ThumbnailResponse): void => {
@@ -266,7 +266,7 @@ export class ThumbnailPool {
           return;
         }
         if (response.error) {
-          finish(new Error(`缩略图处理失败：${response.error}`));
+          finish(new Error(`thumbnail processing failed: ${response.error}`));
         } else {
           finish(null, {
             thumbnail: response.thumbnail ?? null,
@@ -278,10 +278,10 @@ export class ThumbnailPool {
         }
       };
       const onError = (error: Error): void => {
-        finish(new Error(`缩略图工作线程异常：${error.message}`));
+        finish(new Error(`thumbnail worker error: ${error.message}`));
       };
       const onExit = (code: number): void => {
-        finish(new Error(`缩略图工作线程已退出（code=${code}）`));
+        finish(new Error(`thumbnail worker exited (code=${code})`));
       };
 
       slot.worker.on('message', onMessage);
@@ -291,7 +291,7 @@ export class ThumbnailPool {
       try {
         slot.worker.postMessage({ id, filePath } satisfies ThumbnailRequest);
       } catch (error) {
-        finish(new Error(`缩略图任务派发失败：${(error as Error).message}`));
+        finish(new Error(`failed to dispatch thumbnail task: ${(error as Error).message}`));
       }
     });
   }

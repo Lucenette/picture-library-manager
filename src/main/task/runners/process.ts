@@ -72,7 +72,7 @@ async function selectImageForGroup(group: ImageGroupView, scriptId: number): Pro
 
   const selectedFile = filePathByUuid.get(selectedUuid);
   if (!selectedFile) {
-    throw new Error('脚本返回了未知的文件标识');
+    throw new Error('script returned an unknown file marker');
   }
 
   upsertProcessedImage(

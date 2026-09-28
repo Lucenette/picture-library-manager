@@ -36,7 +36,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   const { sourceId, scriptId } = ctx.payload as ScanTaskPayload;
   const source = getSourceById(sourceId);
   if (!source) {
-    throw new Error(`来源不存在（id=${sourceId}）`);
+    throw new Error(`source not found (id=${sourceId})`);
   }
 
   const characters: StoredCharacter[] = [];

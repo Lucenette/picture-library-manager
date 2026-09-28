@@ -208,7 +208,7 @@ function parseChangeSets(version: ChangeLogVersion): ParsedChangeSet[] {
   const parser = new DOMParser({
     // 不接这个回调，解析器只记一条日志就继续，返回的可能是半个文档
     onError: (_level, message) => {
-      throw new Error(`changelog「${version.version}」解析失败：${message}`);
+      throw new Error(`cannot parse changelog ${version.version}: ${message}`);
     },
   });
   const doc = parser.parseFromString(version.dbups, 'text/xml');
@@ -222,11 +222,11 @@ function parseChangeSets(version: ChangeLogVersion): ParsedChangeSet[] {
     const author = node.getAttribute('author') ?? '';
     const id = node.getAttribute('id') ?? '';
     if (author === '' || id === '') {
-      throw new Error(`changelog「${version.version}」里有 changeSet 缺少 id 或 author`);
+      throw new Error(`changelog ${version.version} has a changeSet without id or author`);
     }
     const sql = readSql(node);
     if (sql === '') {
-      throw new Error(`changelog「${version.version}」的 changeset ${author}:${id} 里没有可执行的 <sql>`);
+      throw new Error(`changeset ${author}:${id} in changelog ${version.version} has no executable <sql>`);
     }
     result.push({ author, id, filename: version.version, title: readTitle(node, author, id), sql });
   }
@@ -242,7 +242,7 @@ function buildSteps(versions: readonly ChangeLogVersion[]): ChangeStep[] {
     if (seen.has(version.version)) {
       // 复制版本目录时忘了改 VERSION：新版本的 changeSet 会顶用旧版本的身份，
       // 被账本判定为已执行而静默跳过——宁可启动就失败
-      throw new Error(`版本清单里的版本号重复：${version.version}（检查各版本目录 index.ts 里的 VERSION）`);
+      throw new Error(`duplicate version in changelog list: ${version.version} (check VERSION in each version directory's index.ts)`);
     }
     seen.add(version.version);
 
@@ -439,7 +439,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
   try {
     backupPath = await backupDatabase(store, backupsDir, log);
   } catch (error) {
-    const text = `升级前备份失败，已中止升级：${describeError(error)}`;
+    const text = `pre-upgrade backup failed, upgrade aborted: ${describeError(error)}`;
     onProgress?.(makeProgress('failed', total, 0, stepTitle(pending[0]), text, ''));
     return { ok: false, aborted: false, applied: 0, error: text, backupPath: '' };
   }
@@ -483,7 +483,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
         order,
         executionMs: Date.now() - startedAt,
       });
-      const text = `${step.filename} / ${step.author}:${step.id}（${step.title}）执行失败：${message}`;
+      const text = `${step.filename} / ${step.author}:${step.id} (${step.title}) failed: ${message}`;
       onProgress?.(makeProgress('failed', total, done, stepTitle(step), text, backupPath));
       return { ok: false, aborted: false, applied: done, error: text, backupPath };
     }

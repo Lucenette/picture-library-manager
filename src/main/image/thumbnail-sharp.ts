@@ -89,7 +89,7 @@ try {
 /** 取 sharp 实例；没装或加载失败时抛出带修复方式的错误 */
 function requireSharp(): SharpFactory {
   if (!sharpFactory) {
-    throw new Error(`sharp 不可用（${loadError}），缩略图解码依赖它，请先安装：yarn add sharp`);
+    throw new Error(`sharp is unavailable (${loadError}); thumbnail decoding needs it, install with: yarn add sharp`);
   }
   return sharpFactory;
 }

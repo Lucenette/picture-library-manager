@@ -41,7 +41,7 @@ export async function run(_ctx: ChangeScriptContext): Promise<void> {
       continue;
     }
     if (!(await scriptFileExists(row.filePath))) {
-      throw new Error(`接管旧脚本失败：${row.name} 的源码没有落到文件（${row.filePath}）`);
+      throw new Error(`failed to take over legacy script: source of ${row.name} was not written to ${row.filePath}`);
     }
   }
 }
