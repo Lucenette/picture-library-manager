@@ -3,10 +3,11 @@
     ref="scrollbarRef"
     class="tile-board"
     :class="{ 'selection-active': selectionActive }"
+    :max-height="maxHeight"
     @scroll="onScroll"
   >
     <div class="tile-content">
-      <div v-if="items.length === 0 && !loading" class="tile-empty">暂无数据</div>
+      <div v-if="items.length === 0 && !loading" class="tile-empty">{{ emptyText }}</div>
 
       <template v-else>
         <div :style="{ height: topSpacerHeight + 'px' }"></div>
@@ -17,9 +18,9 @@
               v-for="item in row.items"
               :key="item.id"
               class="tile-card"
-              :class="{ expanded: item.id === expandedId }"
+              :class="{ expanded: mode === 'group' && item.id === expandedId }"
             >
-              <div class="tile-cover" @click="emit('expand', item)">
+              <div class="tile-cover" @click="onCoverClick(item)">
                 <!-- 最多三张封面叠着放：第 0 张在最上面，其余两张在下面错开一个角度 -->
                 <img
                   v-for="(cover, layer) in item.covers"
@@ -34,6 +35,7 @@
                 <span v-if="item.count !== null" class="tile-count">{{ item.count }}</span>
 
                 <el-checkbox
+                  v-if="selectable"
                   class="tile-check"
                   :model-value="selectState(item.id) === 'checked'"
                   :indeterminate="selectState(item.id) === 'indeterminate'"
@@ -115,14 +117,26 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   /** 当前有没有勾选任何一项（内层或外层）：有的话所有复选框常显，没有就只在悬停时出现 */
   selectionActive?: boolean;
+  /** `group` ＝ 一级卡片（点封面展开）；`image` ＝ 展开面板里的二级图片（点封面打开查看器） */
+  mode?: 'group' | 'image';
+  /** 要不要画复选框；图组页的二级图片没有勾选意义 */
+  selectable?: boolean;
+  /** 空列表时显示的文案 */
+  emptyText?: string;
+  /** 高度上限（CSS 值）：嵌在展开面板里时用，交给 el-scrollbar 限在滚动视口上，root 才有得滚 */
+  maxHeight?: string;
 }>(), {
   loading: false,
   selectionActive: false,
+  mode: 'group',
+  selectable: true,
+  emptyText: '暂无数据',
 });
 
 const emit = defineEmits<{
   expand: [item: TileItem];
   select: [item: TileItem];
+  open: [item: TileItem];
   loadMore: [];
 }>();
 
@@ -284,6 +298,15 @@ watch([visibleRows, () => props.expandedId], () => {
     syncCardObserver();
   });
 }, { flush: 'post' });
+
+/** 一级点封面＝展开；二级（`image`）点封面＝打开查看器 */
+function onCoverClick(item: TileItem): void {
+  if (props.mode === 'image') {
+    emit('open', item);
+    return;
+  }
+  emit('expand', item);
+}
 
 function onScroll({ scrollTop: top }: { scrollTop: number }): void {
   scrollTop.value = top;

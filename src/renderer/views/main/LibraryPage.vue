@@ -66,38 +66,20 @@
       @load-more="loadMoreCharacters"
     >
       <template #panel>
-        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="var(--tile-panel-max-height)" @scroll="onPanelScroll">
-          <div
-            v-if="panelImages.length > 0"
-            class="panel-grid"
-            :class="{ 'selection-active': selectedIds.length > 0 }"
-          >
-            <div
-              v-for="image in panelImages"
-              :key="image.id"
-              class="panel-item"
-              :class="{ selected: selectedIdSet.has(image.id) }"
-            >
-              <img
-                v-if="image.selectedFileThumbnail"
-                class="panel-thumb"
-                :src="image.selectedFileThumbnail"
-                :title="image.selectedFileName"
-                @click="openImageViewer(image)"
-              />
-              <span v-else class="panel-thumb panel-thumb-empty" @click="openImageViewer(image)">🖼</span>
-              <el-checkbox
-                class="panel-check"
-                :model-value="selectedIdSet.has(image.id)"
-                @click.stop
-                @change="toggleImageSelection(image.id)"
-              />
-              <span class="panel-name" :title="image.selectedFileName">{{ image.selectedFileName }}</span>
-            </div>
-          </div>
-          <div v-else-if="!panelLoading" class="panel-empty">没有可显示的图片</div>
-          <div v-if="panelLoading" class="panel-loading">加载中…</div>
-        </el-scrollbar>
+        <TileBoard
+          :key="expandedCharacterId ?? 0"
+          mode="image"
+          max-height="var(--tile-panel-max-height)"
+          :items="panelTileItems"
+          :expanded-id="null"
+          :select-state="panelSelectState"
+          :selection-active="selectedIds.length > 0"
+          :loading="panelLoading"
+          empty-text="没有可显示的图片"
+          @open="onPanelOpen"
+          @select="onPanelSelect"
+          @load-more="loadMorePanelImages"
+        />
       </template>
     </TileBoard>
 
@@ -121,7 +103,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
-import type { ScrollbarInstance, TableInstance } from 'element-plus';
+import type { TableInstance } from 'element-plus';
 
 import { IPC } from '@common/ipcChannels';
 import type {
@@ -149,9 +131,6 @@ const TILE_PAGE_SIZE = 60;
 
 /** 筛选变化后等这么久再查询；连点筛选项时只打一次 */
 const FILTER_DEBOUNCE_MS = 200;
-
-/** 展开面板距底部不足这么多像素就请求下一片 */
-const PANEL_LOAD_MORE_THRESHOLD = 200;
 
 /** 脚本筛选里代表「手动确认」的取值，与主进程 COALESCE(script_name, ...) 对齐 */
 const MANUAL_SCRIPT_NAME = '手动确认';
@@ -191,7 +170,6 @@ const expandedCharacterId = ref<number | null>(null);
 const panelImages = ref<ProcessedImageView[]>([]);
 const panelLoading = ref(false);
 const tileBoardRef = ref<InstanceType<typeof TileBoard> | null>(null);
-const panelScrollRef = ref<ScrollbarInstance | null>(null);
 
 /** 相似图片识别是否在跑：跑的过程中禁用按钮 */
 const recognizing = ref(false);
@@ -572,7 +550,6 @@ async function toggleCharacter(item: TileItem): Promise<void> {
   }
   expandedCharacterId.value = item.id;
   panelImages.value = [];
-  panelScrollRef.value?.setScrollTop(0);
   await loadPanelImages(item.id, true);
 }
 
@@ -622,17 +599,6 @@ function toggleCharacterSelection(item: TileItem): void {
     }
   }
   selectedIds.value = [...next];
-}
-
-function onPanelScroll(): void {
-  const wrap = panelScrollRef.value?.wrapRef as HTMLElement | undefined;
-  if (!wrap) {
-    return;
-  }
-  if (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight > PANEL_LOAD_MORE_THRESHOLD) {
-    return;
-  }
-  void loadMorePanelImages();
 }
 
 async function loadMorePanelImages(): Promise<void> {
@@ -692,6 +658,35 @@ function onSelectAll(selection: ProcessedImageView[]): void {
       deselectImage(row.id);
     }
   }
+}
+
+/** 二级图片映射成平铺条目：一张封面、标题是文件名、没有角标 */
+const panelTileItems = computed<TileItem[]>(() =>
+  panelImages.value.map((image) => ({
+    id: image.id,
+    title: image.selectedFileName,
+    subtitle: '',
+    count: null,
+    covers: image.selectedFileThumbnail === null ? [] : [image.selectedFileThumbnail],
+  })),
+);
+
+/** 二级只有「选中 / 未选」两态 */
+function panelSelectState(id: number): TileSelectState {
+  return selectedIdSet.value.has(id) ? 'checked' : 'none';
+}
+
+/** 点二级图片：打开查看器并定位到它 */
+function onPanelOpen(item: TileItem): void {
+  const image = panelImages.value.find((row) => row.id === item.id);
+  if (image) {
+    void openImageViewer(image);
+  }
+}
+
+/** 二级复选框复用同一份 selectedIds */
+function onPanelSelect(item: TileItem): void {
+  toggleImageSelection(item.id);
 }
 
 /** 展开面板里的图片：打开当前筛选结果并定位到这一张 */
@@ -893,87 +888,4 @@ function toFilterItems(values: string[]): FilterItem[] {
   margin-left: auto;
 }
 
-.panel-scroll {
-  margin-right: -4px;
-}
-
-.panel-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  justify-items: center;
-  /* 与一级卡片同一套间距：横向 20px、纵向 24px */
-  column-gap: 20px;
-  row-gap: 24px;
-  /* 留出悬停放大与阴影的余量，否则第一行 / 第一列会被滚动容器裁掉 */
-  padding: 6px;
-}
-
-.panel-item {
-  position: relative;
-  width: 100px;
-}
-
-/* 手型光标与点击都只认图片，不认整个盒子 */
-.panel-thumb {
-  cursor: pointer;
-}
-
-.panel-item:hover {
-  z-index: 5;
-}
-
-.panel-check {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  height: auto;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.panel-item:hover .panel-check,
-.panel-item.selected .panel-check,
-.panel-grid.selection-active .panel-check {
-  opacity: 1;
-}
-
-.panel-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
-}
-
-.panel-thumb {
-  display: block;
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-  border-radius: 6px;
-  background: #2b2d30;
-}
-
-.panel-thumb-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-}
-
-.panel-name {
-  display: block;
-  margin-top: 8px;
-  font-size: 11px;
-  color: #d8dadd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.panel-empty,
-.panel-loading {
-  padding: 12px;
-  text-align: center;
-  color: #82858b;
-  font-size: 12px;
-}
 </style>
