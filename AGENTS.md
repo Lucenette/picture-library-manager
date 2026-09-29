@@ -41,7 +41,7 @@
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
 | `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎；作为加载服务的一项任务运行，调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
 | `src/main/loading/` | **加载服务**：启动阶段任务的登记与调度（谁阻塞、谁可以预热、跑在哪个进程）、加载页状态与跨进程下发 | 具体任务本身——升级在 `ups/`、预热在渲染进程入口；把业务逻辑写进调度 |
-| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
+| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度；`sort/` 子目录把文本算成可比较的排序键（见 [docs/design/sort-keys.md](docs/design/sort-keys.md)） | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 脚本文件与草稿的落盘（用户目录的 `scripts/`、`temp/scripts/`）、编译与调用 | SQL 与表结构——那是 `database/` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |

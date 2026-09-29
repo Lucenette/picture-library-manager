@@ -56,7 +56,7 @@
 | `dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC |
 | `ups/` | 升级模块：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎 | 反向依赖业务模块 |
 | `loading/` | 启动加载服务：任务登记与调度、加载页状态、渲染进程任务下发 | 具体任务本身——升级在 `ups/` |
-| `database/` | 开库、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
+| `database/` | 开库、CRUD、账本读写、DB 的 IPC 调度；`sort/` 子目录把文本算成可比较的排序键（见 [design/sort-keys.md](./design/sort-keys.md)） | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `log/` | 日志：log4js 配置与三个文件（`root.log` / `external.log` / `script.log`）、stdout/stderr 补丁与渲染进程 console 的捕获、通道分流 | 反向依赖业务模块；把它登记成加载任务——启动阶段它必须最先可用 |
 
 判断口径：**按职责归类，不按"谁在用我"归类。** `database` 也只被少数模块使用，但它独立存在。
