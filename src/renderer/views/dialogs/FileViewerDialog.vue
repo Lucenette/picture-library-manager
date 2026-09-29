@@ -38,9 +38,10 @@
 import { onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
-import type { FileViewerInitData, ImageFile, ViewerPayload } from '@common/types';
+import type { FileViewerInitData, ImageFile, ViewerOpenRequest } from '@common/types';
 
 const files = ref<ImageFile[]>([]);
+const groupId = ref(0);
 const groupName = ref('');
 const groupDirPath = ref('');
 
@@ -51,6 +52,7 @@ async function loadInitData(): Promise<void> {
     return;
   }
   files.value = data.files;
+  groupId.value = data.groupId;
   groupName.value = data.groupName;
   groupDirPath.value = data.groupDirPath;
 }
@@ -84,20 +86,11 @@ function pick(file: ImageFile): void {
 }
 
 function openViewer(target: ImageFile): void {
-  const index = files.value.indexOf(target);
-  const payload: ViewerPayload = {
-    files: files.value.map((file) => ({
-      filePath: file.filePath,
-      fileName: file.fileName,
-      relativePath: relativePath(file),
-      fileSize: file.fileSize,
-      width: file.width,
-      height: file.height,
-      thumbnail: file.thumbnail,
-    })),
-    index: index >= 0 ? index : 0,
+  const request: ViewerOpenRequest = {
+    source: { kind: 'group', groupId: groupId.value, startId: target.id },
+    title: `${groupName.value} - ${target.fileName}`,
   };
-  ipcRenderer.invoke(IPC.VIEWER_OPEN, payload);
+  ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
 }
 
 onMounted(loadInitData);

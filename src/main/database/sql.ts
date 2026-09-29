@@ -224,6 +224,27 @@ export const SQL = {
   SELECT_IMAGE_FILES_PAGE: `SELECT * FROM image_file WHERE image_group_id = ?
   ORDER BY file_name_sort, id LIMIT ? OFFSET ?`,
 
+  /** 图组内图片总数 */
+  COUNT_IMAGE_FILES: 'SELECT COUNT(*) AS total FROM image_file WHERE image_group_id = ?',
+
+  /** 图组内排在锚点之前的图片数，顺序与二级分页一致（文件名 + id） */
+  COUNT_IMAGE_FILES_BEFORE: `SELECT COUNT(*) AS total FROM image_file WHERE image_group_id = ?
+  AND (file_name_sort, id) < (SELECT file_name_sort, id FROM image_file WHERE id = ?)`,
+
+  /**
+   * 图库分片用的「排序键视图」：把四个排序键都选出来。
+   *
+   * 查看器要按起始 id 算出它在整个序列里的下标，就得让排序键是这一层的普通列，
+   * 才能用 `(键, id)` 的行值比较一次算出来。
+   */
+  SELECT_PROCESSED_SORT_VIEW_BASE: `SELECT pi.id AS id, c.name_sort AS characterSort,
+    f.file_name_sort AS fileNameSort, pi.script_name_sort AS scriptNameSort, pi.confirmed_at AS confirmedAt
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  JOIN source g ON pi.source_id = g.id
+  LEFT JOIN image_file f ON pi.selected_file = f.file_path
+  WHERE 1 = 1`,
+
   /** 图组封面：每个图组一张缩略图，取文件名排序最靠前的那张；`%IDS%` 由调用方换成占位符 */
   SELECT_GROUP_COVERS: `SELECT id, thumbnail FROM (
     SELECT ig.id AS id, f.thumbnail AS thumbnail,

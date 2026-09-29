@@ -83,6 +83,16 @@ export function getImageFilePage(groupId: number, limit: number, offset: number)
   return call('getImageFilePage', groupId, limit, offset);
 }
 
+/** 图组内图片总数 */
+export function countImageFiles(groupId: number): Promise<number> {
+  return call('countImageFiles', groupId);
+}
+
+/** 图组内起始那张的下标 */
+export function countImageFilesBefore(groupId: number, anchorId: number): Promise<number> {
+  return call('countImageFilesBefore', groupId, anchorId);
+}
+
 /** 按分组 id 取封面缩略图；一条 SQL 拿完当前可见的卡片 */
 export function getCovers(kind: 'character' | 'group', ids: number[]): Promise<CoverThumbnail[]> {
   return call('getCovers', kind, ids);
@@ -162,6 +172,15 @@ export function listProcessedCharacters(filter: ProcessedFilter, limit: number, 
 /** 图库平铺：一级角色总数 */
 export function countProcessedCharacters(filter: ProcessedFilter): Promise<number> {
   return call('countProcessedCharacters', filter);
+}
+
+/** 图库：起始那张在分片序列里的下标 */
+export function countProcessedImagesBefore(
+  filter: ProcessedFilter,
+  sort: ProcessedSort,
+  anchorId: number,
+): Promise<number> {
+  return call('countProcessedImagesBefore', filter, sort, anchorId);
 }
 
 /** 删除图库记录 */

@@ -68,7 +68,9 @@ import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { IPC } from '@common/ipcChannels';
-import type { Source, ProcessedImageView, TaskView, ViewerPayload } from '@common/types';
+import type {
+  ProcessedFilter, ProcessedImageView, ProcessedSort, ProcessedSortKey, Source, TaskView, ViewerOpenRequest,
+} from '@common/types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
 import { useFilterOrder } from '@/composables/useFilterOrder';
@@ -311,23 +313,35 @@ function onSelectionChange(rows: ProcessedImageView[]): void {
   selectedIds.value = rows.map((row) => row.id);
 }
 
-async function openViewer(target: ProcessedImageView): Promise<void> {
-  const list = sortedImages.value;
-  const index = list.indexOf(target);
-
-  const payload: ViewerPayload = {
-    files: list.map((image) => ({
-      filePath: image.selectedFile,
-      fileName: image.selectedFileName,
-      relativePath: image.selectedFileName,
-      fileSize: image.selectedFileSize,
-      width: image.selectedFileWidth,
-      height: image.selectedFileHeight,
-      thumbnail: image.selectedFileThumbnail,
-    })),
-    index: index >= 0 ? index : 0,
+/** 当前筛选条件：分片取数、计数与查看器共用同一份 */
+function currentFilter(): ProcessedFilter {
+  return {
+    sourceId: sourceFilter.value,
+    characterName: characterFilter.value || undefined,
+    fileName: fileNameFilter.value || undefined,
+    scriptName: scriptFilter.value || undefined,
   };
-  await ipcRenderer.invoke(IPC.VIEWER_OPEN, payload);
+}
+
+/** 当前排序：表格列名映射到排序键，没排序时按角色名 */
+function currentSort(): ProcessedSort {
+  let key: ProcessedSortKey = 'character';
+  if (sortProp.value === 'selectedFileName') {
+    key = 'fileName';
+  } else if (sortProp.value === 'scriptName') {
+    key = 'scriptName';
+  } else if (sortProp.value === 'confirmedAt') {
+    key = 'confirmedAt';
+  }
+  return { key, direction: sortOrder.value === 'descending' ? 'desc' : 'asc' };
+}
+
+async function openViewer(target: ProcessedImageView): Promise<void> {
+  const request: ViewerOpenRequest = {
+    source: { kind: 'processed', filter: currentFilter(), sort: currentSort(), startId: target.id },
+    title: `${target.characterName} - ${target.selectedFileName}`,
+  };
+  await ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
 }
 
 async function deleteOne(row: ProcessedImageView): Promise<void> {

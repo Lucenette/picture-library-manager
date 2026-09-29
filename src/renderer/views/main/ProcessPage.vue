@@ -285,6 +285,7 @@ async function unexcludeSelected(): Promise<void> {
 async function viewFiles(group: ImageGroupView): Promise<void> {
   const payload: FileViewerInitData = {
     files: await getImageFilesByGroup(group.id),
+    groupId: group.id,
     groupName: group.dirName,
     groupDirPath: group.dirPath,
   };

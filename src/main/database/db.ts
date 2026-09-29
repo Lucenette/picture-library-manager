@@ -493,6 +493,16 @@ export function getImageFilePage(groupId: number, limit: number, offset: number)
   return queryAll<ImageFile>(SQL.SELECT_IMAGE_FILES_PAGE, [groupId, limit, offset]);
 }
 
+/** 图组内图片总数：查看器要用它显示「第几张 / 共几张」 */
+export function countImageFiles(groupId: number): number {
+  return queryOne<{ total: number }>(SQL.COUNT_IMAGE_FILES, [groupId])?.total ?? 0;
+}
+
+/** 图组内排在锚点之前的图片数，顺序与 `getImageFilePage` 一致 */
+export function countImageFilesBefore(groupId: number, anchorId: number): number {
+  return queryOne<{ total: number }>(SQL.COUNT_IMAGE_FILES_BEFORE, [groupId, anchorId])?.total ?? 0;
+}
+
 /**
  * 按分组 id 取封面缩略图。
  *
@@ -962,6 +972,14 @@ const PROCESSED_SORT_COLUMNS: Record<ProcessedSortKey, string> = {
   confirmedAt: 'pi.confirmed_at',
 };
 
+/** 排序键在「排序键视图」里的列别名，定位锚点下标时按它比较 */
+const PROCESSED_SORT_ALIASES: Record<ProcessedSortKey, string> = {
+  character: 'characterSort',
+  fileName: 'fileNameSort',
+  scriptName: 'scriptNameSort',
+  confirmedAt: 'confirmedAt',
+};
+
 /** 排序子句：`pi.id` 当次键，同键的行才有稳定顺序，分片不会重复或漏行 */
 function buildProcessedOrderBy(sort: ProcessedSort): string {
   const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
@@ -986,6 +1004,23 @@ export function getProcessedImagePage(
     `${SQL.SELECT_PROCESSED_VIEW_BASE}${where.sql}${buildProcessedOrderBy(sort)} LIMIT ? OFFSET ?`,
     [...where.params, limit, offset],
   );
+}
+
+/**
+ * 锚点在整个分片序列里的下标。
+ *
+ * 查看器打开时只知道「从哪一张开始」，用 `(排序键, id)` 的行值比较一次算出它前面有多少行，
+ * 排序方向跟着排序一起翻，降序时算的是排在它后面的行数。
+ */
+export function countProcessedImagesBefore(filter: ProcessedFilter, sort: ProcessedSort, anchorId: number): number {
+  const where = buildProcessedWhere(filter);
+  const view = `${SQL.SELECT_PROCESSED_SORT_VIEW_BASE}${where.sql}`;
+  const alias = PROCESSED_SORT_ALIASES[sort.key];
+  const comparison = sort.direction === 'desc' ? '>' : '<';
+  return queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM (${view}) WHERE (${alias}, id) ${comparison} (SELECT ${alias}, id FROM (${view}) WHERE id = ?)`,
+    [...where.params, ...where.params, anchorId],
+  )?.total ?? 0;
 }
 
 /** 图库平铺一级：当前筛选下有图的角色，按角色名分片 */
@@ -1121,6 +1156,8 @@ const DB_METHODS: Record<string, DbMethod> = {
   getImageGroupPage,
   countImageGroups,
   getImageFilePage,
+  countImageFiles,
+  countImageFilesBefore,
   getCovers,
   updateImageGroupStatus,
   getImageFilesByGroup,
@@ -1133,6 +1170,7 @@ const DB_METHODS: Record<string, DbMethod> = {
   getProcessedImagePage,
   listProcessedCharacters,
   countProcessedCharacters,
+  countProcessedImagesBefore,
   getAllProcessedImages,
   deleteProcessedImage,
 };

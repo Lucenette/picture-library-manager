@@ -300,10 +300,21 @@ export interface ViewerFile {
   thumbnail: string | null;
 }
 
-/** 打开图片查看器时下发的数据 */
-export interface ViewerPayload {
-  files: ViewerFile[];
-  index: number;
+/** 查看器的数据来源：图库按筛选条件分片取，图组页按图组分片取 */
+export type ViewerSource =
+  | { kind: 'processed'; filter: ProcessedFilter; sort: ProcessedSort; startId: number }
+  | { kind: 'group'; groupId: number; startId: number };
+
+/**
+ * 打开图片查看器时下发的数据。
+ *
+ * 只给「看哪些图」与「从哪一张开始」，缩略图由查看器自己按分片取：
+ * 图库动辄几千行，把整份列表连同缩略图塞进 IPC 会一次传十几 MB。
+ */
+export interface ViewerOpenRequest {
+  source: ViewerSource;
+  /** 标题栏与信息条显示的名字 */
+  title: string;
 }
 
 /** 扫描配置窗口初始化数据 */
@@ -387,6 +398,8 @@ export interface PromptResult extends PromptInitData {
 /** 文件查看窗口初始化数据 */
 export interface FileViewerInitData {
   files: ImageFile[];
+  /** 图片组 id：窗口里点开图片查看器时按它分片取 */
+  groupId: number;
   groupName: string;
   groupDirPath: string;
 }
