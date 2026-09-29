@@ -60,23 +60,32 @@
       :expanded-id="expandedCharacterId"
       :select-state="characterSelectState"
       :loading="tileCharactersLoading"
+      :selection-active="selectedIds.length > 0"
       @expand="toggleCharacter"
       @select="toggleCharacterSelection"
-      @open="openCharacter"
       @load-more="loadMoreCharacters"
     >
       <template #panel>
-        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="360px" @scroll="onPanelScroll">
-          <div v-if="panelImages.length > 0" class="panel-grid">
+        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="var(--tile-panel-max-height)" @scroll="onPanelScroll">
+          <div
+            v-if="panelImages.length > 0"
+            class="panel-grid"
+            :class="{ 'selection-active': selectedIds.length > 0 }"
+          >
             <div
               v-for="image in panelImages"
               :key="image.id"
               class="panel-item"
               :class="{ selected: selectedIdSet.has(image.id) }"
-              @click="openImageViewer(image)"
             >
-              <img v-if="image.selectedFileThumbnail" class="panel-thumb" :src="image.selectedFileThumbnail" />
-              <span v-else class="panel-thumb panel-thumb-empty">🖼</span>
+              <img
+                v-if="image.selectedFileThumbnail"
+                class="panel-thumb"
+                :src="image.selectedFileThumbnail"
+                :title="image.selectedFileName"
+                @click="openImageViewer(image)"
+              />
+              <span v-else class="panel-thumb panel-thumb-empty" @click="openImageViewer(image)">🖼</span>
               <el-checkbox
                 class="panel-check"
                 :model-value="selectedIdSet.has(image.id)"
@@ -307,7 +316,8 @@ const tileItems = computed<TileItem[]>(() =>
   tileCharacters.value.map((character) => ({
     id: character.characterId,
     title: character.characterName,
-    subtitle: character.count + ' 张',
+    // 张数在右上角角标里，角色卡不再要副标题
+    subtitle: '',
     count: character.count,
     covers: (characterCovers.value.get(character.characterName) ?? []).filter((cover): cover is string => cover !== null),
   })),
@@ -693,25 +703,6 @@ async function openImageViewer(row: ProcessedImageView): Promise<void> {
   await ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
 }
 
-/** 卡片「打开全部」：把范围收窄到这个角色，并定位到它的第一张 */
-async function openCharacter(item: TileItem): Promise<void> {
-  const character = tileCharacters.value.find((tile) => tile.characterId === item.id);
-  if (!character) {
-    return;
-  }
-  const filter: ProcessedFilter = { ...currentFilter(), characterName: character.characterName };
-  const firstPage = await getProcessedImagePage(filter, currentSort(), 1, 0);
-  const first = firstPage[0];
-  if (!first) {
-    return;
-  }
-  const request: ViewerOpenRequest = {
-    source: { kind: 'processed', filter, sort: currentSort(), startId: first.id },
-    title: character.characterName,
-  };
-  await ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
-}
-
 // ------------------------------------------------------------
 // 任务
 // ------------------------------------------------------------
@@ -910,7 +901,9 @@ function toFilterItems(values: string[]): FilterItem[] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   justify-items: center;
-  gap: 12px;
+  /* 与一级卡片同一套间距：横向 20px、纵向 24px */
+  column-gap: 20px;
+  row-gap: 24px;
   /* 留出悬停放大与阴影的余量，否则第一行 / 第一列会被滚动容器裁掉 */
   padding: 6px;
 }
@@ -918,6 +911,10 @@ function toFilterItems(values: string[]): FilterItem[] {
 .panel-item {
   position: relative;
   width: 100px;
+}
+
+/* 手型光标与点击都只认图片，不认整个盒子 */
+.panel-thumb {
   cursor: pointer;
 }
 
@@ -935,11 +932,12 @@ function toFilterItems(values: string[]): FilterItem[] {
 }
 
 .panel-item:hover .panel-check,
-.panel-item.selected .panel-check {
+.panel-item.selected .panel-check,
+.panel-grid.selection-active .panel-check {
   opacity: 1;
 }
 
-.panel-item:hover .panel-thumb {
+.panel-thumb:hover {
   transform: scale(1.1);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
 }
@@ -963,7 +961,7 @@ function toFilterItems(values: string[]): FilterItem[] {
 
 .panel-name {
   display: block;
-  margin-top: 2px;
+  margin-top: 8px;
   font-size: 11px;
   color: #d8dadd;
   white-space: nowrap;

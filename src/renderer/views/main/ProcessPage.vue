@@ -52,22 +52,23 @@
       :expanded-id="expandedGroupId"
       :select-state="groupSelectState"
       :loading="tileGroupsLoading"
+      :selection-active="selectedIds.length > 0"
       @expand="toggleGroup"
       @select="toggleGroupSelection"
-      @open="openGroup"
       @load-more="loadMoreGroups"
     >
       <template #panel="{ item }">
-        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="360px" @scroll="onPanelScroll">
+        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="var(--tile-panel-max-height)" @scroll="onPanelScroll">
           <div v-if="panelFiles.length > 0" class="panel-grid">
-            <div
-              v-for="file in panelFiles"
-              :key="file.id"
-              class="panel-item"
-              @click="openGroupFile(item, file)"
-            >
-              <img v-if="file.thumbnail" class="panel-thumb" :src="file.thumbnail" />
-              <span v-else class="panel-thumb panel-thumb-empty">🖼</span>
+            <div v-for="file in panelFiles" :key="file.id" class="panel-item">
+              <img
+                v-if="file.thumbnail"
+                class="panel-thumb"
+                :src="file.thumbnail"
+                :title="file.fileName"
+                @click="openGroupFile(item, file)"
+              />
+              <span v-else class="panel-thumb panel-thumb-empty" @click="openGroupFile(item, file)">🖼</span>
               <span class="panel-name" :title="file.fileName">{{ file.fileName }}</span>
             </div>
           </div>
@@ -582,20 +583,6 @@ function onSelectAll(selection: ImageGroupView[]): void {
 // 查看器
 // ------------------------------------------------------------
 
-/** 卡片「打开全部」：打开这个图组的图片并定位到第一张 */
-async function openGroup(item: TileItem): Promise<void> {
-  const firstPage = await getImageFilePage(item.id, 1, 0);
-  const first = firstPage[0];
-  if (!first) {
-    return;
-  }
-  const request: ViewerOpenRequest = {
-    source: { kind: 'group', groupId: item.id, startId: first.id },
-    title: item.title,
-  };
-  await ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
-}
-
 /** 展开面板里的图片：打开它所在的图组并定位到这一张 */
 async function openGroupFile(item: TileItem, file: ImageFile): Promise<void> {
   const request: ViewerOpenRequest = {
@@ -842,7 +829,9 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   justify-items: center;
-  gap: 12px;
+  /* 与一级卡片同一套间距：横向 20px、纵向 24px */
+  column-gap: 20px;
+  row-gap: 24px;
   /* 留出悬停放大与阴影的余量，否则第一行 / 第一列会被滚动容器裁掉 */
   padding: 6px;
 }
@@ -850,6 +839,10 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
 .panel-item {
   position: relative;
   width: 100px;
+}
+
+/* 手型光标与点击都只认图片，不认整个盒子 */
+.panel-thumb {
   cursor: pointer;
 }
 
@@ -857,7 +850,7 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
   z-index: 5;
 }
 
-.panel-item:hover .panel-thumb {
+.panel-thumb:hover {
   transform: scale(1.1);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
 }
@@ -881,7 +874,7 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
 
 .panel-name {
   display: block;
-  margin-top: 2px;
+  margin-top: 8px;
   font-size: 11px;
   color: #d8dadd;
   white-space: nowrap;

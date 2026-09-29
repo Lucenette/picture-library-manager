@@ -4,7 +4,7 @@ export interface TileItem {
   id: number;
   /** 卡片标题，单行省略 */
   title: string;
-  /** 卡片副标题，单行省略 */
+  /** 卡片副标题，单行省略；空串表示这一行不渲染 */
   subtitle: string;
   /** 数量角标；为 null 时不显示 */
   count: number | null;

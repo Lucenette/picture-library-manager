@@ -1,5 +1,10 @@
 <template>
-  <el-scrollbar ref="scrollbarRef" class="tile-board" @scroll="onScroll">
+  <el-scrollbar
+    ref="scrollbarRef"
+    class="tile-board"
+    :class="{ 'selection-active': selectionActive }"
+    @scroll="onScroll"
+  >
     <div class="tile-content">
       <div v-if="items.length === 0 && !loading" class="tile-empty">暂无数据</div>
 
@@ -36,13 +41,10 @@
                   @change="emit('select', item)"
                 />
 
-                <el-button class="tile-open" size="small" text @click.stop="emit('open', item)">
-                  打开全部
-                </el-button>
               </div>
 
               <div class="tile-title" :title="item.title">{{ item.title }}</div>
-              <div class="tile-subtitle" :title="item.subtitle">{{ item.subtitle }}</div>
+              <div v-if="item.subtitle" class="tile-subtitle" :title="item.subtitle">{{ item.subtitle }}</div>
             </div>
           </div>
 
@@ -74,25 +76,26 @@ import { PictureFilled } from '@element-plus/icons-vue';
 import type { ScrollbarInstance } from 'element-plus';
 import type { TileItem, TileSelectState } from './TileBoard.types';
 
-/** 卡片封面边长（像素），与缩略图常量一致 */
-const CARD_SIZE = 100;
-
-/** 卡片之间的间距，横竖一致；要留得下两张后层封面往两侧探出的部分 */
-const CARD_GAP = 18;
-
 /**
- * 行高估算：封面 100 + 标题与副标题两行 + 行间距。
+ * 卡片尺寸与间距的**唯一来源是 CSS 变量**（见下面的样式），脚本只读不写。
  *
- * 展开面板会撑高它所在的那一行，这个定值与实际高度对不上，所以滚动条的
- * 绝对位置会有偏差——面板打开期间可以接受：没有逐行实测就没有便宜的精确解。
+ * 窗口化必须知道「一行多高、一行几张」，但这两个数字会随样式调整、也随将来的
+ * 「缩略图大小」设置变，所以不在这里再存一份：列数由变量与容器宽度算出来，
+ * 行距与面板高度都从真实渲染的 DOM 上量。
  */
-const ROW_HEIGHT = 172;
+const CARD_SIZE_VAR = '--tile-card-size';
+
+const CARD_GAP_VAR = '--tile-gap-x';
+
+/** 变量读不到时的兜底（只可能在挂载后的第一帧用到） */
+const FALLBACK_CARD_SIZE = 100;
+
+const FALLBACK_GAP = 18;
+
+const FALLBACK_ROW_HEIGHT = 172;
 
 /** 视口上下各多渲染几行，滚动时不会先露白再补内容 */
 const OVERSCAN_ROWS = 2;
-
-/** 展开面板与上方卡片之间的间距；量面板高度时要把它算进去 */
-const PANEL_MARGIN = 12;
 
 /** 距底部不足这么多像素就请求下一页 */
 const LOAD_MORE_THRESHOLD = 240;
@@ -110,14 +113,16 @@ const props = withDefaults(defineProps<{
   expandedId: number | null;
   selectState: (id: number) => TileSelectState;
   loading?: boolean;
+  /** 当前有没有勾选任何一项（内层或外层）：有的话所有复选框常显，没有就只在悬停时出现 */
+  selectionActive?: boolean;
 }>(), {
   loading: false,
+  selectionActive: false,
 });
 
 const emit = defineEmits<{
   expand: [item: TileItem];
   select: [item: TileItem];
-  open: [item: TileItem];
   loadMore: [];
 }>();
 
@@ -126,8 +131,15 @@ const columnCount = ref(1);
 const viewportHeight = ref(0);
 const scrollTop = ref(0);
 
+/** 卡片边长与间距：从 CSS 变量读出来，改样式不用改脚本 */
+const cardSize = ref(FALLBACK_CARD_SIZE);
+const cardGap = ref(FALLBACK_GAP);
+
+/** 实测行距（相邻两行顶边的距离，含行间距） */
+const rowHeight = ref(FALLBACK_ROW_HEIGHT);
+
 /**
- * 展开面板的实测高度（含 PANEL_MARGIN）。
+ * 展开面板的实测高度（含它与上方卡片之间的间距）。
  *
  * 面板滚出渲染窗口后就不在 DOM 里了，spacer 得按它把位置补平，
  * 否则总高度会突然变矮、浏览器把滚动条往回夹——表现为「滚到展开的分组就滚不下去」。
@@ -145,6 +157,8 @@ let requestedAtCount = -1;
 let resizeObserver: ResizeObserver | null = null;
 let panelObserver: ResizeObserver | null = null;
 let observedPanel: HTMLElement | null = null;
+let cardObserver: ResizeObserver | null = null;
+let observedCard: HTMLElement | null = null;
 
 /** 上一次展开的面板落在第几行、多高；收起或换分组时用它补偿滚动位置 */
 let panelSnapshot = { row: -1, height: 0 };
@@ -161,7 +175,7 @@ const rowStyle = computed<CSSProperties>(() => ({
 const rowCount = computed(() => Math.ceil(props.items.length / columnCount.value));
 
 /** 视口内第一行（往上留 OVERSCAN_ROWS 行的余量） */
-const visibleStartRow = computed(() => Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN_ROWS));
+const visibleStartRow = computed(() => Math.max(0, rowAt(scrollTop.value) - OVERSCAN_ROWS));
 
 /** 视口内最后一行（往下留 OVERSCAN_ROWS 行的余量） */
 const visibleEndRow = computed(() => {
@@ -169,7 +183,7 @@ const visibleEndRow = computed(() => {
   if (last < 0) {
     return -1;
   }
-  return Math.min(last, Math.floor((scrollTop.value + viewportHeight.value) / ROW_HEIGHT) + OVERSCAN_ROWS);
+  return Math.min(last, rowAt(scrollTop.value + viewportHeight.value) + OVERSCAN_ROWS);
 });
 
 /** 真正渲染的行；上下各用一个 spacer 把总高度撑出来 */
@@ -198,12 +212,12 @@ const panelRowIndex = computed(() => {
 // 面板在窗口上方时它没被挂载，那块高度由 top spacer 顶上；在下方时同理
 const topSpacerHeight = computed(() => {
   const above = panelRowIndex.value >= 0 && panelRowIndex.value < visibleStartRow.value ? panelHeight.value : 0;
-  return visibleStartRow.value * ROW_HEIGHT + above;
+  return visibleStartRow.value * rowHeight.value + above;
 });
 
 const bottomSpacerHeight = computed(() => {
   const below = panelRowIndex.value > visibleEndRow.value ? panelHeight.value : 0;
-  return Math.max(0, rowCount.value - visibleEndRow.value - 1) * ROW_HEIGHT + below;
+  return Math.max(0, rowCount.value - visibleEndRow.value - 1) * rowHeight.value + below;
 });
 
 // ------------------------------------------------------------
@@ -217,6 +231,7 @@ onMounted(() => {
   if (root) {
     resizeObserver.observe(root);
   }
+  void nextTick(syncCardObserver);
   void nextTick(maybeLoadMore);
 });
 
@@ -225,6 +240,8 @@ onUnmounted(() => {
   resizeObserver = null;
   panelObserver?.disconnect();
   panelObserver = null;
+  cardObserver?.disconnect();
+  cardObserver = null;
 });
 
 // ------------------------------------------------------------
@@ -234,7 +251,10 @@ onUnmounted(() => {
 // 换了列表（追加或替换）就解禁下一次触底请求，并顺手检查视口是不是还空着
 watch(() => props.items, () => {
   requestedAtCount = -1;
-  void nextTick(maybeLoadMore);
+  void nextTick(() => {
+    measureRowHeight(scrollbarRef.value?.$el as HTMLElement);
+    maybeLoadMore();
+  });
 });
 
 watch(() => props.loading, (loading) => {
@@ -257,9 +277,12 @@ watch([panelRowIndex, panelHeight], () => {
   panelSnapshot = { row: panelRowIndex.value, height: panelHeight.value };
 });
 
-// 面板换了位置（展开、收起、换分组）就重新找一次元素并量高度
+// 面板换了位置（展开、收起、换分组）就重新找一次元素并量高度；顺手盯住卡片尺寸
 watch([visibleRows, () => props.expandedId], () => {
-  void nextTick(syncPanel);
+  void nextTick(() => {
+    syncPanel();
+    syncCardObserver();
+  });
 }, { flush: 'post' });
 
 function onScroll({ scrollTop: top }: { scrollTop: number }): void {
@@ -270,6 +293,22 @@ function onScroll({ scrollTop: top }: { scrollTop: number }): void {
 /** el-scrollbar 的滚动视口；量高度与判断触底都靠它 */
 function viewport(): HTMLElement | undefined {
   return scrollbarRef.value?.wrapRef as HTMLElement | undefined;
+}
+
+/**
+ * 内容坐标 → 行号。
+ *
+ * 展开面板会把它下面的行整体推下去一个面板高度，所以换算要先减掉这一段；
+ * 落在面板自己那一段里时算作面板所在的行——面板还看得见，它那一行就不能被卸载。
+ * 不减这一段的话，上方有面板时算出来的行号会偏大，最上面几行会被提前丢掉（视口顶部露白）。
+ */
+function rowAt(y: number): number {
+  const panelRow = panelRowIndex.value;
+  const panel = panelRow >= 0 ? panelHeight.value : 0;
+  if (panel > 0 && y > (panelRow + 1) * rowHeight.value) {
+    return Math.max(panelRow, Math.floor((y - panel) / rowHeight.value));
+  }
+  return Math.floor(y / rowHeight.value);
 }
 
 /**
@@ -290,11 +329,20 @@ function syncPanel(): void {
     panelObserver = null;
     return;
   }
-  panelObserver = new ResizeObserver(() => {
-    panelHeight.value = panel.offsetHeight + PANEL_MARGIN;
-  });
+
+  // 面板高度 = 面板自己的高度 + 它与卡片之间那段间距，都从真实布局上量
+  const measurePanel = (): void => {
+    const row = panel.parentElement?.querySelector('.tile-row');
+    if (!row) {
+      return;
+    }
+    const panelRect = panel.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    panelHeight.value = panelRect.height + Math.max(0, panelRect.top - rowRect.bottom);
+  };
+  panelObserver = new ResizeObserver(measurePanel);
   panelObserver.observe(panel);
-  panelHeight.value = panel.offsetHeight + PANEL_MARGIN;
+  measurePanel();
 }
 
 /** 量容器：宽度决定列数，高度决定视口里有几行 */
@@ -304,10 +352,67 @@ function measure(): void {
   if (!root || !wrap) {
     return;
   }
-  columnCount.value = Math.max(1, Math.floor((root.clientWidth + CARD_GAP) / (CARD_SIZE + CARD_GAP)));
+  readSizes(root);
+  // 栅格的可用宽度取自行元素（它已经扣掉了内容区的内边距），不是滚动容器的宽度
+  const row = root.querySelector('.tile-row') as HTMLElement | null;
+  const available = row ? row.getBoundingClientRect().width : root.clientWidth;
+  columnCount.value = Math.max(1, Math.floor((available + cardGap.value) / (cardSize.value + cardGap.value)));
   viewportHeight.value = root.clientHeight;
   scrollTop.value = wrap.scrollTop;
+  measureRowHeight(root);
   void nextTick(maybeLoadMore);
+}
+
+/** 卡片尺寸与间距读 CSS 变量：将来做「缩略图大小」设置也只改这一个地方 */
+function readSizes(root: HTMLElement): void {
+  const style = getComputedStyle(root);
+  const size = Number.parseFloat(style.getPropertyValue(CARD_SIZE_VAR));
+  const gap = Number.parseFloat(style.getPropertyValue(CARD_GAP_VAR));
+  if (Number.isFinite(size) && size > 0) {
+    cardSize.value = size;
+  }
+  if (Number.isFinite(gap) && gap >= 0) {
+    cardGap.value = gap;
+  }
+}
+
+/**
+ * 盯住卡片本身的尺寸。
+ *
+ * 容器没变但卡片变了（改样式、将来「缩略图大小」这类设置），
+ * 只监听容器是收不到的——卡片的盒子变了才知道要重新量行距与列数。
+ */
+function syncCardObserver(): void {
+  const root = scrollbarRef.value?.$el as HTMLElement | undefined;
+  const card = (root?.querySelector('.tile-card') as HTMLElement | null) ?? null;
+  if (card === observedCard) {
+    return;
+  }
+  cardObserver?.disconnect();
+  observedCard = card;
+  if (!card) {
+    cardObserver = null;
+    return;
+  }
+  cardObserver = new ResizeObserver(() => {
+    measure();
+  });
+  cardObserver.observe(card);
+}
+
+/** 行距＝相邻两行顶边的距离（含行间距）；带面板的那一行不算，它比普通行高一截 */
+function measureRowHeight(root: HTMLElement): void {
+  const wraps = root.querySelectorAll<HTMLElement>('.tile-row-wrap');
+  for (let index = 0; index + 1 < wraps.length; index += 1) {
+    if (wraps[index].querySelector('.tile-panel')) {
+      continue;
+    }
+    const pitch = wraps[index + 1].getBoundingClientRect().top - wraps[index].getBoundingClientRect().top;
+    if (pitch > 0) {
+      rowHeight.value = pitch;
+      return;
+    }
+  }
 }
 
 /** 触底且同一批数据没有请求过时才 emit，避免滚动事件把 loadMore 刷屏 */
@@ -337,7 +442,12 @@ defineExpose({ scrollToTop });
 </script>
 
 <style scoped>
+/* 卡片尺寸与间距的唯一来源：脚本读这两个变量算列数，改样式不用动脚本 */
 .tile-board {
+  --tile-card-size: 100px;
+  --tile-gap-x: 20px;
+  --tile-gap-y: 24px;
+  --tile-panel-max-height: 470px;
   flex: 1;
   min-height: 0;
 }
@@ -347,7 +457,7 @@ defineExpose({ scrollToTop });
 }
 
 .tile-content {
-  padding-right: 6px;
+  padding: 2px 8px 8px 8px;
 }
 
 .tile-row-wrap {
@@ -358,13 +468,14 @@ defineExpose({ scrollToTop });
   display: grid;
   align-items: start;
   justify-items: center;
-  gap: 18px;
+  column-gap: var(--tile-gap-x);
+  row-gap: var(--tile-gap-y);
 }
 
 .tile-card {
   position: relative;
   width: 100%;
-  max-width: 132px;
+  max-width: calc(var(--tile-card-size) + 32px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -372,8 +483,8 @@ defineExpose({ scrollToTop });
 
 .tile-cover {
   position: relative;
-  width: 100px;
-  height: 100px;
+  width: var(--tile-card-size);
+  height: var(--tile-card-size);
   cursor: pointer;
 }
 
@@ -396,12 +507,21 @@ defineExpose({ scrollToTop });
 
 .tile-cover-img.layer-1 {
   z-index: 2;
-  transform: rotate(-4.5deg) translate(-4px, 2px) scale(0.96);
+  transform: rotate(-3.5deg) translate(-3px, 2px) scale(0.97);
 }
 
 .tile-cover-img.layer-2 {
   z-index: 1;
-  transform: rotate(4.5deg) translate(4px, 2px) scale(0.92);
+  transform: rotate(3.5deg) translate(3px, 2px) scale(0.94);
+}
+
+/* 展开：后层张开到与悬停差不多的程度（不放大；放大留给悬停，见下） */
+.tile-card.expanded .tile-cover-img.layer-1 {
+  transform: rotate(-7deg) translate(-7px, 3px) scale(1);
+}
+
+.tile-card.expanded .tile-cover-img.layer-2 {
+  transform: rotate(7deg) translate(7px, 3px) scale(0.96);
 }
 
 /* 悬停：整张卡抬到邻居之上，三张封面一起放大、各带一层阴影（与查看器底部小图一个观感） */
@@ -419,11 +539,11 @@ defineExpose({ scrollToTop });
 }
 
 .tile-cover:hover .tile-cover-img.layer-1 {
-  transform: rotate(-7deg) translate(-7px, 3px) scale(1.08);
+  transform: rotate(-8deg) translate(-8px, 3px) scale(1.1);
 }
 
 .tile-cover:hover .tile-cover-img.layer-2 {
-  transform: rotate(7deg) translate(7px, 3px) scale(1.04);
+  transform: rotate(8deg) translate(8px, 3px) scale(1.06);
 }
 
 .tile-cover-empty {
@@ -459,20 +579,14 @@ defineExpose({ scrollToTop });
   left: 4px;
   z-index: 5;
   height: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.tile-open {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  z-index: 5;
-  display: none;
-  background: rgba(0, 0, 0, 0.65);
-  color: #ffffff;
-}
-
-.tile-cover:hover .tile-open {
-  display: block;
+/* 没勾选任何东西时只在悬停的那张卡片上出现；一旦有勾选，所有复选框都常显 */
+.tile-cover:hover .tile-check,
+.tile-board.selection-active .tile-check {
+  opacity: 1;
 }
 
 /* 展开了的卡片给一圈主色描边：描边画在最上面那张封面上，跟着它一起缩放与旋转 */
@@ -481,23 +595,12 @@ defineExpose({ scrollToTop });
   outline-offset: 0;
 }
 
-/* 展开时后层再向外张开一些，比收起状态更明显 */
-.tile-card.expanded .tile-cover-img.layer-1 {
-  transform: rotate(-9deg) translate(-9px, 4px) scale(1.04);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7);
-}
-
-.tile-card.expanded .tile-cover-img.layer-2 {
-  transform: rotate(9deg) translate(9px, 4px) scale(1);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7);
-}
-
 .tile-card.expanded .tile-title {
   color: #7aa2f7;
 }
 
 .tile-title {
-  margin-top: 4px;
+  margin-top: 10px;
   max-width: 100%;
   font-size: 12px;
   color: #d8dadd;
@@ -517,7 +620,7 @@ defineExpose({ scrollToTop });
 
 .tile-panel {
   margin-top: 12px;
-  padding: 10px 12px 12px 12px;
+  padding: 14px 16px 16px 16px;
   border: 1px solid #3871e1;
   border-radius: 8px;
   background: #232427;
