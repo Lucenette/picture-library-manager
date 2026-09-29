@@ -91,6 +91,9 @@ const ROW_HEIGHT = 172;
 /** 视口上下各多渲染几行，滚动时不会先露白再补内容 */
 const OVERSCAN_ROWS = 2;
 
+/** 展开面板与上方卡片之间的间距；量面板高度时要把它算进去 */
+const PANEL_MARGIN = 12;
+
 /** 距底部不足这么多像素就请求下一页 */
 const LOAD_MORE_THRESHOLD = 240;
 
@@ -124,6 +127,14 @@ const viewportHeight = ref(0);
 const scrollTop = ref(0);
 
 /**
+ * 展开面板的实测高度（含 PANEL_MARGIN）。
+ *
+ * 面板滚出渲染窗口后就不在 DOM 里了，spacer 得按它把位置补平，
+ * 否则总高度会突然变矮、浏览器把滚动条往回夹——表现为「滚到展开的分组就滚不下去」。
+ */
+const panelHeight = ref(0);
+
+/**
  * 上一次请求下一页时的条目数。
  *
  * 滚动事件是连续触发的，只靠 loading 挡不住「同一批数据被请求多次」；
@@ -132,6 +143,11 @@ const scrollTop = ref(0);
 let requestedAtCount = -1;
 
 let resizeObserver: ResizeObserver | null = null;
+let panelObserver: ResizeObserver | null = null;
+let observedPanel: HTMLElement | null = null;
+
+/** 上一次展开的面板落在第几行、多高；收起或换分组时用它补偿滚动位置 */
+let panelSnapshot = { row: -1, height: 0 };
 
 // ------------------------------------------------------------
 // 计算属性
@@ -170,9 +186,25 @@ const visibleRows = computed<TileRow[]>(() => {
   return rows;
 });
 
-const topSpacerHeight = computed(() => visibleStartRow.value * ROW_HEIGHT);
+/** 展开项落在第几行；没有展开项时为 -1 */
+const panelRowIndex = computed(() => {
+  if (props.expandedId === null) {
+    return -1;
+  }
+  const index = props.items.findIndex((item) => item.id === props.expandedId);
+  return index < 0 ? -1 : Math.floor(index / columnCount.value);
+});
 
-const bottomSpacerHeight = computed(() => Math.max(0, rowCount.value - visibleEndRow.value - 1) * ROW_HEIGHT);
+// 面板在窗口上方时它没被挂载，那块高度由 top spacer 顶上；在下方时同理
+const topSpacerHeight = computed(() => {
+  const above = panelRowIndex.value >= 0 && panelRowIndex.value < visibleStartRow.value ? panelHeight.value : 0;
+  return visibleStartRow.value * ROW_HEIGHT + above;
+});
+
+const bottomSpacerHeight = computed(() => {
+  const below = panelRowIndex.value > visibleEndRow.value ? panelHeight.value : 0;
+  return Math.max(0, rowCount.value - visibleEndRow.value - 1) * ROW_HEIGHT + below;
+});
 
 // ------------------------------------------------------------
 // 生命周期
@@ -191,6 +223,8 @@ onMounted(() => {
 onUnmounted(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  panelObserver?.disconnect();
+  panelObserver = null;
 });
 
 // ------------------------------------------------------------
@@ -209,6 +243,25 @@ watch(() => props.loading, (loading) => {
   }
 });
 
+// 换分组或收起时：原来那块面板若在视口上方，它消失会让下面的内容整体上移，
+// 这里把滚动位置往回补同样的高度，视口里的内容就不跳（要在快照更新之前建，才能读到上一份）
+watch(() => props.expandedId, () => {
+  const { row, height } = panelSnapshot;
+  if (row < 0 || height === 0 || row >= visibleStartRow.value) {
+    return;
+  }
+  scrollbarRef.value?.setScrollTop(Math.max(0, scrollTop.value - height));
+});
+
+watch([panelRowIndex, panelHeight], () => {
+  panelSnapshot = { row: panelRowIndex.value, height: panelHeight.value };
+});
+
+// 面板换了位置（展开、收起、换分组）就重新找一次元素并量高度
+watch([visibleRows, () => props.expandedId], () => {
+  void nextTick(syncPanel);
+}, { flush: 'post' });
+
 function onScroll({ scrollTop: top }: { scrollTop: number }): void {
   scrollTop.value = top;
   maybeLoadMore();
@@ -217,6 +270,31 @@ function onScroll({ scrollTop: top }: { scrollTop: number }): void {
 /** el-scrollbar 的滚动视口；量高度与判断触底都靠它 */
 function viewport(): HTMLElement | undefined {
   return scrollbarRef.value?.wrapRef as HTMLElement | undefined;
+}
+
+/**
+ * 跟着量展开面板的高度。
+ *
+ * 面板会随「加载更多」长高，所以用 ResizeObserver 盯着；面板被移出渲染窗口后
+ * 保留最后一次的高度——spacer 还要用它。
+ */
+function syncPanel(): void {
+  const root = scrollbarRef.value?.$el as HTMLElement | undefined;
+  const panel = (root?.querySelector('.tile-panel') as HTMLElement | null) ?? null;
+  if (panel === observedPanel) {
+    return;
+  }
+  panelObserver?.disconnect();
+  observedPanel = panel;
+  if (!panel) {
+    panelObserver = null;
+    return;
+  }
+  panelObserver = new ResizeObserver(() => {
+    panelHeight.value = panel.offsetHeight + PANEL_MARGIN;
+  });
+  panelObserver.observe(panel);
+  panelHeight.value = panel.offsetHeight + PANEL_MARGIN;
 }
 
 /** 量容器：宽度决定列数，高度决定视口里有几行 */
@@ -327,24 +405,24 @@ defineExpose({ scrollToTop });
 }
 
 /* 悬停：整张卡抬到邻居之上，三张封面一起放大、各带一层阴影（与查看器底部小图一个观感） */
-.tile-card:hover {
+.tile-cover:hover {
   z-index: 10;
 }
 
-.tile-card:hover .tile-cover-img {
+.tile-cover:hover .tile-cover-img {
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.8);
 }
 
-.tile-card:hover .tile-cover-img.layer-0 {
+.tile-cover:hover .tile-cover-img.layer-0 {
   transform: scale(1.14);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85);
 }
 
-.tile-card:hover .tile-cover-img.layer-1 {
+.tile-cover:hover .tile-cover-img.layer-1 {
   transform: rotate(-7deg) translate(-7px, 3px) scale(1.08);
 }
 
-.tile-card:hover .tile-cover-img.layer-2 {
+.tile-cover:hover .tile-cover-img.layer-2 {
   transform: rotate(7deg) translate(7px, 3px) scale(1.04);
 }
 
@@ -393,14 +471,25 @@ defineExpose({ scrollToTop });
   color: #ffffff;
 }
 
-.tile-card:hover .tile-open {
+.tile-cover:hover .tile-open {
   display: block;
 }
 
 /* 展开了的卡片给一圈主色描边：描边画在最上面那张封面上，跟着它一起缩放与旋转 */
 .tile-card.expanded .tile-cover-img.layer-0 {
   outline: 2px solid #3871e1;
-  outline-offset: 2px;
+  outline-offset: 0;
+}
+
+/* 展开时后层再向外张开一些，比收起状态更明显 */
+.tile-card.expanded .tile-cover-img.layer-1 {
+  transform: rotate(-9deg) translate(-9px, 4px) scale(1.04);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7);
+}
+
+.tile-card.expanded .tile-cover-img.layer-2 {
+  transform: rotate(9deg) translate(9px, 4px) scale(1);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.7);
 }
 
 .tile-card.expanded .tile-title {
