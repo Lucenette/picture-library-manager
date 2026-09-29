@@ -232,8 +232,15 @@ export interface ImageGroupSort {
   direction: 'asc' | 'desc';
 }
 
-/** 分组封面：一个分组最多三张，`rn` 是它在组内的序号（1 起），缩略图缺失时为 null */
-export interface CoverThumbnail {
+/** 角色封面：一个角色名最多三张，`rn` 是组内序号（1 起），缩略图缺失时为 null */
+export interface CharacterCover {
+  name: string;
+  rn: number;
+  thumbnail: string | null;
+}
+
+/** 图组封面：与角色封面同构，键是图组 id */
+export interface GroupCover {
   id: number;
   rn: number;
   thumbnail: string | null;

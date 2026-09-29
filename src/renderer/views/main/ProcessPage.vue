@@ -114,7 +114,7 @@ import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import { useViewMode } from '@/composables/useViewMode';
 import {
-  countImageGroups, getAllSources, getCovers, getImageFilePage, getImageGroupIdByFilePath, getImageGroupPage,
+  countImageGroups, getAllSources, getGroupCovers, getImageFilePage, getImageGroupIdByFilePath, getImageGroupPage,
   getImageFilesByGroup, getScriptsByType, updateImageGroupStatus, upsertProcessedImage,
 } from '@/db/database';
 import { alertDialog } from '@/services/dialog-service';
@@ -410,7 +410,7 @@ async function loadGroupCovers(ids: number[]): Promise<void> {
   if (ids.length === 0) {
     return;
   }
-  const covers = await getCovers('group', ids);
+  const covers = await getGroupCovers(ids);
   const next = new Map(groupCovers.value);
   // 同一个分组会回来多行（rn 1..3），按 rn 顺序攒成数组
   for (const cover of covers) {
@@ -839,14 +839,22 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
 }
 
 .panel-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  justify-items: center;
+  gap: 12px;
+  /* 留出悬停放大与阴影的余量，否则第一行 / 第一列会被滚动容器裁掉 */
+  padding: 6px;
 }
 
 .panel-item {
+  position: relative;
   width: 100px;
   cursor: pointer;
+}
+
+.panel-item:hover {
+  z-index: 5;
 }
 
 .panel-item:hover .panel-thumb {

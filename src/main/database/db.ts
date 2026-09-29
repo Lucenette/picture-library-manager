@@ -4,7 +4,7 @@ import { basename, join } from 'path';
 import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, CharacterTile, CoverThumbnail, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
+  Character, CharacterCover, CharacterTile, GroupCover, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
   ImageGroupSortKey, ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView,
   ProcessedIndexRow, ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
   SimilarData, SimilarGroup, Source, TaskRow, TaskStatus, TaskType,
@@ -495,17 +495,26 @@ export function countImageFilesBefore(groupId: number, anchorId: number): number
 }
 
 /**
- * 按分组 id 取封面缩略图。
+ * 按角色名取封面缩略图：每个名字最多三张，卡片叠着放。
  *
- * `kind` 决定分组是角色还是图组；只查当前可见卡片的 id，一条 SQL 拿完，不逐卡查。
+ * 按名字而不是 `character.id`：同一个角色可能散在多个来源里，只按一个 id 取会让
+ * 卡片上只剩那个来源的封面（明明有几十张图却只显示一张）。一条 SQL 拿完当前可见的卡片，不逐卡查。
  */
-export function getCovers(kind: 'character' | 'group', ids: number[]): CoverThumbnail[] {
+export function getCharacterCovers(names: string[]): CharacterCover[] {
+  if (names.length === 0) {
+    return [];
+  }
+  const placeholders = names.map(() => '?').join(', ');
+  return queryAll<CharacterCover>(SQL.SELECT_CHARACTER_COVERS.replace('%NAMES%', placeholders), names);
+}
+
+/** 按图组 id 取封面缩略图：每个图组最多三张，同上 */
+export function getGroupCovers(ids: number[]): GroupCover[] {
   if (ids.length === 0) {
     return [];
   }
   const placeholders = ids.map(() => '?').join(', ');
-  const base = kind === 'character' ? SQL.SELECT_CHARACTER_COVERS : SQL.SELECT_GROUP_COVERS;
-  return queryAll<CoverThumbnail>(base.replace('%IDS%', placeholders), ids);
+  return queryAll<GroupCover>(SQL.SELECT_GROUP_COVERS.replace('%IDS%', placeholders), ids);
 }
 
 /** 更新图片组状态；标记为已排除时同步清除其已处理记录 */
@@ -1140,7 +1149,8 @@ const DB_METHODS: Record<string, DbMethod> = {
   getImageFilePage,
   countImageFiles,
   countImageFilesBefore,
-  getCovers,
+  getCharacterCovers,
+  getGroupCovers,
   updateImageGroupStatus,
   getImageFilesByGroup,
   getImageGroupIdByFilePath,

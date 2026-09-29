@@ -130,7 +130,7 @@ import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import { useViewMode } from '@/composables/useViewMode';
 import {
-  countProcessedCharacters, countProcessedImages, deleteProcessedImage, getAllSources, getCovers,
+  countProcessedCharacters, countProcessedImages, deleteProcessedImage, getAllSources, getCharacterCovers,
   getProcessedImagePage, getScriptsByType, listProcessedCharacters, listProcessedIndex,
 } from '@/db/database';
 import { confirmDialog } from '@/services/dialog-service';
@@ -176,8 +176,8 @@ const indexRows = ref<ProcessedIndexRow[]>([]);
 const tileCharacters = ref<CharacterTile[]>([]);
 const tileCharacterTotal = ref(0);
 const tileCharactersLoading = ref(false);
-/** 角色 id → 最多三张封面；键是卡片句柄（该名字下最小的 character id） */
-const characterCovers = ref(new Map<number, (string | null)[]>());
+/** 角色名 → 最多三张封面（与卡片同一个归组口径） */
+const characterCovers = ref(new Map<string, (string | null)[]>());
 const expandedCharacterId = ref<number | null>(null);
 const panelImages = ref<ProcessedImageView[]>([]);
 const panelLoading = ref(false);
@@ -309,7 +309,7 @@ const tileItems = computed<TileItem[]>(() =>
     title: character.characterName,
     subtitle: character.count + ' 张',
     count: character.count,
-    covers: (characterCovers.value.get(character.characterId) ?? []).filter((cover): cover is string => cover !== null),
+    covers: (characterCovers.value.get(character.characterName) ?? []).filter((cover): cover is string => cover !== null),
   })),
 );
 
@@ -453,7 +453,7 @@ async function loadTileCharacters(reset: boolean): Promise<void> {
     if (reset && seq === tileRequestSeq) {
       tileCharacterTotal.value = await countProcessedCharacters(filter);
     }
-    await loadCharacterCovers(rows.map((row) => row.characterId));
+    await loadCharacterCovers(rows.map((row) => row.characterName));
   } finally {
     if (seq === tileRequestSeq) {
       tileCharactersLoading.value = false;
@@ -461,15 +461,15 @@ async function loadTileCharacters(reset: boolean): Promise<void> {
   }
 }
 
-async function loadCharacterCovers(ids: number[]): Promise<void> {
-  if (ids.length === 0) {
+async function loadCharacterCovers(names: string[]): Promise<void> {
+  if (names.length === 0) {
     return;
   }
-  const covers = await getCovers('character', ids);
+  const covers = await getCharacterCovers(names);
   const next = new Map(characterCovers.value);
-  // 同一个分组会回来多行（rn 1..3），按 rn 顺序攒成数组
+  // 同一个名字会回来多行（rn 1..3），按 rn 顺序攒成数组
   for (const cover of covers) {
-    next.set(cover.id, [...(next.get(cover.id) ?? []), cover.thumbnail]);
+    next.set(cover.name, [...(next.get(cover.name) ?? []), cover.thumbnail]);
   }
   characterCovers.value = next;
 }
@@ -907,15 +907,22 @@ function toFilterItems(values: string[]): FilterItem[] {
 }
 
 .panel-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  justify-items: center;
+  gap: 12px;
+  /* 留出悬停放大与阴影的余量，否则第一行 / 第一列会被滚动容器裁掉 */
+  padding: 6px;
 }
 
 .panel-item {
   position: relative;
   width: 100px;
   cursor: pointer;
+}
+
+.panel-item:hover {
+  z-index: 5;
 }
 
 .panel-check {

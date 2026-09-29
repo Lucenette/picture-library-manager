@@ -77,8 +77,8 @@ import type { TileItem, TileSelectState } from './TileBoard.types';
 /** 卡片封面边长（像素），与缩略图常量一致 */
 const CARD_SIZE = 100;
 
-/** 卡片之间的间距，横竖一致 */
-const CARD_GAP = 12;
+/** 卡片之间的间距，横竖一致；要留得下两张后层封面往两侧探出的部分 */
+const CARD_GAP = 18;
 
 /**
  * 行高估算：封面 100 + 标题与副标题两行 + 行间距。
@@ -280,10 +280,11 @@ defineExpose({ scrollToTop });
   display: grid;
   align-items: start;
   justify-items: center;
-  gap: 12px;
+  gap: 18px;
 }
 
 .tile-card {
+  position: relative;
   width: 100%;
   max-width: 132px;
   display: flex;
@@ -317,28 +318,34 @@ defineExpose({ scrollToTop });
 
 .tile-cover-img.layer-1 {
   z-index: 2;
-  transform: rotate(-7deg) translate(-7px, 3px) scale(0.97);
+  transform: rotate(-4.5deg) translate(-4px, 2px) scale(0.96);
 }
 
 .tile-cover-img.layer-2 {
   z-index: 1;
-  transform: rotate(7deg) translate(7px, 3px) scale(0.94);
+  transform: rotate(4.5deg) translate(4px, 2px) scale(0.92);
 }
 
-/* 悬停放大并加阴影，与图片查看器底部小图一个观感 */
+/* 悬停：整张卡抬到邻居之上，三张封面一起放大、各带一层阴影（与查看器底部小图一个观感） */
+.tile-card:hover {
+  z-index: 10;
+}
+
+.tile-card:hover .tile-cover-img {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.8);
+}
+
 .tile-card:hover .tile-cover-img.layer-0 {
-  transform: scale(1.12);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+  transform: scale(1.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85);
 }
 
 .tile-card:hover .tile-cover-img.layer-1 {
-  transform: rotate(-9deg) translate(-11px, 4px) scale(1.08);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  transform: rotate(-7deg) translate(-7px, 3px) scale(1.08);
 }
 
 .tile-card:hover .tile-cover-img.layer-2 {
-  transform: rotate(9deg) translate(11px, 4px) scale(1.05);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  transform: rotate(7deg) translate(7px, 3px) scale(1.04);
 }
 
 .tile-cover-empty {
@@ -390,15 +397,10 @@ defineExpose({ scrollToTop });
   display: block;
 }
 
-/* 展开了的卡片给一圈主色描边，免得看不出展开的是哪一个 */
-.tile-card.expanded .tile-cover::after {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  z-index: 4;
-  border: 2px solid #3871e1;
-  border-radius: 10px;
-  pointer-events: none;
+/* 展开了的卡片给一圈主色描边：描边画在最上面那张封面上，跟着它一起缩放与旋转 */
+.tile-card.expanded .tile-cover-img.layer-0 {
+  outline: 2px solid #3871e1;
+  outline-offset: 2px;
 }
 
 .tile-card.expanded .tile-title {

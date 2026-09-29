@@ -1,7 +1,7 @@
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, CharacterTile, CoverThumbnail, Source, ImageFile, ImageGroupFilter, ImageGroupSort,
+  Character, CharacterCover, CharacterTile, GroupCover, Source, ImageFile, ImageGroupFilter, ImageGroupSort,
   ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView, ProcessedIndexRow, ProcessedSort,
   ProcessScript, ScriptType,
 } from '@common/types';
@@ -88,9 +88,14 @@ export function countImageFilesBefore(groupId: number, anchorId: number): Promis
   return call('countImageFilesBefore', groupId, anchorId);
 }
 
-/** 按分组 id 取封面缩略图；一条 SQL 拿完当前可见的卡片 */
-export function getCovers(kind: 'character' | 'group', ids: number[]): Promise<CoverThumbnail[]> {
-  return call('getCovers', kind, ids);
+/** 按角色名取封面缩略图（每个名字最多三张） */
+export function getCharacterCovers(names: string[]): Promise<CharacterCover[]> {
+  return call('getCharacterCovers', names);
+}
+
+/** 按图组 id 取封面缩略图（每个图组最多三张） */
+export function getGroupCovers(ids: number[]): Promise<GroupCover[]> {
+  return call('getGroupCovers', ids);
 }
 
 /** 更新图片组状态 */

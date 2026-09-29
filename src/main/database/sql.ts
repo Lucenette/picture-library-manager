@@ -215,14 +215,21 @@ export const SQL = {
   JOIN character c ON pi.character_id = c.id
   WHERE 1 = 1`,
 
-  /** 角色封面：每个角色最多三张缩略图（按文件名），卡片叠着放；`%IDS%` 由调用方换成占位符 */
-  SELECT_CHARACTER_COVERS: `SELECT id, thumbnail, rn FROM (
-    SELECT pi.character_id AS id, f.thumbnail AS thumbnail,
-      ROW_NUMBER() OVER (PARTITION BY pi.character_id ORDER BY f.file_name_sort, f.id) AS rn
+  /**
+   * 角色封面：每个角色名最多三张缩略图（按文件名），卡片叠着放。
+   *
+   * 按**名字**分组取，和一级卡片同一个口径：同一个角色可能散在多个来源里，
+   * 只按某一个 character.id 取会漏掉其它来源的图（卡片上就只有一张封面）。
+   * `%NAMES%` 由调用方换成占位符。
+   */
+  SELECT_CHARACTER_COVERS: `SELECT name, thumbnail, rn FROM (
+    SELECT c.name AS name, f.thumbnail AS thumbnail,
+      ROW_NUMBER() OVER (PARTITION BY c.name ORDER BY f.file_name_sort, f.id) AS rn
     FROM processed_image pi
+    JOIN character c ON pi.character_id = c.id
     JOIN image_file f ON f.file_path = pi.selected_file
-    WHERE pi.character_id IN (%IDS%)
-  ) WHERE rn <= 3 ORDER BY id, rn`,
+    WHERE c.name IN (%NAMES%)
+  ) WHERE rn <= 3 ORDER BY name, rn`,
 
   /** 图组页一级总数：与 `SELECT_IMAGE_GROUPS_VIEW_BASE` 同一套 join */
   COUNT_IMAGE_GROUPS_VIEW_BASE: `SELECT COUNT(*) AS total
