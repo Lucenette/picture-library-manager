@@ -220,7 +220,7 @@
 src/main/database/sort/
   key.ts        编排：把字符串切成「模块段」，查注册表，拼组前缀与正文
   registry.ts   文字系统 → 模块 的注册表：按字符类分派，第一个匹配者胜
-  profile.ts    字段 → profile（例：character.name 用姓氏模式）
+  profile.ts    字段 → profile：文本列 / 键列 / 读音策略（回填与重建按它遍历）
   scripts/
     han.ts      汉字 → pinyin-pro（surname / default 两档）
     latin.ts    拉丁 → 小写原样
@@ -265,7 +265,7 @@ interface SortScript {
 ### 9.4 阶段、验收与提交草案
 
 - [x] **阶段 0 · 依赖**：`pinyin-pro@3.29.4` 已装（2026-09-30；纯 JS、零运行时依赖、无二进制）。
-- [ ] **阶段 1 · 纯函数**（不改 DB）：按 9.2 的目录建 `src/main/database/sort/`（`key.ts` / `registry.ts` / `profile.ts` / `scripts/*.ts` / `index.ts`；`scripts/han.ts` 是**唯一** import `pinyin-pro` 的文件，方便换词库或整体替换）。用 `dist/` 下的临时脚本跑断言（分组前缀、数字填充、空格分隔、生僻字回退、大小写、混合名、tie-break 语义），跑完删脚本。验收：断言全绿 + `tsc`。提交：`排序键：实现 sortKeyOf（分组前缀 + 拼音 + 数字填充）`。
+- [x] **阶段 1 · 纯函数**（不改 DB）：按 9.2 的目录建 `src/main/database/sort/`（`key.ts` / `registry.ts` / `profile.ts` / `scripts/*.ts` / `index.ts`；`scripts/han.ts` 是**唯一** import `pinyin-pro` 的文件，方便换词库或整体替换）。用 `dist/` 下的临时脚本跑断言（分组前缀、数字填充、空格分隔、生僻字回退、大小写、混合名、tie-break 语义），跑完删脚本。验收：断言全绿 + `tsc`。提交：`排序键：实现 sortKeyOf（分组前缀 + 拼音 + 数字填充）`。 已提交 `caf741f`。
 - [ ] **阶段 2 · schema 与回填**：新增版本目录 `src/main/ups/changesets/1.1.1/`（`index.ts` / `dbups.xml`：8 个 `ALTER TABLE ADD COLUMN` + 索引 / `postups.ts`：回填）。**在 `dist/data/picture-lib.db` 的副本上预演**：跑一遍 DDL + 回填，抽样核对键、记录耗时。验收：副本上键数与行数一致、抽样正确、耗时记录在案。提交：`数据库：新增排序键列与 1.1.1 升级（含回填）`。
 - [ ] **阶段 3 · 写入路径接键**：9 个写入点接上算键；`shapeRow()` 剔除 `*Sort`；把 `INSERT_PROCESSED` / `UPDATE_PROCESSED` 里的 `(SELECT name FROM process_script …)` 改成 JS 传入 name + key。验收：`tsc`；扫一个小目录确认新行带键；给角色/脚本改名后键跟着变。提交：`排序键：写入路径接键（来源 / 角色 / 图组 / 图片文件 / 脚本）`。
 - [ ] **阶段 4 · 重建入口**：`scripts/rebuild-sort-keys.mjs`（复用 `sort/` 里的实现，对库做整表重算 + 对账）。验收：跑一次，键数与行数一致；故意改坏一行的键再重跑能修回来。提交：`排序键：提供整表重建入口`。

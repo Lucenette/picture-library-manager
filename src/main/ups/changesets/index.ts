@@ -2,6 +2,7 @@ import type { ChangeLogVersion } from '@/ups/engine';
 
 import { changelog as v100 } from './1.0.0';
 import { changelog as v110 } from './1.1.0';
+import { changelog as v111 } from './1.1.1';
 
 /**
  * 全部版本目录，顺序即执行顺序，必须与版本号递增一致。
@@ -11,4 +12,4 @@ import { changelog as v110 } from './1.1.0';
  *
  * `1.1.0` 的 `VERSION` 仍是 `1.0.1`，缘由见它自己的 index.ts。
  */
-export const CHANGELOG_VERSIONS: readonly ChangeLogVersion[] = [v100, v110];
+export const CHANGELOG_VERSIONS: readonly ChangeLogVersion[] = [v100, v110, v111];

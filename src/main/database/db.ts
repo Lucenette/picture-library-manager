@@ -9,6 +9,7 @@ import type {
   SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
+import type { SortKeyTable } from '@/database/sort';
 import { SQL } from '@/database/sql';
 import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
@@ -645,6 +646,36 @@ export function hasScriptCodeColumn(): boolean {
 /** 老库接管：把每一条的旧源码读出来 */
 export function listLegacyScriptSources(): { id: number; name: string; filePath: string; code: string }[] {
   return queryAll<{ id: number; name: string; filePath: string; code: string }>(SQL.SELECT_LEGACY_SCRIPTS);
+}
+
+/**
+ * 回填 / 重建排序键用的一行：id 与各文本列的当前值，顺序与 `table.fields` 一致。
+ */
+export interface SortKeyRow {
+  id: number;
+  texts: string[];
+}
+
+/** 取一张表里所有要重算排序键的行；表名与列名都来自 `SORT_KEY_TABLES`，不接外部输入 */
+export function listSortKeyRows(table: SortKeyTable): SortKeyRow[] {
+  const columns = table.fields.map((field, index) => `${field.textColumn} AS t${index}`).join(', ');
+  const rows = db!.prepare(`SELECT id, ${columns} FROM ${table.table}`).all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: Number(row.id),
+    texts: table.fields.map((_, index) => (row[`t${index}`] === null ? '' : String(row[`t${index}`]))),
+  }));
+}
+
+/** 写回一行算好的排序键，顺序与 `table.fields` 一致 */
+export function updateSortKeyRow(table: SortKeyTable, id: number, keys: readonly string[]): void {
+  const assignments = table.fields.map((field) => `${field.sortColumn} = ?`).join(', ');
+  run(`UPDATE ${table.table} SET ${assignments} WHERE id = ?`, [...keys, id]);
+}
+
+/** 自校验：这张表还有多少行的排序键是空的。回填与重建收尾都问它一句 */
+export function countRowsMissingSortKeys(table: SortKeyTable): number {
+  const missing = table.fields.map((field) => `${field.sortColumn} IS NULL`).join(' OR ');
+  return queryOne<{ missing: number }>(`SELECT COUNT(*) AS missing FROM ${table.table} WHERE ${missing}`)?.missing ?? 0;
 }
 
 
