@@ -2,7 +2,7 @@ import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
   Character, CharacterTile, CoverThumbnail, Source, ImageFile, ImageGroupFilter, ImageGroupSort,
-  ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView, ProcessedSort,
+  ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView, ProcessedIndexRow, ProcessedSort,
   ProcessScript, ScriptType,
 } from '@common/types';
 
@@ -57,11 +57,6 @@ export function renameCharacter(id: number, name: string): Promise<void> {
 // ------------------------------------------------------------
 // ImageGroup
 // ------------------------------------------------------------
-
-/** 查询图片组列表（整表；图组页切到分片后删除） */
-export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): Promise<ImageGroupView[]> {
-  return call('getImageGroupsView', status, sourceId);
-}
 
 /** 图组页：一页图组，筛选与排序都下推 */
 export function getImageGroupPage(
@@ -144,11 +139,6 @@ export function upsertProcessedImage(
   return call('upsertProcessedImage', imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId);
 }
 
-/** 查询图库列表（整表；表格视图切到分片后删除） */
-export function getAllProcessedImages(sourceId?: number, characterName?: string): Promise<ProcessedImageView[]> {
-  return call('getAllProcessedImages', sourceId, characterName);
-}
-
 /** 图库：当前筛选下的图片总数 */
 export function countProcessedImages(filter: ProcessedFilter): Promise<number> {
   return call('countProcessedImages', filter);
@@ -162,6 +152,11 @@ export function getProcessedImagePage(
   offset: number,
 ): Promise<ProcessedImageView[]> {
   return call('getProcessedImagePage', filter, sort, limit, offset);
+}
+
+/** 图库：轻量索引行（id + 角色名），平铺三态与全选用 */
+export function listProcessedIndex(filter: ProcessedFilter): Promise<ProcessedIndexRow[]> {
+  return call('listProcessedIndex', filter);
 }
 
 /** 图库平铺：一级角色分片 */

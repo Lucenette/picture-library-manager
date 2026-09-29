@@ -6,7 +6,7 @@ import { IPC } from '@common/ipcChannels';
 import type {
   Character, CharacterTile, CoverThumbnail, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
   ImageGroupSortKey, ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView,
-  ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
+  ProcessedIndexRow, ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
   SimilarData, SimilarGroup, Source, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
@@ -408,25 +408,6 @@ export function insertImageGroup(
   return queryOne<ImageGroup>(SQL.SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
-/**
- * 整表取回图组列表（旧入口）。
- *
- * 图组页切到分片取数之后就删掉它。
- */
-export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): ImageGroupView[] {
-  let sql = SQL.SELECT_IMAGE_GROUPS_VIEW_BASE;
-  const params: SqlValue[] = [];
-  if (status) {
-    sql += ' AND ig.status = ?';
-    params.push(status);
-  }
-  if (sourceId) {
-    sql += ' AND g.id = ?';
-    params.push(sourceId);
-  }
-  return queryAll<ImageGroupView>(`${sql} ORDER BY g.name, c.name, ig.dir_name`, params);
-}
-
 /** 图组筛选的谓词：分片与计数共用，别名固定为 `ig` / `c` / `g` */
 function buildImageGroupWhere(filter: ImageGroupFilter): { sql: string; params: SqlValue[] } {
   let sql = '';
@@ -455,6 +436,7 @@ const IMAGE_GROUP_SORT_COLUMNS: Record<ImageGroupSortKey, string> = {
   source: 'g.name_sort',
   character: 'c.name_sort',
   dirName: 'ig.dir_name_sort',
+  dirPath: 'ig.dir_path_sort',
   fileCount: 'ig.file_count',
   status: 'ig.status',
 };
@@ -917,25 +899,6 @@ export function upsertProcessedImage(
   return queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
-/**
- * 整表取回图库列表。
- *
- * 兼容表格视图的旧入口，分片取数接上之后（见下面那一组）就删掉它。
- */
-export function getAllProcessedImages(sourceId?: number, characterName?: string): ProcessedImageView[] {
-  let sql = SQL.SELECT_PROCESSED_VIEW_BASE;
-  const params: SqlValue[] = [];
-  if (sourceId) {
-    sql += ' AND pi.source_id = ?';
-    params.push(sourceId);
-  }
-  if (characterName) {
-    sql += ' AND c.name = ?';
-    params.push(characterName);
-  }
-  return queryAll<ProcessedImageView>(`${sql} ORDER BY c.name`, params);
-}
-
 /** LIKE 的通配符要转义，否则用户输入的 `%` 会匹配一切 */
 function escapeLike(keyword: string): string {
   return keyword.replace(/[\\%_]/g, (char) => `\\${char}`);
@@ -1021,6 +984,17 @@ export function countProcessedImagesBefore(filter: ProcessedFilter, sort: Proces
     `SELECT COUNT(*) AS total FROM (${view}) WHERE (${alias}, id) ${comparison} (SELECT ${alias}, id FROM (${view}) WHERE id = ?)`,
     [...where.params, ...where.params, anchorId],
   )?.total ?? 0;
+}
+
+/**
+ * 图库的轻量索引行：只要 id 与角色名。
+ *
+ * 平铺视图的卡片三态（这个角色的图是不是都选了）与「全选本分组」都按它判断——
+ * 带缩略图的行一律分片，这份不带缩略图的索引才留在渲染进程内存里。
+ */
+export function listProcessedIndex(filter: ProcessedFilter): ProcessedIndexRow[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<ProcessedIndexRow>(`${SQL.SELECT_PROCESSED_INDEX_BASE}${where.sql} ORDER BY c.name_sort, pi.id`, where.params);
 }
 
 /** 图库平铺一级：当前筛选下有图的角色，按角色名分片 */
@@ -1152,7 +1126,6 @@ const DB_METHODS: Record<string, DbMethod> = {
   getCharactersBySource,
   renameCharacter,
 
-  getImageGroupsView,
   getImageGroupPage,
   countImageGroups,
   getImageFilePage,
@@ -1168,10 +1141,10 @@ const DB_METHODS: Record<string, DbMethod> = {
   upsertProcessedImage,
   countProcessedImages,
   getProcessedImagePage,
+  listProcessedIndex,
   listProcessedCharacters,
   countProcessedCharacters,
   countProcessedImagesBefore,
-  getAllProcessedImages,
   deleteProcessedImage,
 };
 

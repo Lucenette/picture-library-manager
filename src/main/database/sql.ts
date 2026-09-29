@@ -192,6 +192,12 @@ export const SQL = {
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
 
+  /** 图库轻量索引行：平铺的三态与「全选本分组」靠它，不带缩略图 */
+  SELECT_PROCESSED_INDEX_BASE: `SELECT pi.id AS id, c.name AS characterName
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  WHERE 1 = 1`,
+
   /** 图库平铺一级：角色 + 当前筛选下的图片数；调用方追加 WHERE / GROUP BY / LIMIT */
   SELECT_PROCESSED_CHARACTER_TILES_BASE: `SELECT c.id AS characterId, c.name AS characterName, COUNT(*) AS count
   FROM processed_image pi

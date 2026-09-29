@@ -195,6 +195,12 @@ export interface ProcessedSort {
   direction: 'asc' | 'desc';
 }
 
+/** 图库的轻量索引行：只要 id 与角色名，不带缩略图 */
+export interface ProcessedIndexRow {
+  id: number;
+  characterName: string;
+}
+
 /** 图库平铺视图的一级卡片：一个角色 + 当前筛选下的图片数 */
 export interface CharacterTile {
   characterId: number;
@@ -213,7 +219,7 @@ export interface ImageGroupFilter {
 }
 
 /** 图组页的排序键：列名走主进程的白名单 */
-export type ImageGroupSortKey = 'source' | 'character' | 'dirName' | 'fileCount' | 'status';
+export type ImageGroupSortKey = 'source' | 'character' | 'dirName' | 'dirPath' | 'fileCount' | 'status';
 
 /** 图组页的排序；不传就用「来源 → 角色 → 目录名」 */
 export interface ImageGroupSort {
