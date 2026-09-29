@@ -198,14 +198,19 @@ export const SQL = {
   JOIN character c ON pi.character_id = c.id
   WHERE 1 = 1`,
 
-  /** 图库平铺一级：角色 + 当前筛选下的图片数；调用方追加 WHERE / GROUP BY / LIMIT */
-  SELECT_PROCESSED_CHARACTER_TILES_BASE: `SELECT c.id AS characterId, c.name AS characterName, COUNT(*) AS count
+  /**
+   * 图库平铺一级：角色 + 当前筛选下的图片数；调用方追加 WHERE / GROUP BY / LIMIT。
+   *
+   * 按 `c.name` 归组（不是 `c.id`）：同一个角色可能出现在多个来源里，那是同一张卡。
+   * `characterId` 取该名字下最小的 id，只当卡片的稳定句柄用。
+   */
+  SELECT_PROCESSED_CHARACTER_TILES_BASE: `SELECT MIN(c.id) AS characterId, c.name AS characterName, COUNT(*) AS count
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
   WHERE 1 = 1`,
 
-  /** 图库平铺一级的总数：当前筛选下有图可显示的角色数 */
-  COUNT_PROCESSED_CHARACTERS_BASE: `SELECT COUNT(DISTINCT c.id) AS total
+  /** 图库平铺一级的总数：当前筛选下有图可显示的角色名数 */
+  COUNT_PROCESSED_CHARACTERS_BASE: `SELECT COUNT(DISTINCT c.name) AS total
   FROM processed_image pi
   JOIN character c ON pi.character_id = c.id
   WHERE 1 = 1`,

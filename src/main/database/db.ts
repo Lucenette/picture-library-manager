@@ -1010,7 +1010,7 @@ export function listProcessedIndex(filter: ProcessedFilter): ProcessedIndexRow[]
 export function listProcessedCharacters(filter: ProcessedFilter, limit: number, offset: number): CharacterTile[] {
   const where = buildProcessedWhere(filter);
   return queryAll<CharacterTile>(
-    `${SQL.SELECT_PROCESSED_CHARACTER_TILES_BASE}${where.sql} GROUP BY c.id ORDER BY c.name_sort, c.id LIMIT ? OFFSET ?`,
+    `${SQL.SELECT_PROCESSED_CHARACTER_TILES_BASE}${where.sql} GROUP BY c.name ORDER BY MIN(c.name_sort), MIN(c.id) LIMIT ? OFFSET ?`,
     [...where.params, limit, offset],
   );
 }

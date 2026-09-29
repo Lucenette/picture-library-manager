@@ -201,7 +201,12 @@ export interface ProcessedIndexRow {
   characterName: string;
 }
 
-/** 图库平铺视图的一级卡片：一个角色 + 当前筛选下的图片数 */
+/**
+ * 图库平铺视图的一级卡片：一个角色 + 当前筛选下的图片数。
+ *
+ * 归组的键是**角色名**——同一个角色可能出现在多个来源里，那是同一张卡；
+ * `characterId` 只是这个名字下最小的那个 id，用来给卡片一个稳定的句柄。
+ */
 export interface CharacterTile {
   characterId: number;
   characterName: string;
