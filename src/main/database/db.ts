@@ -142,9 +142,17 @@ function insert(sql: string, params: SqlValue[] = []): number {
  *
  * 复制前先做一次 FULL checkpoint，把 WAL 里的改动落回主文件，
  * 否则复制出来的可能缺最近几次事务。
+ *
+ * **事务进行中不做备份**：那时 checkpoint 必定报 `database table is locked`。
+ * 升级回填、批量改名这类写入整段跑在事务里，逐行触发的备份一次也做不成，
+ * 反而会每行写一条错误日志——实测一次 1.1.1 回填刷了 33907 条、把日志写到 35 MB，
+ * 主进程被同步写日志拖住、界面无响应。升级自己已经在开始前备份过一次。
  */
 function backupDatabase(): void {
   if (!db || !existsSync(dbPath)) {
+    return;
+  }
+  if (batchDepth > 0) {
     return;
   }
   const now = Date.now();
@@ -152,10 +160,11 @@ function backupDatabase(): void {
     return;
   }
 
+  // 先记下这次尝试再动手：真失败也只按间隔重试一次，不会退化成每次写入都报一遍
+  lastBackupAt = now;
   try {
     db.exec('PRAGMA wal_checkpoint(FULL)');
     copyFileSync(dbPath, `${dbPath}.bak`);
-    lastBackupAt = now;
   } catch (error) {
     log.error('database backup failed', error);
   }
