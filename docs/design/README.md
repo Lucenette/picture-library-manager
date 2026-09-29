@@ -14,3 +14,4 @@
 | 加载服务：启动任务的登记与调度 | [loading.md](./loading.md) |
 | 脚本管理：用户目录里的脚本文件库、常驻编辑器与脚本分组 | [script-management.md](./script-management.md) |
 | 日志系统：三个文件、category、控制台来源与兜底捕获 | [logging.md](./logging.md) |
+| 平铺视图：两级相册式渲染、行窗口化、派生排序键与分片取数 | [view-layouts.md](./view-layouts.md) |
