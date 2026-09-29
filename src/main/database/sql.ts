@@ -38,7 +38,7 @@ export const SQL = {
   // Source
   // ----------------------------------------------------------
 
-  INSERT_SOURCE: 'INSERT INTO source (name, root_path) VALUES (?, ?)',
+  INSERT_SOURCE: 'INSERT INTO source (name, name_sort, root_path, root_path_sort) VALUES (?, ?, ?, ?)',
   SELECT_SOURCE_ALL: 'SELECT * FROM source ORDER BY created_at DESC',
   SELECT_SOURCE_BY_ID: 'SELECT * FROM source WHERE id = ?',
   DELETE_SOURCE: 'DELETE FROM source WHERE id = ?',
@@ -58,16 +58,16 @@ export const SQL = {
   // Character
   // ----------------------------------------------------------
 
-  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (source_id, name, source_path) VALUES (?, ?, ?)',
+  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (source_id, name, name_sort, source_path) VALUES (?, ?, ?, ?)',
   SELECT_CHARACTER_BY_SOURCE_NAME: 'SELECT * FROM character WHERE source_id = ? AND name = ?',
   SELECT_CHARACTERS_BY_SOURCE: 'SELECT * FROM character WHERE source_id = ? ORDER BY name',
-  RENAME_CHARACTER: 'UPDATE character SET name = ? WHERE id = ?',
+  RENAME_CHARACTER: 'UPDATE character SET name = ?, name_sort = ? WHERE id = ?',
 
   // ----------------------------------------------------------
   // ImageGroup
   // ----------------------------------------------------------
 
-  INSERT_IMAGE_GROUP: 'INSERT OR IGNORE INTO image_group (character_id, dir_name, dir_path, file_count) VALUES (?, ?, ?, ?)',
+  INSERT_IMAGE_GROUP: 'INSERT OR IGNORE INTO image_group (character_id, dir_name, dir_name_sort, dir_path, dir_path_sort, file_count) VALUES (?, ?, ?, ?, ?, ?)',
   SELECT_IMAGE_GROUP_BY_PATH: 'SELECT * FROM image_group WHERE dir_path = ?',
   UPDATE_IMAGE_GROUP_STATUS: 'UPDATE image_group SET status = ? WHERE id = ?',
   UPDATE_IMAGE_GROUP_PROCESSED: "UPDATE image_group SET status = 'processed' WHERE id = ?",
@@ -84,7 +84,7 @@ export const SQL = {
   // ImageFile
   // ----------------------------------------------------------
 
-  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension, thumbnail, phash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_name_sort, file_path, file_size, width, height, extension, thumbnail, phash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   SELECT_IMAGE_FILES_BY_GROUP: 'SELECT * FROM image_file WHERE image_group_id = ? ORDER BY file_name',
   SELECT_GROUP_ID_BY_FILE_PATH: 'SELECT image_group_id FROM image_file WHERE file_path = ?',
 
@@ -114,6 +114,8 @@ export const SQL = {
   SELECT_SCRIPTS_ALL: 'SELECT * FROM process_script ORDER BY name',
   /** 改名：正文在文件里，这里只动名称与时间戳；图库那份名字副本由调用方在同一个事务里跟着改 */
   RENAME_SCRIPT: "UPDATE process_script SET name = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
+  /** 脚本行的排序键：单独一条 UPDATE——老库升级途中还没有这一列，见 db.ts 的说明 */
+  SET_SCRIPT_SORT: 'UPDATE process_script SET name_sort = ? WHERE id = ?',
   /** 接管旧脚本与内置脚本落盘：只回填文件路径 */
   SET_SCRIPT_FILE_PATH: "UPDATE process_script SET file_path = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
   TOUCH_SCRIPT_LOADED_AT: "UPDATE process_script SET loaded_at = datetime('now','localtime') WHERE id = ?",
@@ -121,6 +123,8 @@ export const SQL = {
   SET_SCRIPT_GROUP: 'UPDATE process_script SET group_id = ? WHERE id = ?',
   /** 改写图库里的脚本名副本（改名级联） */
   RENAME_PROCESSED_SCRIPT_NAME: 'UPDATE processed_image SET script_name = ? WHERE script_id = ?',
+  /** 图库里脚本名副本的排序键，同上 */
+  SET_PROCESSED_SCRIPT_SORT: 'UPDATE processed_image SET script_name_sort = ? WHERE script_id = ?',
   COUNT_PROCESSED_BY_SCRIPT: 'SELECT COUNT(*) AS processed FROM processed_image WHERE script_id = ?',
   /** 老库接管用：库里还有 code 列时，把每一条的源码读出来 */
   SELECT_LEGACY_SCRIPTS: 'SELECT id, name, file_path, code FROM process_script',
@@ -139,10 +143,10 @@ export const SQL = {
   // ----------------------------------------------------------
 
   /** 图库行里存一份「当时是哪个脚本选的」名字副本：脚本删掉之后仍然显示得出来 */
-  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, script_name, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, (SELECT name FROM process_script WHERE id = ?), datetime('now','localtime'))",
+  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, script_name, script_name_sort, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
   SELECT_PROCESSED_BY_GROUP: 'SELECT * FROM processed_image WHERE image_group_id = ?',
   SELECT_PROCESSED_BY_ID_GROUP: 'SELECT image_group_id FROM processed_image WHERE id = ?',
-  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, script_name = (SELECT name FROM process_script WHERE id = ?), confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
+  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, script_name = ?, script_name_sort = ?, confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
   DELETE_PROCESSED: 'DELETE FROM processed_image WHERE id = ?',
   DELETE_PROCESSED_BY_GROUP: 'DELETE FROM processed_image WHERE image_group_id = ?',
 

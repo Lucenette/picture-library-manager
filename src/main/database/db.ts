@@ -9,7 +9,7 @@ import type {
   SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
-import type { SortKeyTable } from '@/database/sort';
+import { CHARACTER_NAME_PROFILE, sortKeyOf, type SortKeyTable } from '@/database/sort';
 import { SQL } from '@/database/sql';
 import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
@@ -50,6 +50,15 @@ let batchDepth = 0;
 /** 上次写入备份的时间戳 */
 let lastBackupAt = 0;
 
+/**
+ * 脚本表的排序键列在不在（1.1.1 才加）。
+ *
+ * 老库升级到 1.1.1 时，1.1.0 的 postups 会调用 `insertScript` / `renameScript`，那时列还不存在；
+ * 这两个写入点因此把键单独写成一条 UPDATE，并在缺列时跳过——升级收尾的整表回填会补上。
+ * `null` 表示还没问过。
+ */
+let scriptSortColumnReady: boolean | null = null;
+
 // ------------------------------------------------------------
 // 底层：查询
 // ------------------------------------------------------------
@@ -76,9 +85,20 @@ function thumbnailToDataUrl(value: unknown): unknown {
   return `data:image/webp;base64,${Buffer.from(value).toString('base64')}`;
 }
 
-/** 读出来的行统一整形：缩略图字节转成 data URL */
+/** 排序键列是给 SQL 排序用的派生数据，不进业务对象 */
+function stripSortKeys(row: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (!key.endsWith('_sort')) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/** 读出来的行统一整形：缩略图字节转成 data URL，排序键列丢掉 */
 function shapeRow<T>(row: Record<string, unknown>): T {
-  const shaped = snakeToCamel(row);
+  const shaped = snakeToCamel(stripSortKeys(row));
   if ('thumbnail' in shaped) {
     shaped.thumbnail = thumbnailToDataUrl(shaped.thumbnail);
   }
@@ -306,7 +326,8 @@ export function endBatch(): void {
 
 /** 新增来源，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
 export function addSource(rootPath: string): Source {
-  const id = insert(SQL.INSERT_SOURCE, [basename(rootPath), rootPath]);
+  const name = basename(rootPath);
+  const id = insert(SQL.INSERT_SOURCE, [name, sortKeyOf(name), rootPath, sortKeyOf(rootPath)]);
   return queryOne<Source>(SQL.SELECT_SOURCE_BY_ID, [id])!;
 }
 
@@ -345,7 +366,7 @@ export function updateSourceScannedAt(sourceId: number): void {
 
 /** 写入角色；同来源下同名已存在时忽略并返回既有记录 */
 export function insertCharacter(sourceId: number, name: string, sourcePath: string): Character {
-  run(SQL.INSERT_CHARACTER, [sourceId, name, sourcePath]);
+  run(SQL.INSERT_CHARACTER, [sourceId, name, sortKeyOf(name, CHARACTER_NAME_PROFILE), sourcePath]);
   return queryOne<Character>(SQL.SELECT_CHARACTER_BY_SOURCE_NAME, [sourceId, name])!;
 }
 
@@ -357,7 +378,7 @@ export function getCharactersBySource(sourceId: number): Character[] {
 /** 重命名角色；与同来源内的角色重名时抛出可读错误 */
 export function renameCharacter(id: number, name: string): void {
   try {
-    run(SQL.RENAME_CHARACTER, [name, id]);
+    run(SQL.RENAME_CHARACTER, [name, sortKeyOf(name, CHARACTER_NAME_PROFILE), id]);
   } catch (error) {
     if (isUniqueViolation(error)) {
       throw new Error(`角色「${name}」已存在于当前来源`);
@@ -382,7 +403,7 @@ export function insertImageGroup(
   dirPath: string,
   fileCount: number,
 ): ImageGroup {
-  run(SQL.INSERT_IMAGE_GROUP, [characterId, dirName, dirPath, fileCount]);
+  run(SQL.INSERT_IMAGE_GROUP, [characterId, dirName, sortKeyOf(dirName), dirPath, sortKeyOf(dirPath), fileCount]);
   return queryOne<ImageGroup>(SQL.SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
@@ -517,7 +538,7 @@ export function getImageGroupIdByFilePath(filePath: string): number | null {
 export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
   for (const file of files) {
     run(SQL.INSERT_IMAGE_FILE, [
-      groupId, file.fileName, file.filePath, file.fileSize,
+      groupId, file.fileName, sortKeyOf(file.fileName), file.filePath, file.fileSize,
       file.width ?? 0, file.height ?? 0, file.extension, file.thumbnail, file.phash,
     ]);
   }
@@ -597,6 +618,7 @@ export function insertScript(
   groupId: number | null,
 ): ProcessScript {
   const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0, groupId]);
+  writeScriptSortKey(id, name);
   return getScriptById(id)!;
 }
 
@@ -611,8 +633,36 @@ export function renameScript(id: number, name: string): void {
   try {
     run(SQL.RENAME_SCRIPT, [name, id]);
     run(SQL.RENAME_PROCESSED_SCRIPT_NAME, [name, id]);
+    writeScriptSortKey(id, name);
+    writeProcessedScriptSortKey(id, name);
   } finally {
     endBatch();
+  }
+}
+
+/** 脚本表的排序键列在不在；进程内只问一次库 */
+function hasScriptSortColumn(): boolean {
+  if (scriptSortColumnReady === null) {
+    scriptSortColumnReady = queryAll<{ name: string }>('PRAGMA table_info(process_script)')
+      .some((column) => column.name === 'name_sort');
+    if (!scriptSortColumnReady) {
+      log.info('script sort keys are not available yet, rows written during the upgrade are backfilled by 1.1.1');
+    }
+  }
+  return scriptSortColumnReady;
+}
+
+/** 写脚本行的排序键；列还没建出来时交给 1.1.1 的回填 */
+function writeScriptSortKey(id: number, name: string): void {
+  if (hasScriptSortColumn()) {
+    run(SQL.SET_SCRIPT_SORT, [sortKeyOf(name), id]);
+  }
+}
+
+/** 写图库里脚本名副本的排序键，同上 */
+function writeProcessedScriptSortKey(scriptId: number, name: string): void {
+  if (hasScriptSortColumn()) {
+    run(SQL.SET_PROCESSED_SCRIPT_SORT, [sortKeyOf(name), scriptId]);
   }
 }
 
@@ -756,11 +806,16 @@ export function upsertProcessedImage(
   scriptId: number | null,
 ): ProcessedImage {
   const existing = queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId]);
+  // 脚本名在这里查一次：INSERT 与 UPDATE 都要它，而 SQL 里的子查询给不出排序键
+  const scriptName = scriptId === null
+    ? null
+    : (queryOne<{ name: string }>(SQL.SELECT_SCRIPT_BY_ID, [scriptId])?.name ?? null);
+  const scriptNameSort = scriptName === null ? null : sortKeyOf(scriptName);
   if (existing) {
-    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptId, imageGroupId]);
+    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptName, scriptNameSort, imageGroupId]);
   } else {
     run(SQL.INSERT_PROCESSED, [
-      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptId,
+      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptName, scriptNameSort,
     ]);
   }
   run(SQL.UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
