@@ -4,9 +4,10 @@ import { basename, join } from 'path';
 import { ipcMain } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
-  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
+  Character, CharacterTile, CoverThumbnail, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
+  ImageGroupSortKey, ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView,
+  ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
+  SimilarData, SimilarGroup, Source, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
 import type { SimilarInputRow } from '@/image/similar';
 import { CHARACTER_NAME_PROFILE, sortKeyOf, type SortKeyTable } from '@/database/sort';
@@ -407,7 +408,11 @@ export function insertImageGroup(
   return queryOne<ImageGroup>(SQL.SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
-/** 查询图片组列表，可按状态与来源过滤 */
+/**
+ * 整表取回图组列表（旧入口）。
+ *
+ * 图组页切到分片取数之后就删掉它。
+ */
 export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): ImageGroupView[] {
   let sql = SQL.SELECT_IMAGE_GROUPS_VIEW_BASE;
   const params: SqlValue[] = [];
@@ -420,6 +425,86 @@ export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number)
     params.push(sourceId);
   }
   return queryAll<ImageGroupView>(`${sql} ORDER BY g.name, c.name, ig.dir_name`, params);
+}
+
+/** 图组筛选的谓词：分片与计数共用，别名固定为 `ig` / `c` / `g` */
+function buildImageGroupWhere(filter: ImageGroupFilter): { sql: string; params: SqlValue[] } {
+  let sql = '';
+  const params: SqlValue[] = [];
+  if (filter.status) {
+    sql += ' AND ig.status = ?';
+    params.push(filter.status);
+  }
+  if (filter.sourceId !== undefined) {
+    sql += ' AND g.id = ?';
+    params.push(filter.sourceId);
+  }
+  if (filter.characterName) {
+    sql += ' AND c.name = ?';
+    params.push(filter.characterName);
+  }
+  if (filter.dirPath) {
+    sql += " AND ig.dir_path LIKE ? ESCAPE '\\'";
+    params.push(`%${escapeLike(filter.dirPath)}%`);
+  }
+  return { sql, params };
+}
+
+/** 图组排序的列名白名单，同图库 */
+const IMAGE_GROUP_SORT_COLUMNS: Record<ImageGroupSortKey, string> = {
+  source: 'g.name_sort',
+  character: 'c.name_sort',
+  dirName: 'ig.dir_name_sort',
+  fileCount: 'ig.file_count',
+  status: 'ig.status',
+};
+
+/** 不传排序就用「来源 → 角色 → 目录名」，与页面上的默认顺序一致 */
+function buildImageGroupOrderBy(sort?: ImageGroupSort): string {
+  if (!sort) {
+    return ' ORDER BY g.name_sort, c.name_sort, ig.dir_name_sort, ig.id';
+  }
+  const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+  return ` ORDER BY ${IMAGE_GROUP_SORT_COLUMNS[sort.key]} ${direction}, ig.id ${direction}`;
+}
+
+/** 图组页的一页图组 */
+export function getImageGroupPage(
+  filter: ImageGroupFilter,
+  sort: ImageGroupSort | undefined,
+  limit: number,
+  offset: number,
+): ImageGroupView[] {
+  const where = buildImageGroupWhere(filter);
+  return queryAll<ImageGroupView>(
+    `${SQL.SELECT_IMAGE_GROUPS_VIEW_BASE}${where.sql}${buildImageGroupOrderBy(sort)} LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/** 当前筛选下的图组总数 */
+export function countImageGroups(filter: ImageGroupFilter): number {
+  const where = buildImageGroupWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_IMAGE_GROUPS_VIEW_BASE}${where.sql}`, where.params)?.total ?? 0;
+}
+
+/** 图组页二级：图组内图片文件的一页，按文件名 */
+export function getImageFilePage(groupId: number, limit: number, offset: number): ImageFile[] {
+  return queryAll<ImageFile>(SQL.SELECT_IMAGE_FILES_PAGE, [groupId, limit, offset]);
+}
+
+/**
+ * 按分组 id 取封面缩略图。
+ *
+ * `kind` 决定分组是角色还是图组；只查当前可见卡片的 id，一条 SQL 拿完，不逐卡查。
+ */
+export function getCovers(kind: 'character' | 'group', ids: number[]): CoverThumbnail[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => '?').join(', ');
+  const base = kind === 'character' ? SQL.SELECT_CHARACTER_COVERS : SQL.SELECT_GROUP_COVERS;
+  return queryAll<CoverThumbnail>(base.replace('%IDS%', placeholders), ids);
 }
 
 /** 更新图片组状态；标记为已排除时同步清除其已处理记录 */
@@ -822,7 +907,11 @@ export function upsertProcessedImage(
   return queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
-/** 查询图库列表，可按来源与角色过滤 */
+/**
+ * 整表取回图库列表。
+ *
+ * 兼容表格视图的旧入口，分片取数接上之后（见下面那一组）就删掉它。
+ */
 export function getAllProcessedImages(sourceId?: number, characterName?: string): ProcessedImageView[] {
   let sql = SQL.SELECT_PROCESSED_VIEW_BASE;
   const params: SqlValue[] = [];
@@ -835,6 +924,83 @@ export function getAllProcessedImages(sourceId?: number, characterName?: string)
     params.push(characterName);
   }
   return queryAll<ProcessedImageView>(`${sql} ORDER BY c.name`, params);
+}
+
+/** LIKE 的通配符要转义，否则用户输入的 `%` 会匹配一切 */
+function escapeLike(keyword: string): string {
+  return keyword.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/** 图库筛选的谓词：分片、计数、平铺一级共用同一套，别名固定为 `pi` 与 `c` */
+function buildProcessedWhere(filter: ProcessedFilter): { sql: string; params: SqlValue[] } {
+  let sql = '';
+  const params: SqlValue[] = [];
+  if (filter.sourceId !== undefined) {
+    sql += ' AND pi.source_id = ?';
+    params.push(filter.sourceId);
+  }
+  if (filter.characterName) {
+    sql += ' AND c.name = ?';
+    params.push(filter.characterName);
+  }
+  if (filter.fileName) {
+    sql += " AND pi.selected_file LIKE ? ESCAPE '\\'";
+    params.push(`%${escapeLike(filter.fileName)}%`);
+  }
+  if (filter.scriptName) {
+    sql += " AND COALESCE(pi.script_name, '手动确认') = ?";
+    params.push(filter.scriptName);
+  }
+  return { sql, params };
+}
+
+/** 图库排序的列名白名单：用户只给键，列名永远出自这里 */
+const PROCESSED_SORT_COLUMNS: Record<ProcessedSortKey, string> = {
+  character: 'c.name_sort',
+  fileName: 'f.file_name_sort',
+  scriptName: 'pi.script_name_sort',
+  confirmedAt: 'pi.confirmed_at',
+};
+
+/** 排序子句：`pi.id` 当次键，同键的行才有稳定顺序，分片不会重复或漏行 */
+function buildProcessedOrderBy(sort: ProcessedSort): string {
+  const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+  return ` ORDER BY ${PROCESSED_SORT_COLUMNS[sort.key]} ${direction}, pi.id ${direction}`;
+}
+
+/** 当前筛选下的图库图片总数 */
+export function countProcessedImages(filter: ProcessedFilter): number {
+  const where = buildProcessedWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_PROCESSED_VIEW_BASE}${where.sql}`, where.params)?.total ?? 0;
+}
+
+/** 图库页的一页图片：表格跳页与平铺「加载更多」共用同一套参数 */
+export function getProcessedImagePage(
+  filter: ProcessedFilter,
+  sort: ProcessedSort,
+  limit: number,
+  offset: number,
+): ProcessedImageView[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<ProcessedImageView>(
+    `${SQL.SELECT_PROCESSED_VIEW_BASE}${where.sql}${buildProcessedOrderBy(sort)} LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/** 图库平铺一级：当前筛选下有图的角色，按角色名分片 */
+export function listProcessedCharacters(filter: ProcessedFilter, limit: number, offset: number): CharacterTile[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<CharacterTile>(
+    `${SQL.SELECT_PROCESSED_CHARACTER_TILES_BASE}${where.sql} GROUP BY c.id ORDER BY c.name_sort, c.id LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/** 图库平铺一级的总数：有图可显示的角色数 */
+export function countProcessedCharacters(filter: ProcessedFilter): number {
+  const where = buildProcessedWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_PROCESSED_CHARACTERS_BASE}${where.sql}`, where.params)?.total ?? 0;
 }
 
 /** 导出任务唯一需要的字段 */
@@ -952,6 +1118,10 @@ const DB_METHODS: Record<string, DbMethod> = {
   renameCharacter,
 
   getImageGroupsView,
+  getImageGroupPage,
+  countImageGroups,
+  getImageFilePage,
+  getCovers,
   updateImageGroupStatus,
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
@@ -959,6 +1129,10 @@ const DB_METHODS: Record<string, DbMethod> = {
   getScriptsByType,
 
   upsertProcessedImage,
+  countProcessedImages,
+  getProcessedImagePage,
+  listProcessedCharacters,
+  countProcessedCharacters,
   getAllProcessedImages,
   deleteProcessedImage,
 };

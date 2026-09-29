@@ -1,8 +1,9 @@
 import { ipcRenderer } from 'electron';
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, Source, ImageFile, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScriptType,
+  Character, CharacterTile, CoverThumbnail, Source, ImageFile, ImageGroupFilter, ImageGroupSort,
+  ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView, ProcessedSort,
+  ProcessScript, ScriptType,
 } from '@common/types';
 
 /**
@@ -57,9 +58,34 @@ export function renameCharacter(id: number, name: string): Promise<void> {
 // ImageGroup
 // ------------------------------------------------------------
 
-/** 查询图片组列表 */
+/** 查询图片组列表（整表；图组页切到分片后删除） */
 export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): Promise<ImageGroupView[]> {
   return call('getImageGroupsView', status, sourceId);
+}
+
+/** 图组页：一页图组，筛选与排序都下推 */
+export function getImageGroupPage(
+  filter: ImageGroupFilter,
+  sort: ImageGroupSort | undefined,
+  limit: number,
+  offset: number,
+): Promise<ImageGroupView[]> {
+  return call('getImageGroupPage', filter, sort, limit, offset);
+}
+
+/** 图组页：当前筛选下的图组总数 */
+export function countImageGroups(filter: ImageGroupFilter): Promise<number> {
+  return call('countImageGroups', filter);
+}
+
+/** 图组页二级：图组内图片文件的一页 */
+export function getImageFilePage(groupId: number, limit: number, offset: number): Promise<ImageFile[]> {
+  return call('getImageFilePage', groupId, limit, offset);
+}
+
+/** 按分组 id 取封面缩略图；一条 SQL 拿完当前可见的卡片 */
+export function getCovers(kind: 'character' | 'group', ids: number[]): Promise<CoverThumbnail[]> {
+  return call('getCovers', kind, ids);
 }
 
 /** 更新图片组状态 */
@@ -108,9 +134,34 @@ export function upsertProcessedImage(
   return call('upsertProcessedImage', imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId);
 }
 
-/** 查询图库列表 */
+/** 查询图库列表（整表；表格视图切到分片后删除） */
 export function getAllProcessedImages(sourceId?: number, characterName?: string): Promise<ProcessedImageView[]> {
   return call('getAllProcessedImages', sourceId, characterName);
+}
+
+/** 图库：当前筛选下的图片总数 */
+export function countProcessedImages(filter: ProcessedFilter): Promise<number> {
+  return call('countProcessedImages', filter);
+}
+
+/** 图库：一页图片，表格跳页与平铺「加载更多」共用 */
+export function getProcessedImagePage(
+  filter: ProcessedFilter,
+  sort: ProcessedSort,
+  limit: number,
+  offset: number,
+): Promise<ProcessedImageView[]> {
+  return call('getProcessedImagePage', filter, sort, limit, offset);
+}
+
+/** 图库平铺：一级角色分片 */
+export function listProcessedCharacters(filter: ProcessedFilter, limit: number, offset: number): Promise<CharacterTile[]> {
+  return call('listProcessedCharacters', filter, limit, offset);
+}
+
+/** 图库平铺：一级角色总数 */
+export function countProcessedCharacters(filter: ProcessedFilter): Promise<number> {
+  return call('countProcessedCharacters', filter);
 }
 
 /** 删除图库记录 */

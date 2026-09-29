@@ -174,6 +174,59 @@ export interface ProcessedImageView extends ProcessedImage {
   selectedFileSize: number | null;
 }
 
+/** 图库页的筛选条件：表格与平铺共用，主进程按它下推 SQL */
+export interface ProcessedFilter {
+  /** 来源 id */
+  sourceId?: number;
+  /** 角色名，精确匹配 */
+  characterName?: string;
+  /** 文件名子串，不区分大小写 */
+  fileName?: string;
+  /** 处理脚本名，精确匹配；`手动确认` 对应脚本名为空的行 */
+  scriptName?: string;
+}
+
+/** 图库页的排序键：列名走主进程的白名单 */
+export type ProcessedSortKey = 'character' | 'fileName' | 'scriptName' | 'confirmedAt';
+
+/** 图库页的排序 */
+export interface ProcessedSort {
+  key: ProcessedSortKey;
+  direction: 'asc' | 'desc';
+}
+
+/** 图库平铺视图的一级卡片：一个角色 + 当前筛选下的图片数 */
+export interface CharacterTile {
+  characterId: number;
+  characterName: string;
+  count: number;
+}
+
+/** 图组页的筛选条件 */
+export interface ImageGroupFilter {
+  status?: ImageGroupStatus;
+  sourceId?: number;
+  /** 角色名，精确匹配 */
+  characterName?: string;
+  /** 图组目录路径的子串，不区分大小写 */
+  dirPath?: string;
+}
+
+/** 图组页的排序键：列名走主进程的白名单 */
+export type ImageGroupSortKey = 'source' | 'character' | 'dirName' | 'fileCount' | 'status';
+
+/** 图组页的排序；不传就用「来源 → 角色 → 目录名」 */
+export interface ImageGroupSort {
+  key: ImageGroupSortKey;
+  direction: 'asc' | 'desc';
+}
+
+/** 分组封面：分组里没有缩略图时为 null */
+export interface CoverThumbnail {
+  id: number;
+  thumbnail: string | null;
+}
+
 // ------------------------------------------------------------
 // 扫描
 // ------------------------------------------------------------
