@@ -66,7 +66,7 @@
       @load-more="loadMoreCharacters"
     >
       <template #panel>
-        <div class="panel-scroll" @scroll.passive="onPanelScroll">
+        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="360px" @scroll="onPanelScroll">
           <div v-if="panelImages.length > 0" class="panel-grid">
             <div
               v-for="image in panelImages"
@@ -88,7 +88,7 @@
           </div>
           <div v-else-if="!panelLoading" class="panel-empty">没有可显示的图片</div>
           <div v-if="panelLoading" class="panel-loading">加载中…</div>
-        </div>
+        </el-scrollbar>
       </template>
     </TileBoard>
 
@@ -112,7 +112,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
-import type { TableInstance } from 'element-plus';
+import type { ScrollbarInstance, TableInstance } from 'element-plus';
 
 import { IPC } from '@common/ipcChannels';
 import type {
@@ -176,11 +176,13 @@ const indexRows = ref<ProcessedIndexRow[]>([]);
 const tileCharacters = ref<CharacterTile[]>([]);
 const tileCharacterTotal = ref(0);
 const tileCharactersLoading = ref(false);
-const characterCovers = ref(new Map<number, string | null>());
+/** 角色 id → 最多三张封面；键是卡片句柄（该名字下最小的 character id） */
+const characterCovers = ref(new Map<number, (string | null)[]>());
 const expandedCharacterId = ref<number | null>(null);
 const panelImages = ref<ProcessedImageView[]>([]);
 const panelLoading = ref(false);
 const tileBoardRef = ref<InstanceType<typeof TileBoard> | null>(null);
+const panelScrollRef = ref<ScrollbarInstance | null>(null);
 
 /** 相似图片识别是否在跑：跑的过程中禁用按钮 */
 const recognizing = ref(false);
@@ -307,7 +309,7 @@ const tileItems = computed<TileItem[]>(() =>
     title: character.characterName,
     subtitle: character.count + ' 张',
     count: character.count,
-    cover: characterCovers.value.get(character.characterId) ?? null,
+    covers: (characterCovers.value.get(character.characterId) ?? []).filter((cover): cover is string => cover !== null),
   })),
 );
 
@@ -465,8 +467,9 @@ async function loadCharacterCovers(ids: number[]): Promise<void> {
   }
   const covers = await getCovers('character', ids);
   const next = new Map(characterCovers.value);
+  // 同一个分组会回来多行（rn 1..3），按 rn 顺序攒成数组
   for (const cover of covers) {
-    next.set(cover.id, cover.thumbnail);
+    next.set(cover.id, [...(next.get(cover.id) ?? []), cover.thumbnail]);
   }
   characterCovers.value = next;
 }
@@ -559,6 +562,7 @@ async function toggleCharacter(item: TileItem): Promise<void> {
   }
   expandedCharacterId.value = item.id;
   panelImages.value = [];
+  panelScrollRef.value?.setScrollTop(0);
   await loadPanelImages(item.id, true);
 }
 
@@ -610,9 +614,12 @@ function toggleCharacterSelection(item: TileItem): void {
   selectedIds.value = [...next];
 }
 
-function onPanelScroll(event: Event): void {
-  const el = event.currentTarget as HTMLElement;
-  if (el.scrollHeight - el.scrollTop - el.clientHeight > PANEL_LOAD_MORE_THRESHOLD) {
+function onPanelScroll(): void {
+  const wrap = panelScrollRef.value?.wrapRef as HTMLElement | undefined;
+  if (!wrap) {
+    return;
+  }
+  if (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight > PANEL_LOAD_MORE_THRESHOLD) {
     return;
   }
   void loadMorePanelImages();
@@ -896,8 +903,7 @@ function toFilterItems(values: string[]): FilterItem[] {
 }
 
 .panel-scroll {
-  max-height: 360px;
-  overflow-y: auto;
+  margin-right: -4px;
 }
 
 .panel-grid {
@@ -926,11 +932,17 @@ function toFilterItems(values: string[]): FilterItem[] {
   opacity: 1;
 }
 
+.panel-item:hover .panel-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+
 .panel-thumb {
   display: block;
   width: 100px;
   height: 100px;
   object-fit: cover;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   border-radius: 6px;
   background: #2b2d30;
 }

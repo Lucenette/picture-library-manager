@@ -215,14 +215,14 @@ export const SQL = {
   JOIN character c ON pi.character_id = c.id
   WHERE 1 = 1`,
 
-  /** 角色封面：每个角色一张缩略图，取文件名排序最靠前的那张；`%IDS%` 由调用方换成占位符 */
-  SELECT_CHARACTER_COVERS: `SELECT id, thumbnail FROM (
+  /** 角色封面：每个角色最多三张缩略图（按文件名），卡片叠着放；`%IDS%` 由调用方换成占位符 */
+  SELECT_CHARACTER_COVERS: `SELECT id, thumbnail, rn FROM (
     SELECT pi.character_id AS id, f.thumbnail AS thumbnail,
       ROW_NUMBER() OVER (PARTITION BY pi.character_id ORDER BY f.file_name_sort, f.id) AS rn
     FROM processed_image pi
     JOIN image_file f ON f.file_path = pi.selected_file
     WHERE pi.character_id IN (%IDS%)
-  ) WHERE rn = 1`,
+  ) WHERE rn <= 3 ORDER BY id, rn`,
 
   /** 图组页一级总数：与 `SELECT_IMAGE_GROUPS_VIEW_BASE` 同一套 join */
   COUNT_IMAGE_GROUPS_VIEW_BASE: `SELECT COUNT(*) AS total
@@ -256,14 +256,14 @@ export const SQL = {
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
 
-  /** 图组封面：每个图组一张缩略图，取文件名排序最靠前的那张；`%IDS%` 由调用方换成占位符 */
-  SELECT_GROUP_COVERS: `SELECT id, thumbnail FROM (
+  /** 图组封面：每个图组最多三张缩略图（按文件名），卡片叠着放；`%IDS%` 由调用方换成占位符 */
+  SELECT_GROUP_COVERS: `SELECT id, thumbnail, rn FROM (
     SELECT ig.id AS id, f.thumbnail AS thumbnail,
       ROW_NUMBER() OVER (PARTITION BY ig.id ORDER BY f.file_name_sort, f.id) AS rn
     FROM image_group ig
     JOIN image_file f ON f.image_group_id = ig.id
     WHERE ig.id IN (%IDS%)
-  ) WHERE rn = 1`,
+  ) WHERE rn <= 3 ORDER BY id, rn`,
 
   // ----------------------------------------------------------
   // 升级账本

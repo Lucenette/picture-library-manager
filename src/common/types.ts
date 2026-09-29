@@ -232,9 +232,10 @@ export interface ImageGroupSort {
   direction: 'asc' | 'desc';
 }
 
-/** 分组封面：分组里没有缩略图时为 null */
+/** 分组封面：一个分组最多三张，`rn` 是它在组内的序号（1 起），缩略图缺失时为 null */
 export interface CoverThumbnail {
   id: number;
+  rn: number;
   thumbnail: string | null;
 }
 

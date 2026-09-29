@@ -1,53 +1,77 @@
 <template>
-  <div ref="containerEl" class="tile-board" @scroll.passive="onScroll">
-    <div v-if="items.length === 0 && !loading" class="tile-empty">暂无数据</div>
+  <el-scrollbar ref="scrollbarRef" class="tile-board" @scroll="onScroll">
+    <div class="tile-content">
+      <div v-if="items.length === 0 && !loading" class="tile-empty">暂无数据</div>
 
-    <template v-else>
-      <div :style="{ height: topSpacerHeight + 'px' }"></div>
+      <template v-else>
+        <div :style="{ height: topSpacerHeight + 'px' }"></div>
 
-      <div v-for="row in visibleRows" :key="row.key" class="tile-row-wrap">
-        <div class="tile-row">
-          <div v-for="item in row.items" :key="item.id" class="tile-card">
-            <div class="tile-cover" @click="emit('expand', item)">
-              <img v-if="item.cover" class="tile-cover-img" :src="item.cover" :alt="item.title" />
-              <el-icon v-else class="tile-cover-empty" :size="28"><PictureFilled /></el-icon>
+        <div v-for="row in visibleRows" :key="row.key" class="tile-row-wrap">
+          <div class="tile-row" :style="rowStyle">
+            <div
+              v-for="item in row.items"
+              :key="item.id"
+              class="tile-card"
+              :class="{ expanded: item.id === expandedId }"
+            >
+              <div class="tile-cover" @click="emit('expand', item)">
+                <!-- 最多三张封面叠着放：第 0 张在最上面，其余两张在下面错开一个角度 -->
+                <img
+                  v-for="(cover, layer) in item.covers"
+                  :key="layer"
+                  class="tile-cover-img"
+                  :class="'layer-' + layer"
+                  :src="cover"
+                  :alt="item.title"
+                />
+                <el-icon v-if="item.covers.length === 0" class="tile-cover-empty" :size="28"><PictureFilled /></el-icon>
 
-              <span v-if="item.count !== null" class="tile-count">{{ item.count }}</span>
+                <span v-if="item.count !== null" class="tile-count">{{ item.count }}</span>
 
-              <el-checkbox
-                class="tile-check"
-                :model-value="selectState(item.id) === 'checked'"
-                :indeterminate="selectState(item.id) === 'indeterminate'"
-                @click.stop
-                @change="emit('select', item)"
-              />
+                <el-checkbox
+                  class="tile-check"
+                  :model-value="selectState(item.id) === 'checked'"
+                  :indeterminate="selectState(item.id) === 'indeterminate'"
+                  @click.stop
+                  @change="emit('select', item)"
+                />
 
-              <el-button class="tile-open" size="small" text @click.stop="emit('open', item)">
-                打开全部
+                <el-button class="tile-open" size="small" text @click.stop="emit('open', item)">
+                  打开全部
+                </el-button>
+              </div>
+
+              <div class="tile-title" :title="item.title">{{ item.title }}</div>
+              <div class="tile-subtitle" :title="item.subtitle">{{ item.subtitle }}</div>
+            </div>
+          </div>
+
+          <!-- 面板挂在它所在那一行的下方、占满整行；一次只展开一个 -->
+          <div v-if="row.expandedItem" class="tile-panel">
+            <div class="tile-panel-head">
+              <span class="tile-panel-title">{{ row.expandedItem.title }}</span>
+              <span class="tile-panel-count">{{ row.expandedItem.subtitle }}</span>
+              <el-button class="tile-panel-close" text size="small" @click="emit('expand', row.expandedItem)">
+                收起
               </el-button>
             </div>
-
-            <div class="tile-title" :title="item.title">{{ item.title }}</div>
-            <div class="tile-subtitle" :title="item.subtitle">{{ item.subtitle }}</div>
+            <slot name="panel" :item="row.expandedItem" />
           </div>
         </div>
 
-        <!-- 面板挂在它所在那一行的下方、占满整行；一次只展开一个 -->
-        <div v-if="row.expandedItem" class="tile-panel">
-          <slot name="panel" :item="row.expandedItem" />
-        </div>
-      </div>
+        <div :style="{ height: bottomSpacerHeight + 'px' }"></div>
+      </template>
 
-      <div :style="{ height: bottomSpacerHeight + 'px' }"></div>
-    </template>
-
-    <div v-if="loading" class="tile-loading">加载中…</div>
-  </div>
+      <div v-if="loading" class="tile-loading">加载中…</div>
+    </div>
+  </el-scrollbar>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import type { CSSProperties } from 'vue';
 import { PictureFilled } from '@element-plus/icons-vue';
+import type { ScrollbarInstance } from 'element-plus';
 import type { TileItem, TileSelectState } from './TileBoard.types';
 
 /** 卡片封面边长（像素），与缩略图常量一致 */
@@ -94,7 +118,7 @@ const emit = defineEmits<{
   loadMore: [];
 }>();
 
-const containerEl = ref<HTMLElement | null>(null);
+const scrollbarRef = ref<ScrollbarInstance | null>(null);
 const columnCount = ref(1);
 const viewportHeight = ref(0);
 const scrollTop = ref(0);
@@ -112,6 +136,11 @@ let resizeObserver: ResizeObserver | null = null;
 // ------------------------------------------------------------
 // 计算属性
 // ------------------------------------------------------------
+
+/** 行内格子等宽，卡片在格子里居中——这样整行铺满容器宽度，而不是都挤在左边 */
+const rowStyle = computed<CSSProperties>(() => ({
+  gridTemplateColumns: `repeat(${columnCount.value}, minmax(0, 1fr))`,
+}));
 
 const rowCount = computed(() => Math.ceil(props.items.length / columnCount.value));
 
@@ -152,8 +181,9 @@ const bottomSpacerHeight = computed(() => Math.max(0, rowCount.value - visibleEn
 onMounted(() => {
   measure();
   resizeObserver = new ResizeObserver(measure);
-  if (containerEl.value) {
-    resizeObserver.observe(containerEl.value);
+  const root = scrollbarRef.value?.$el;
+  if (root) {
+    resizeObserver.observe(root);
   }
   void nextTick(maybeLoadMore);
 });
@@ -179,37 +209,36 @@ watch(() => props.loading, (loading) => {
   }
 });
 
-function onScroll(): void {
-  const el = containerEl.value;
-  if (!el) {
-    return;
-  }
-  scrollTop.value = el.scrollTop;
+function onScroll({ scrollTop: top }: { scrollTop: number }): void {
+  scrollTop.value = top;
   maybeLoadMore();
+}
+
+/** el-scrollbar 的滚动视口；量高度与判断触底都靠它 */
+function viewport(): HTMLElement | undefined {
+  return scrollbarRef.value?.wrapRef as HTMLElement | undefined;
 }
 
 /** 量容器：宽度决定列数，高度决定视口里有几行 */
 function measure(): void {
-  const el = containerEl.value;
-  if (!el) {
+  const root = scrollbarRef.value?.$el;
+  const wrap = viewport();
+  if (!root || !wrap) {
     return;
   }
-  columnCount.value = Math.max(1, Math.floor((el.clientWidth + CARD_GAP) / (CARD_SIZE + CARD_GAP)));
-  viewportHeight.value = el.clientHeight;
-  scrollTop.value = el.scrollTop;
+  columnCount.value = Math.max(1, Math.floor((root.clientWidth + CARD_GAP) / (CARD_SIZE + CARD_GAP)));
+  viewportHeight.value = root.clientHeight;
+  scrollTop.value = wrap.scrollTop;
   void nextTick(maybeLoadMore);
 }
 
 /** 触底且同一批数据没有请求过时才 emit，避免滚动事件把 loadMore 刷屏 */
 function maybeLoadMore(): void {
-  if (props.loading || props.items.length === 0) {
+  const wrap = viewport();
+  if (props.loading || props.items.length === 0 || !wrap) {
     return;
   }
-  const el = containerEl.value;
-  if (!el) {
-    return;
-  }
-  if (el.scrollHeight - el.scrollTop - el.clientHeight > LOAD_MORE_THRESHOLD) {
+  if (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight > LOAD_MORE_THRESHOLD) {
     return;
   }
   if (requestedAtCount === props.items.length) {
@@ -221,11 +250,7 @@ function maybeLoadMore(): void {
 
 /** 页面换筛选 / 切视图时把滚动位置归零 */
 function scrollToTop(): void {
-  const el = containerEl.value;
-  if (!el) {
-    return;
-  }
-  el.scrollTop = 0;
+  scrollbarRef.value?.setScrollTop(0);
   scrollTop.value = 0;
   requestedAtCount = -1;
 }
@@ -237,41 +262,83 @@ defineExpose({ scrollToTop });
 .tile-board {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+}
+
+.tile-board :deep(.el-scrollbar__wrap) {
   overflow-x: hidden;
 }
 
+.tile-content {
+  padding-right: 6px;
+}
+
 .tile-row-wrap {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .tile-row {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  align-items: start;
+  justify-items: center;
   gap: 12px;
 }
 
 .tile-card {
-  width: 100px;
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .tile-cover {
   position: relative;
   width: 100px;
   height: 100px;
-  overflow: hidden;
-  border: 1px solid #3e4044;
-  border-radius: 6px;
-  background: #2b2d30;
   cursor: pointer;
 }
 
 .tile-cover-img {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border: 1px solid #3e4044;
+  border-radius: 6px;
+  background: #2b2d30;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+/* 三张封面叠着放：第 0 张在最上面，另外两张往两侧错开并稍作旋转 */
+.tile-cover-img.layer-0 {
+  z-index: 3;
+}
+
+.tile-cover-img.layer-1 {
+  z-index: 2;
+  transform: rotate(-7deg) translate(-7px, 3px) scale(0.97);
+}
+
+.tile-cover-img.layer-2 {
+  z-index: 1;
+  transform: rotate(7deg) translate(7px, 3px) scale(0.94);
+}
+
+/* 悬停放大并加阴影，与图片查看器底部小图一个观感 */
+.tile-card:hover .tile-cover-img.layer-0 {
+  transform: scale(1.12);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+
+.tile-card:hover .tile-cover-img.layer-1 {
+  transform: rotate(-9deg) translate(-11px, 4px) scale(1.08);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+.tile-card:hover .tile-cover-img.layer-2 {
+  transform: rotate(9deg) translate(11px, 4px) scale(1.05);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
 }
 
 .tile-cover-empty {
@@ -280,6 +347,9 @@ defineExpose({ scrollToTop });
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid #3e4044;
+  border-radius: 6px;
+  background: #2b2d30;
   color: #5e6065;
 }
 
@@ -287,6 +357,7 @@ defineExpose({ scrollToTop });
   position: absolute;
   top: 4px;
   right: 4px;
+  z-index: 5;
   min-width: 18px;
   padding: 0 4px;
   border-radius: 9px;
@@ -301,6 +372,7 @@ defineExpose({ scrollToTop });
   position: absolute;
   top: 2px;
   left: 4px;
+  z-index: 5;
   height: auto;
 }
 
@@ -308,6 +380,7 @@ defineExpose({ scrollToTop });
   position: absolute;
   right: 4px;
   bottom: 4px;
+  z-index: 5;
   display: none;
   background: rgba(0, 0, 0, 0.65);
   color: #ffffff;
@@ -317,8 +390,24 @@ defineExpose({ scrollToTop });
   display: block;
 }
 
+/* 展开了的卡片给一圈主色描边，免得看不出展开的是哪一个 */
+.tile-card.expanded .tile-cover::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  z-index: 4;
+  border: 2px solid #3871e1;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.tile-card.expanded .tile-title {
+  color: #7aa2f7;
+}
+
 .tile-title {
   margin-top: 4px;
+  max-width: 100%;
   font-size: 12px;
   color: #d8dadd;
   white-space: nowrap;
@@ -327,6 +416,7 @@ defineExpose({ scrollToTop });
 }
 
 .tile-subtitle {
+  max-width: 100%;
   font-size: 11px;
   color: #82858b;
   white-space: nowrap;
@@ -335,11 +425,34 @@ defineExpose({ scrollToTop });
 }
 
 .tile-panel {
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid #323438;
+  margin-top: 12px;
+  padding: 10px 12px 12px 12px;
+  border: 1px solid #3871e1;
   border-radius: 8px;
   background: #232427;
+}
+
+.tile-panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tile-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d8dadd;
+}
+
+.tile-panel-count {
+  font-size: 12px;
+  color: #82858b;
+}
+
+.tile-panel-close {
+  margin-left: auto;
+  color: #82858b;
 }
 
 .tile-empty {

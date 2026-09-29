@@ -58,7 +58,7 @@
       @load-more="loadMoreGroups"
     >
       <template #panel="{ item }">
-        <div class="panel-scroll" @scroll.passive="onPanelScroll">
+        <el-scrollbar ref="panelScrollRef" class="panel-scroll" max-height="360px" @scroll="onPanelScroll">
           <div v-if="panelFiles.length > 0" class="panel-grid">
             <div
               v-for="file in panelFiles"
@@ -73,7 +73,7 @@
           </div>
           <div v-else-if="!panelLoading" class="panel-empty">这个图片组没有图片</div>
           <div v-if="panelLoading" class="panel-loading">加载中…</div>
-        </div>
+        </el-scrollbar>
       </template>
     </TileBoard>
 
@@ -96,7 +96,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
-import type { TableInstance } from 'element-plus';
+import type { ScrollbarInstance, TableInstance } from 'element-plus';
 
 import { IPC } from '@common/ipcChannels';
 import type {
@@ -161,10 +161,12 @@ const statusFilter = ref('');
 const tableGroups = ref<ImageGroupView[]>([]);
 const groupTotal = ref(0);
 const tableRef = ref<TableInstance | null>(null);
+const panelScrollRef = ref<ScrollbarInstance | null>(null);
 
 const tileGroups = ref<ImageGroupView[]>([]);
 const tileGroupsLoading = ref(false);
-const groupCovers = ref(new Map<number, string | null>());
+/** 图组 id → 最多三张封面 */
+const groupCovers = ref(new Map<number, (string | null)[]>());
 const expandedGroupId = ref<number | null>(null);
 const panelFiles = ref<ImageFile[]>([]);
 const panelLoading = ref(false);
@@ -278,7 +280,7 @@ const tileItems = computed<TileItem[]>(() =>
     title: group.dirName,
     subtitle: group.sourceName + ' · ' + group.characterName,
     count: group.fileCount,
-    cover: groupCovers.value.get(group.id) ?? null,
+    covers: (groupCovers.value.get(group.id) ?? []).filter((cover): cover is string => cover !== null),
   })),
 );
 
@@ -410,8 +412,9 @@ async function loadGroupCovers(ids: number[]): Promise<void> {
   }
   const covers = await getCovers('group', ids);
   const next = new Map(groupCovers.value);
+  // 同一个分组会回来多行（rn 1..3），按 rn 顺序攒成数组
   for (const cover of covers) {
-    next.set(cover.id, cover.thumbnail);
+    next.set(cover.id, [...(next.get(cover.id) ?? []), cover.thumbnail]);
   }
   groupCovers.value = next;
 }
@@ -495,6 +498,7 @@ async function toggleGroup(item: TileItem): Promise<void> {
   }
   expandedGroupId.value = item.id;
   panelFiles.value = [];
+  panelScrollRef.value?.setScrollTop(0);
   await loadPanelFiles(item.id, true);
 }
 
@@ -517,9 +521,12 @@ function toggleGroupSelection(item: TileItem): void {
   }
 }
 
-function onPanelScroll(event: Event): void {
-  const el = event.currentTarget as HTMLElement;
-  if (el.scrollHeight - el.scrollTop - el.clientHeight > PANEL_LOAD_MORE_THRESHOLD) {
+function onPanelScroll(): void {
+  const wrap = panelScrollRef.value?.wrapRef as HTMLElement | undefined;
+  if (!wrap) {
+    return;
+  }
+  if (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight > PANEL_LOAD_MORE_THRESHOLD) {
     return;
   }
   void loadMorePanelFiles();
@@ -828,8 +835,7 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
 }
 
 .panel-scroll {
-  max-height: 360px;
-  overflow-y: auto;
+  margin-right: -4px;
 }
 
 .panel-grid {
@@ -843,10 +849,16 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
   cursor: pointer;
 }
 
+.panel-item:hover .panel-thumb {
+  transform: scale(1.1);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+
 .panel-thumb {
   display: block;
   width: 100px;
   height: 100px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   object-fit: cover;
   border-radius: 6px;
   background: #2b2d30;

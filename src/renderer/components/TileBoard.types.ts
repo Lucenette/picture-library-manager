@@ -8,8 +8,8 @@ export interface TileItem {
   subtitle: string;
   /** 数量角标；为 null 时不显示 */
   count: number | null;
-  /** 封面缩略图 Data URL；没有就显示占位图标 */
-  cover: string | null;
+  /** 封面缩略图 Data URL（最多三张，第一张在最上面）；没有就显示占位图标 */
+  covers: string[];
 }
 
 /** 卡片复选框的选中状态；三态只用于图库页的角色卡 */
