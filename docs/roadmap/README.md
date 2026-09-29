@@ -22,7 +22,7 @@
 | 脚本库：互相引用、外部依赖与补全跳转 | 待评审 | [script-library.md](./script-library.md) |
 | 设置页面 | 待评审 | [settings-page.md](./settings-page.md) |
 | 颜色主题切换 | 待评审 | [theme.md](./theme.md) |
-| 平铺视图 | 待评审 | [view-layouts.md](./view-layouts.md) |
+| 平铺视图 | 待实施 | [view-layouts.md](./view-layouts.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
 | 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
 | 测试系统 | 待评审 | [test-system.md](./test-system.md) |
