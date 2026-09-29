@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog">
+  <changeSet id="20260930103000000001" author="powerinv">
+    <comment>source / character | 排序键列：来源名、来源根路径、角色名</comment>
+    <sql>
+      ALTER TABLE source ADD COLUMN name_sort TEXT;
+      ALTER TABLE source ADD COLUMN root_path_sort TEXT;
+      ALTER TABLE character ADD COLUMN name_sort TEXT;
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260930103000000002" author="powerinv">
+    <comment>image_group / image_file | 排序键列：图组目录名与路径、图片文件名</comment>
+    <sql>
+      ALTER TABLE image_group ADD COLUMN dir_name_sort TEXT;
+      ALTER TABLE image_group ADD COLUMN dir_path_sort TEXT;
+      ALTER TABLE image_file ADD COLUMN file_name_sort TEXT;
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260930103000000003" author="powerinv">
+    <comment>process_script / processed_image | 排序键列：脚本名与图库里的脚本名副本</comment>
+    <sql>
+      ALTER TABLE process_script ADD COLUMN name_sort TEXT;
+      ALTER TABLE processed_image ADD COLUMN script_name_sort TEXT;
+    </sql>
+  </changeSet>
+
+  <changeSet id="20260930103000000004" author="powerinv">
+    <comment>排序索引 | 六个排序键列各建一条 (列, id) 索引；图库按文件名排序再要一条 selected_file</comment>
+    <sql>
+      CREATE INDEX idx_source_name_sort ON source(name_sort, id);
+      CREATE INDEX idx_character_name_sort ON character(name_sort, id);
+      CREATE INDEX idx_image_group_dir_name_sort ON image_group(dir_name_sort, id);
+      CREATE INDEX idx_image_file_file_name_sort ON image_file(file_name_sort, id);
+      CREATE INDEX idx_process_script_name_sort ON process_script(name_sort, id);
+      CREATE INDEX idx_processed_script_name_sort ON processed_image(script_name_sort, id);
+      CREATE INDEX idx_processed_selected_file ON processed_image(selected_file);
+    </sql>
+  </changeSet>
+</databaseChangeLog>

@@ -174,6 +174,78 @@ export interface ProcessedImageView extends ProcessedImage {
   selectedFileSize: number | null;
 }
 
+/** 图库页的筛选条件：表格与平铺共用，主进程按它下推 SQL */
+export interface ProcessedFilter {
+  /** 来源 id */
+  sourceId?: number;
+  /** 角色名，精确匹配 */
+  characterName?: string;
+  /** 文件名子串，不区分大小写 */
+  fileName?: string;
+  /** 处理脚本名，精确匹配；`手动确认` 对应脚本名为空的行 */
+  scriptName?: string;
+}
+
+/** 图库页的排序键：列名走主进程的白名单 */
+export type ProcessedSortKey = 'character' | 'fileName' | 'scriptName' | 'confirmedAt';
+
+/** 图库页的排序 */
+export interface ProcessedSort {
+  key: ProcessedSortKey;
+  direction: 'asc' | 'desc';
+}
+
+/** 图库的轻量索引行：只要 id 与角色名，不带缩略图 */
+export interface ProcessedIndexRow {
+  id: number;
+  characterName: string;
+}
+
+/**
+ * 图库平铺视图的一级卡片：一个角色 + 当前筛选下的图片数。
+ *
+ * 归组的键是**角色名**——同一个角色可能出现在多个来源里，那是同一张卡；
+ * `characterId` 只是这个名字下最小的那个 id，用来给卡片一个稳定的句柄。
+ */
+export interface CharacterTile {
+  characterId: number;
+  characterName: string;
+  count: number;
+}
+
+/** 图组页的筛选条件 */
+export interface ImageGroupFilter {
+  status?: ImageGroupStatus;
+  sourceId?: number;
+  /** 角色名，精确匹配 */
+  characterName?: string;
+  /** 图组目录路径的子串，不区分大小写 */
+  dirPath?: string;
+}
+
+/** 图组页的排序键：列名走主进程的白名单 */
+export type ImageGroupSortKey = 'source' | 'character' | 'dirName' | 'dirPath' | 'fileCount' | 'status';
+
+/** 图组页的排序；不传就用「来源 → 角色 → 目录名」 */
+export interface ImageGroupSort {
+  key: ImageGroupSortKey;
+  direction: 'asc' | 'desc';
+}
+
+/** 角色封面：一个角色名最多三张，`rn` 是组内序号（1 起），缩略图缺失时为 null */
+export interface CharacterCover {
+  name: string;
+  rn: number;
+  thumbnail: string | null;
+}
+
+/** 图组封面：与角色封面同构，键是图组 id */
+export interface GroupCover {
+  id: number;
+  rn: number;
+  thumbnail: string | null;
+}
+
 // ------------------------------------------------------------
 // 扫描
 // ------------------------------------------------------------
@@ -247,10 +319,21 @@ export interface ViewerFile {
   thumbnail: string | null;
 }
 
-/** 打开图片查看器时下发的数据 */
-export interface ViewerPayload {
-  files: ViewerFile[];
-  index: number;
+/** 查看器的数据来源：图库按筛选条件分片取，图组页按图组分片取 */
+export type ViewerSource =
+  | { kind: 'processed'; filter: ProcessedFilter; sort: ProcessedSort; startId: number }
+  | { kind: 'group'; groupId: number; startId: number };
+
+/**
+ * 打开图片查看器时下发的数据。
+ *
+ * 只给「看哪些图」与「从哪一张开始」，缩略图由查看器自己按分片取：
+ * 图库动辄几千行，把整份列表连同缩略图塞进 IPC 会一次传十几 MB。
+ */
+export interface ViewerOpenRequest {
+  source: ViewerSource;
+  /** 标题栏与信息条显示的名字 */
+  title: string;
 }
 
 /** 扫描配置窗口初始化数据 */
@@ -334,6 +417,8 @@ export interface PromptResult extends PromptInitData {
 /** 文件查看窗口初始化数据 */
 export interface FileViewerInitData {
   files: ImageFile[];
+  /** 图片组 id：窗口里点开图片查看器时按它分片取 */
+  groupId: number;
   groupName: string;
   groupDirPath: string;
 }
