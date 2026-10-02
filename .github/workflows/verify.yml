@@ -25,15 +25,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          # 注意：未启用 setup-node 的 yarn 缓存，因为仓库当前未跟踪 yarn.lock
+          cache: yarn
 
       - name: 文档与 skill 检查
         # 零依赖，放在安装依赖之前：文档问题不必等依赖装完才暴露
         run: node scripts/check-docs.mjs
 
       - name: 安装依赖
-        # yarn.lock 目前被 .gitignore 忽略，因此不能用 --frozen-lockfile
-        run: yarn install --network-timeout 600000
+        run: yarn install --frozen-lockfile --network-timeout 600000
 
       - name: 类型检查
         run: yarn typecheck

@@ -21,6 +21,7 @@
 | `yarn build` | 打包**当前平台**（Windows → NSIS，macOS → dmg，Linux → AppImage / deb） | 产物在 `dist/`；指定平台用 `yarn build:win` / `build:mac` / `build:linux` |
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
+| `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
 
 ---
 
@@ -271,7 +272,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 - **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
   要清理只点具体产物：`dist/icons`、`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。
-- **`yarn.lock` 被 `.gitignore` 忽略**：CI 无法使用冻结锁文件，依赖版本以 `package.json` 为准。
+- **依赖可复现**：`yarn.lock` 已入库，CI 用 `yarn install --frozen-lockfile` 安装；Node 版本由 `.nvmrc`（`22`）与 `package.json` 的 `engines.node`（`>=22.12`）固定。
 - **`?nodeWorker` 是 electron-vite 的虚拟模块**：静态的"导入路径是否存在"检查工具会把它报成无法解析，这是正常的，不是错误。
 - **`ReplaceFileW EIO (Win32 32)`**：`yarn dev` 或 IDE 正在占用该文件，稍后重试即可。
 
