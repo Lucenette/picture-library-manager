@@ -4,6 +4,8 @@
 
 参与本项目即表示你同意遵守 [行为准则](./CODE_OF_CONDUCT.md)。
 
+本项目以**中文**协作：Issue、PR 与讨论用中文即可；提交信息也用中文，外部 PR 的英文提交信息由维护者统一改写。
+
 ---
 
 ## 环境准备
@@ -106,6 +108,29 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 - `yarn typecheck` —— 改了主进程或渲染进程时
 
 静态检查通过不等于功能正常：改了主进程 / 窗口 / worker / IPC 的，请人工冒烟受影响的界面。
+
+---
+
+## 不知道从哪开始
+
+下面五项都在 GitHub 上标了 `good first issue`，改动小、边界清楚，适合先熟悉流程。认领入口是 Issues 里对应的那个 Issue；方案背景在 `docs/roadmap/` 的同名文件里。
+
+| 起步项 | 大致动什么 | 背景 |
+|---|---|---|
+| 颜色主题切换 | 渲染进程 CSS 变量 | [theme.md](./docs/roadmap/theme.md) |
+| 设置页面 | 主进程 + 渲染进程 | [settings-page.md](./docs/roadmap/settings-page.md) |
+| 构建目标：32 位与 arm | 只动构建配置 | [build-targets.md](./docs/roadmap/build-targets.md) |
+| 诊断：打开日志目录与收集日志 | 主进程 + 一个入口 | [diagnostics.md](./docs/roadmap/diagnostics.md) |
+| 其余窗口的自绘标题栏 | 有现成设计可照抄 | [window-chrome.md](./docs/roadmap/window-chrome.md) |
+
+---
+
+## 协作方式
+
+- **提问出口**：用法问题与想法走 [GitHub Discussions](https://github.com/Lucenette/picture-library-manager/discussions) 的 Q&A / Ideas；先查 [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)，查不到再问。
+- **响应节奏**：Issue 与 PR 的首次回应通常在 3 个工作日内；合入 `develop` 后由维护者安排发布。
+- **发布流程**：版本由维护者按 `.agents/skills/gitflow-release/SKILL.md` 的 gitflow 流程发布（`develop` → `release/<x.y>` → 合入 `master` → 打 tag → CI 出三平台产物）。贡献者只需在 `CHANGELOG.md` 的 `[未发布]` 段补条目，不需要关心版本号与发布段。
+- **`.agents/skills/`**：那是给编码代理（AI）用的可复用工作流，人类贡献者可以选读；常驻的硬性约定看 [AGENTS.md](./AGENTS.md)。
 
 ---
 
