@@ -35,6 +35,7 @@ export default tseslint.config(
     },
     rules: {
       curly: ['error', 'all'],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'no-restricted-syntax': ['error',
         { selector: 'ImportNamespaceSpecifier', message: '禁止 import * as，改用具名导入' },
         { selector: 'ExportNamespaceSpecifier', message: '禁止 export * as，改用具名导出' },

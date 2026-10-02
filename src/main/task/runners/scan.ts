@@ -45,7 +45,6 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
 
   const characters: StoredCharacter[] = [];
   let collectedGroups = 0;
-  let totalFiles = 0;
   let failedWrites = 0;
   let thumbnailFailures = 0;
   let thumbnailEngine: ThumbnailEngineName | 'none' = 'none';
@@ -111,7 +110,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   }
 
     // ---- 3. 逐张生成缩略图并立刻入库：一张一条 INSERT，写一张落一张 ----
-  totalFiles = characters.reduce(
+  const totalFiles = characters.reduce(
     (sum, character) => sum + character.groups.reduce((count, group) => count + group.files.length, 0),
     0,
   );
@@ -166,7 +165,6 @@ async function generateThumbnails(
   ctx.onAbort(() => pool.terminate());
   const batchSize = pool.concurrency;
   let doneFiles = 0;
-  let storedFiles = 0;
   let failures = 0;
 
   const analyzeFile = async (group: StoredGroup, file: ScannedFile): Promise<void> => {
@@ -198,7 +196,6 @@ async function generateThumbnails(
     // 无论这张有没有缩略图都立刻入库；写失败只让它自己缺一行
     try {
       insertImageFiles(group.groupId, [file]);
-      storedFiles += 1;
     } catch (error) {
       log.error(`store image failed: ${file.filePath}`, error);
     }
