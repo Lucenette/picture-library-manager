@@ -60,7 +60,7 @@ Scripts are CommonJS `.js` files stored under the user data directory; the app k
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The project works in Chinese; English issues and pull requests are welcome and the maintainer will translate. Starter tasks are labelled `good first issue` on GitHub.
+See [CONTRIBUTING.md](CONTRIBUTING.md). The project works in Chinese; English issues and pull requests are welcome and the maintainer will translate. Starter tasks are labelled `good first issue` on GitHub - [see the claimable issues](https://github.com/Lucenette/picture-library-manager/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
 ## License
 

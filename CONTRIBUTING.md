@@ -115,7 +115,9 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 
 ## 不知道从哪开始
 
-下面五项都在 GitHub 上标了 `good first issue`，改动小、边界清楚，适合先熟悉流程。认领入口是 Issues 里对应的那个 Issue；方案背景在 `docs/roadmap/` 的同名文件里。
+下面五项都在 GitHub 上标了 `good first issue`，改动小、边界清楚，适合先熟悉流程。
+
+**认领入口**：[标了 `good first issue` 的 Issues](https://github.com/Lucenette/picture-library-manager/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)。方案背景在 `docs/roadmap/` 的同名文件里。
 
 | 起步项 | 大致动什么 | 背景 |
 |---|---|---|
