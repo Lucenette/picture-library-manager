@@ -29,8 +29,40 @@ yarn dev
 | `yarn typecheck` | 类型检查：主进程 `tsc` + 渲染进程 `vue-tsc` |
 | `yarn build` | 打包当前平台（Windows NSIS / macOS dmg / Linux AppImage、deb）到 `dist/` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符（零依赖） |
+| `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/`（零依赖，可重复执行） |
 
 > `yarn typecheck` 依赖 `vue-tsc`，它是 devDependency，必须先 `yarn install`。
+
+---
+
+## 样例图库
+
+仓库不跟踪任何图片，但改扫描 / 选图 / 导出的人需要一份可扫描的输入。生成它（零依赖，可重复执行）：
+
+```bash
+node scripts/make-fixture.mjs
+```
+
+产物在 `dist/fixture/`（已被 `.gitignore` 忽略）。把下面三个目录**分别**作为来源添加，而不是把 `dist/fixture` 整个加进去：
+
+| 来源目录 | 覆盖的目录规范 | 内置「默认」脚本识别结果（已实跑确认） |
+|---|---|---|
+| `dist/fixture/三端壁纸` | 角色 / 图片组 / 设备分类（三层） | 阿波尼亚（2 个图片组）、神里绫人（1 个） |
+| `dist/fixture/动漫游戏人物` | 长名称图片组、编号开头的角色、角色下直接放图 | 雷电将军、阿尼亚、散图角色（各 1 个） |
+| `dist/fixture/边界情况` | 必须被处理、但不该让流程崩掉的输入 | 测试角色（1 个） |
+
+「边界情况」里特意放了非图片文件、0 字节文件、扩展名是图片但内容损坏的文件、超宽与超高比图片。它们**不应让扫描失败**：
+
+- `说明.txt`、`Thumbs.db` 不是图片，扫描时直接跳过，不计入图片组的文件数；
+- `损坏.png`、`空文件.png` 是图片扩展名但读不出内容：缩略图生成失败，计入任务结果里的失败张数，**不中断**整轮扫描。
+
+真实大图不进样例库（会让生成与仓库都变重）。要验证解码分批或内存预算时，临时用 `sharp` 造一张再删掉即可：
+
+```bash
+node -e "require('sharp')({create:{width:8000,height:8000,channels:3,background:'#346'}}).png().toFile('dist/fixture/大图.png')"
+```
+
+改动扫描 / 选图 / 导出后，请用这份样例图库手工走一遍「添加来源 → 扫描 → 选图 → 导出」。
 
 ---
 
