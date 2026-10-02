@@ -144,7 +144,7 @@ dirs:
 
 ## 6. 验证方法
 
-1. 静态：给 `node scripts/check-code.mjs` 加一条「`src/core/**` 不得 import electron」的规则，先只在 CI 统计。
+1. 静态：给 `eslint.config.mjs` 加一条「`src/core/**` 不得 import electron」的规则，先只在 CI 统计。
 2. 纯 Node：不启动 Electron，用 Node 跑起 core 的开库与一次扫描任务。
 3. bus：同一组命令分别经 IPC 与 HTTP 调用，返回一致。
 4. 人工冒烟：桌面路径全功能回归；server 模式起服务，浏览器完成「添加来源 → 扫描 → 选图 → 导出」。

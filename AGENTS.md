@@ -22,7 +22,7 @@
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
-| `node scripts/check-code.mjs` | 代码规范检查：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析 | 用现有 `typescript` 与 `@vue/compiler-sfc`，需先 `yarn install` |
+| `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs` |
 | `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置 | 只跑一侧用 `yarn test:main` / `yarn test:renderer` |
 
 ---
@@ -299,14 +299,9 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 1. `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `common`。
 2. `node_modules/.bin/vue-tsc -p tsconfig.web.json` —— 覆盖渲染进程，**含 `.vue`**。
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
-3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
-4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
-5. 导入解析：确认所有 `@/`、`@common/` 与相对路径都能落到真实文件（`?nodeWorker`、`?raw` 除外——
-   它们由 electron-vite / Vite 接管）。
-6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
-7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
-8. `node scripts/check-code.mjs` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译（第 3 条）与导入解析（第 5 条）。
-9. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
+3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译与导入解析，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。
+4. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+5. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 

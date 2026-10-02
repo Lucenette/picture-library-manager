@@ -37,11 +37,11 @@ jobs:
           node-version: 22
           cache: yarn
       - name: 安装依赖
-        # check-code 需要 typescript 与 @vue/compiler-sfc（现有依赖），因此必须装依赖；
+        # ESLint 及其插件是 devDependencies，必须装依赖；
         # --ignore-scripts 跳过原生模块（sharp / electron）的安装脚本，只取纯 JS 部分。
         run: yarn install --frozen-lockfile --ignore-scripts --network-timeout 600000
       - name: 代码规范检查
-        run: node scripts/check-code.mjs
+        run: yarn lint
 
   test:
     name: 单元测试

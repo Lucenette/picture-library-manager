@@ -34,7 +34,7 @@ yarn dev
 | `yarn build` | 打包当前平台（Windows NSIS / macOS dmg / Linux AppImage、deb）到 `dist/` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符（零依赖） |
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/`（零依赖，可重复执行） |
-| `node scripts/check-code.mjs` | 代码规范检查：命名空间导入、控制语句大括号、渲染进程 Node 边界、database 反向依赖、`.vue` 模板编译与导入解析（需先 `yarn install`） |
+| `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、database 反向依赖、`.vue` 模板编译与导入解析、类型感知规则（需先 `yarn install`） |
 | `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置（只跑一侧用 `yarn test:main` / `yarn test:renderer`） |
 
 > `yarn typecheck` 依赖 `vue-tsc`，它是 devDependency，必须先 `yarn install`。
@@ -107,7 +107,7 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 与贡献者最相关的四条：
 
 - `node scripts/check-docs.mjs` —— 任何文档改动都要跑（零依赖，秒级）
-- `node scripts/check-code.mjs` —— 改了 `.ts` / `.vue` 时（需先 `yarn install`）
+- `yarn lint` —— 改了 `.ts` / `.vue` 时（需先 `yarn install`）
 - `yarn typecheck` —— 改了主进程或渲染进程时
 - `yarn test` —— 改了「规则内」的代码时，判据见 [AGENTS.md](./AGENTS.md) 的「测试覆盖规则」
 

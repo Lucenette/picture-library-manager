@@ -3,14 +3,14 @@
 **状态**：现行架构
 **最后更新**：2026-10-03
 
-**关联**：[ARCHITECTURE.md](../ARCHITECTURE.md)（进程模型与分层）、[AGENTS.md](../../AGENTS.md)（改完必须自检的八条）
+**关联**：[ARCHITECTURE.md](../ARCHITECTURE.md)（进程模型与分层）、[AGENTS.md](../../AGENTS.md)（改完必须自检的五条）
 
 ---
 
 ## 1. 背景
 
 1. **仓库此前没有测试框架。** `package.json` 只有 `postinstall` / `dev` / `preview` / `icon` / `build` / `typecheck`；逻辑最密的几处（任务状态机、升级引擎、行级差分、发布说明合并）只能靠人工冒烟。
-2. **原有验证手段是脚本加人工步骤：** `scripts/check-docs.mjs`、`scripts/check-code.mjs`、`yarn typecheck`、`.agents/skills/db-maintenance/scripts/verify-migration.mjs`。AGENTS.md 的八条自检里，`.vue` 模板编译与导入解析当时没有脚本兜底。
+2. **原有验证手段是脚本加人工步骤：** `scripts/check-docs.mjs`、`scripts/check-code.mjs`（后由 `yarn lint` 取代）、`yarn typecheck`、`.agents/skills/db-maintenance/scripts/verify-migration.mjs`。AGENTS.md 的自检里，`.vue` 模板编译与导入解析当时没有脚本兜底。
 3. **可测的纯逻辑已经存在：** `ups/engine.ts`（数据库与日志以接口注入）、`database/sort/`、`image/similar.ts`、`task/task-control.ts`、`renderer/views/main/scripts/diff.ts`、`scripts/release-notes.mjs`。缺的只是一台运行器。
 4. **主进程与渲染进程的 `@` 指向不同源码根**（`tsconfig.node.json` → `src/main`，`tsconfig.web.json` → `src/renderer`），一套配置同时跑两侧会互相打架——这是两份配置的直接原因。
 5. **写第一批测试就抓到 bug：** 脚本编译用 `new NodeModule('')`，而 Node 的 CJS 解析器按 `module.id` 定位相对引用的基准目录，`require('./helper')` 一直解析不到；[SCRIPTING.md](../SCRIPTING.md) 里相对引用可用的承诺实际不成立。
@@ -24,6 +24,7 @@
 | 2026-10-03 | 由 `docs/roadmap/test-system.md` 迁入，正文改写为现行说明 | 测试系统落地 |
 | 2026-10-03 | 补「规则内必须带用例」的判据与检查点 | 确定测试覆盖规则 |
 | 2026-10-03 | 测试改用 `@test` / `@scripts` 绝对引用 | 去掉测试里的相对路径 |
+| 2026-10-03 | 引入 ESLint：四条硬规则迁入，新增格式与类型感知规则，`scripts/check-code.mjs` 退役 | 用成熟 lint 取代自研检查 |
 
 ---
 
@@ -64,11 +65,15 @@ test/
 - `yarn test`（两侧依次跑）、`yarn test:main`、`yarn test:renderer`；只跑一个文件用 `yarn test:main test/main/database/sort.test.ts`。
 - `.github/workflows/verify.yml` 的 `test` 作业分两步跑 `yarn test:main` 与 `yarn test:renderer`，失败能一眼看出是哪一侧。
 
-## 5. 类型检查与规范
+## 5. 类型检查、ESLint 与文档检查
 
-- `test/` 的对应目录已并入两份 tsconfig 的 `include`，`@` 按各自的映射解析，`yarn typecheck` 连测试一起查；`tsconfig.node.json` 开 `allowJs`，测试才能 import `scripts/release-notes.mjs`。
-- `scripts/check-code.mjs` 的扫描范围是 `src` 与 `test`。除四条硬性规范外，它还检查 `.vue` 的 `parse` / `compileScript` / `compileTemplate`，以及 `@/`、`@common/`、`@static/` 与相对导入能否落到真实文件（`?nodeWorker` 放行、`?raw` 去掉查询后校验）。
-- `check-code.mjs` 导出 `lintText(rel, content)`：测试进程内喂一段源码就能验规则，不必起子进程扫全仓库。
+- `test/` 的对应目录已并入两份 tsconfig 的 `include`，`@` 按各自的映射解析，`yarn typecheck` 连测试一起查；`tsconfig.node.json` 开 `allowJs`，测试才能 import `scripts/release-notes.mjs`（同目录的 `release-notes.d.mts` 提供类型）。
+- **ESLint 是唯一的形式检查入口**（`eslint.config.mjs`，`yarn lint`）：`@eslint/js` recommended + `typescript-eslint` recommended / recommendedTypeChecked + `eslint-plugin-vue` flat/essential。
+  - 仓库专属：`curly`、禁止命名空间导入 / 导出、渲染进程 Node 边界、`src/main/database/**` 禁 `@/ups`、`no-console`（`src/main/log/**` 除外）、`import-x/order`、`comma-dangle` / `object-curly-spacing` / `block-spacing`。
+  - `.vue` 的模板语法由 `vue/no-parsing-error` 覆盖：`vue-tsc` 只查模板里的类型错误（未定义变量报 `TS2339`），不查语法错误（`{{ 1 + }}` 会放过）。
+  - 导入解析不再单独写脚本：`tsc` / `vue-tsc` 本来就会报未解析的导入（`TS2307`）。
+  - `src/main/image/thumbnail-sharp.ts` / `walk.ts` / `script/compile.ts` 的 `require` 是有意写法（图像依赖不交给打包器内联），`@typescript-eslint/no-require-imports` 按文件放行。
+- `node scripts/check-docs.mjs` 管文档。`scripts/check-code.mjs` 已在引入 ESLint 时删除：它的四条规则迁进 ESLint，模板编译与导入解析分别由 `vue/no-parsing-error` 与 `typecheck` 覆盖。
 
 ## 6. 覆盖范围
 
@@ -81,17 +86,17 @@ test/
 | `ups/engine.ts` | 三段顺序、已执行不重跑、failed 不算已执行、抛错回滚且只记 failed、备份保留 3 份、shouldAbort |
 | `image/walk.ts`、`script/compile.ts` | 隐藏项、children 语义、白名单收集、坏图 0×0；导出类型、编译错误、相对 require |
 | `contracts/` | IPC 通道值不重复、排序列都在 changelog 里、版本号唯一递增 |
-| `scripts/` | check-code 的规则反例、check-docs 的占位符、release-notes 的小节合并 |
+| `scripts/` | check-docs 的占位符、release-notes 的小节合并 |
 
 不覆盖：端到端（真实 Electron 与窗口）、渲染进程组件测试（jsdom 与 `@vue/test-utils` 以后往 `vitest.renderer.config.ts` 上加）、覆盖率门槛，以及窗口 / 对话框 / 菜单 / `nativeTheme` 这类只能人工冒烟的部分。
 
 ## 7. 改动时的检查点
 
 - **放对边**：渲染进程的测试写进 `test/main` 会被主进程配置的 `@` 解析到错误路径。
-- **同步扫描范围**：测试在 `src/` 之外，动了 tsconfig 的 `include` 或 `check-code` 的扫描根，两边要一起改。
-- **测试也守规范**：`check-code` 同一套硬规则对 `test/` 生效。
+- **同步扫描范围**：测试在 `src/` 之外，动了 tsconfig 的 `include` 或 `eslint.config.mjs` 的 `files` 范围，两边要一起改。
+- **测试也守规范**：`yarn lint` 的同一套规则对 `test/` 生效。
 - **别加 `type: module`**：`package.json` 没有它，vitest 会打 `MODULE_TYPELESS_PACKAGE_JSON` 警告；为了消警告加 `type` 会动 Electron 构建。
-- **子进程要克制**：`check-code` 已能进程内验规则；`check-docs` 没有可 import 的入口，对应测试只能起子进程（约 0.5s / 次）。
+- **子进程要克制**：`check-docs` 没有可 import 的入口，对应测试只能起子进程（约 0.5s / 次）。
 - **别名四处同步**：`@test` / `@scripts` 写在两份 vitest 配置的 `resolve.alias` 与两份 tsconfig 的 `paths` 里，新增或改名要四处一起改。
 - **规则内必须带用例**：不触达 Electron 与 DOM 的模块（纯函数、状态机、解析与编排、数据变换）改了行为就要在 `test/` 对应文件里落断言，规则外的人工冒烟即可；判据与边界见 [AGENTS.md](../../AGENTS.md) 的「测试覆盖规则」。
 
@@ -100,7 +105,8 @@ test/
 | 取舍 | 代价 |
 |---|---|
 | 引入 vitest（一棵依赖树） | 多 esbuild / rollup 平台包、lock 要跟着更新；换来别名与 TS 免配置、watch 可用 |
-| 测试集中在根目录 `test/` | 与源码分居两处，tsconfig 与 check-code 各要多一行；换来 `src` 不被测试混入 |
+| 测试集中在根目录 `test/` | 与源码分居两处，tsconfig 与 ESLint 配置各要多一行；换来 `src` 不被测试混入 |
+| 引入 ESLint（一棵依赖树） | 多 eslint / typescript-eslint / vue 插件等依赖；换来规范由工具强制，不再维护自研检查脚本 |
 | 主 / 渲染两份配置 | `yarn test` 要跑两次；换来 `@` 不打架、jsdom 只影响渲染侧 |
 | 不设覆盖率门槛 | 容易只测好测的；只要求关键不变量有断言，不追数量 |
 | 不做端到端与组件测试 | 窗口、对话框、菜单仍归人工冒烟 |

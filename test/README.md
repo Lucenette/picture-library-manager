@@ -26,4 +26,4 @@
 - 主进程侧 `@` 指向 `src/main`，渲染进程侧 `@` 指向 `src/renderer`——两侧各一份配置，别把渲染测试写进 `test/main`。
 - 测试里显式 `import { test, expect } from 'vitest'`，不开全局。
 - 测试内部引用共用基建用 `@test/setup/...`，引用仓库脚本用 `@scripts/...`；**不写相对路径**（两个别名在两份 vitest 配置与两份 tsconfig 的 paths 里都有）。
-- 测试代码同样受 `node scripts/check-code.mjs` 的四条硬规则约束。
+- 测试代码同样受 `yarn lint` 的规则约束。
