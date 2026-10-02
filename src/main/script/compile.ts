@@ -32,7 +32,10 @@ const NodeModule = require('module') as ModuleConstructor;
  * @param filename 脚本文件路径；传了它，堆栈与 `require('./x')` 都指向真实文件
  */
 export function compileScriptModule(code: string, filename = ''): Record<string, unknown> {
-  const scriptModule = new NodeModule('');
+  // 直接调 _compile 不经过 Module.load，id 与 filename 得自己设：Node 的 CJS 解析器
+  // 用 module.id 定位相对引用的基准目录，传空串会让 require('./x') 退化成从 cwd 找。
+  const scriptModule = new NodeModule(filename);
+  scriptModule.filename = filename;
   scriptModule.paths = NodeModule._nodeModulePaths(process.cwd());
   scriptModule._compile(code, filename);
   return scriptModule.exports as Record<string, unknown>;
