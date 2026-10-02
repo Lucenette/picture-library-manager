@@ -13,7 +13,10 @@
     "build:win": "yarn build --win",
     "build:mac": "yarn build --mac",
     "build:linux": "yarn build --linux",
-    "typecheck": "tsc -p tsconfig.node.json && vue-tsc -p tsconfig.web.json"
+    "typecheck": "tsc -p tsconfig.node.json && vue-tsc -p tsconfig.web.json",
+    "test": "vitest run --config vitest.main.config.ts && vitest run --config vitest.renderer.config.ts",
+    "test:main": "vitest run --config vitest.main.config.ts",
+    "test:renderer": "vitest run --config vitest.renderer.config.ts"
   },
   "keywords": [],
   "author": "Lucenette",
