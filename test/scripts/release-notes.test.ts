@@ -1,0 +1,78 @@
+import { test, expect } from 'vitest';
+
+import {
+  changelogSections,
+  compareVersions,
+  formatSections,
+  sectionsSinceLastRelease,
+} from '../../scripts/release-notes.mjs';
+
+const SAMPLE = [
+  '# 更新日志',
+  '',
+  '## [未发布]',
+  '',
+  '### 新增',
+  '',
+  '- 新功能 A',
+  '',
+  '## [1.1.0] - 2026-09-28',
+  '',
+  '### 新增',
+  '',
+  '- 功能 B',
+  '',
+  '## [1.0.0] - 2026-09-26',
+  '',
+  '- 首个版本',
+  '',
+  '[未发布]: https://example.com/compare',
+].join('\n');
+
+test('小节按出现顺序拆出，链接定义不算正文', () => {
+  const sections = changelogSections(SAMPLE);
+  expect(sections.map((section: { version: string }) => section.version)).toEqual(['未发布', '1.1.0', '1.0.0']);
+  expect(sections[0].body).toContain('新功能 A');
+  expect(sections[2].body).not.toContain('example.com');
+});
+
+test('版本号比较：三段数字，非版本号按「更新」处理', () => {
+  expect(compareVersions('1.1.0', '1.0.0')).toBeGreaterThan(0);
+  expect(compareVersions('1.0.0', '1.1.0')).toBeLessThan(0);
+  expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
+  expect(compareVersions('未发布', '1.0.0')).toBe(1);
+});
+
+test('上次发布以来的小节：按 tag 定位', () => {
+  const since = sectionsSinceLastRelease(changelogSections(SAMPLE), 'v1.1.0');
+  expect(since.map((section: { version: string }) => section.version)).toEqual(['未发布']);
+});
+
+test('找不到 tag 那一节时退回版本号比较', () => {
+  const since = sectionsSinceLastRelease(changelogSections(SAMPLE), 'v1.0.5');
+  expect(since.map((section: { version: string }) => section.version)).toEqual(['未发布', '1.1.0']);
+});
+
+test('没有 tag 时带上全部非空小节', () => {
+  const since = sectionsSinceLastRelease(changelogSections(SAMPLE), '');
+  expect(since.map((section: { version: string }) => section.version)).toEqual(['未发布', '1.1.0', '1.0.0']);
+});
+
+test('空小节不进结果', () => {
+  const since = sectionsSinceLastRelease(changelogSections('## [未发布]\n\n## [1.0.0]\n\n- x'), '');
+  expect(since.map((section: { version: string }) => section.version)).toEqual(['1.0.0']);
+});
+
+test('只有一节时原样输出', () => {
+  expect(formatSections([{ version: '1.0.0', body: '### 新增\n\n- x' }])).toBe('### 新增\n\n- x');
+});
+
+test('多节时按版本分块并降一级标题', () => {
+  const text = formatSections([
+    { version: '未发布', body: '### 新增\n\n- a' },
+    { version: '1.0.0', body: '### 修复\n\n- b' },
+  ]);
+  expect(text).toContain('### [未发布]');
+  expect(text).toContain('#### 新增');
+  expect(text).toContain('### [1.0.0]');
+});

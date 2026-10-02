@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "types": ["node"],
     "skipLibCheck": true,
+    "allowJs": true,
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
