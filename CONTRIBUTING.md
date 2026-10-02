@@ -12,7 +12,7 @@
 |---|---|---|
 | Node.js | **≥ 22.12** | 受 Electron 44 约束，低于该版本无法安装依赖 |
 | Yarn | 1.x（经典版） | 也可用 npm，但本项目按 Yarn 1 的布局开发 |
-| 操作系统 | Windows 10/11 | 目前只支持 Windows |
+| 操作系统 | Windows / macOS / Linux | 三平台都能出安装包；日常开发与验证在 Windows 上进行 |
 
 ```bash
 git clone https://github.com/Lucenette/picture-library-manager.git
@@ -27,7 +27,8 @@ yarn dev
 |---|---|
 | `yarn dev` | 启动开发环境。主进程与 preload 由 electron-vite 构建，渲染进程走 Vite |
 | `yarn typecheck` | 类型检查：主进程 `tsc` + 渲染进程 `vue-tsc` |
-| `yarn build` | 打包 NSIS 安装程序到 `dist/` |
+| `yarn build` | 打包当前平台（Windows NSIS / macOS dmg / Linux AppImage、deb）到 `dist/` |
+| `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符（零依赖） |
 
 > `yarn typecheck` 依赖 `vue-tsc`，它是 devDependency，必须先 `yarn install`。
 
@@ -56,22 +57,21 @@ yarn dev
 
 | 分支 | 用途 |
 |---|---|
-| `main` | 稳定版 |
+| `master` | 稳定版 |
 | `develop` | 日常开发，PR 默认合到这里 |
 
 ---
 
 ## 自检清单
 
-PR 之前至少跑通：
+PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」七条，这里不另抄一份，避免两处漂移。
 
-- [ ] `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `src/common`
-- [ ] 渲染进程的 `.ts` 类型检查（`.vue` 需 `vue-tsc`）
-- [ ] `.vue` 能通过 `@vue/compiler-sfc` 的 parse + compileScript + compileTemplate
-- [ ] 所有 `@/` 与 `@common/` 导入都能落到真实文件
-- [ ] 手工冒烟受影响的界面：改了主进程/窗口/worker/IPC 的，**静态检查通过不等于功能正常**
+与贡献者最相关的两条：
 
-AGENTS.md 的"改完必须自检"一节给了逐条做法。
+- `node scripts/check-docs.mjs` —— 任何文档改动都要跑（零依赖，秒级）
+- `yarn typecheck` —— 改了主进程或渲染进程时
+
+静态检查通过不等于功能正常：改了主进程 / 窗口 / worker / IPC 的，请人工冒烟受影响的界面。
 
 ---
 

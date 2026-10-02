@@ -4,7 +4,7 @@
 
 **把来源各异的角色图片，整理成按角色分组、可直接用于训练的数据集**
 
-[![Electron](https://img.shields.io/badge/Electron-40.x-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron-44.x-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -108,7 +108,7 @@
 
 - Node.js ≥ 22.12（Electron 44 的要求）
 - Yarn（推荐）或 npm
-- Windows 10/11
+- Windows / macOS / Linux（三平台都能打包；日常开发与验证在 Windows 上进行）
 
 ### 开发
 
@@ -144,7 +144,7 @@ yarn build:mac
 yarn build:linux
 ```
 
-输出 `dist/PLManager_Setup_1.0.0.exe`（NSIS 安装程序，`productName` 为 `PLManager`）。
+输出 `dist/PLManager_Setup_1.1.1.exe`（NSIS 安装程序，`productName` 为 `PLManager`）。
 
 ---
 

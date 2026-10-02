@@ -26,13 +26,8 @@ updates:
           - "@element-plus/*"
       image:
         patterns:
-          - jimp
           - image-size
-          - jpeg-js
-          - pngjs
-          - omggif
-          - bmp-ts
-          - utif2
+          - sharp
       minor-and-patch:
         update-types:
           - minor
