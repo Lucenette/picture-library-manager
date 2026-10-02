@@ -25,7 +25,7 @@
 | 相似图片管理 | 待评审 | 中 | 主进程 + 渲染进程 + 数据库（需先评审） | [similar-manage.md](./similar-manage.md) |
 | 相似图片识别的语义加强（CLIP + sqlite-vec） | 待评审 | 高 | 主进程 + 任务系统 + 数据库 + 原生依赖（需先评审） | [similar-semantic.md](./similar-semantic.md) |
 | 其余窗口的自绘标题栏 | 待评审 | 中 | 渲染进程 + 主进程窗口配置 | [window-chrome.md](./window-chrome.md) |
-| 测试系统 | 待评审 | 中 | 构建配置 + 测试（需先评审） | [test-system.md](./test-system.md) |
+| 测试系统 | 待实施 | 中 | 构建配置 + 测试 | [test-system.md](./test-system.md) |
 | 构建目标：32 位与 arm 架构 | 待评审 | 低 | 构建配置（需先核实 Electron 与 sharp 的架构支持） | [build-targets.md](./build-targets.md) |
 | Electron 依赖剥离与无头 server 模式 | 待评审 | 高 | 主进程 + 渲染进程 + 构建配置 | [headless-server.md](./headless-server.md) |
 | 视觉素材与 LoRA 训练流水线 | 待评审 | 高 | 主进程 + 任务系统 + 数据库 + 原生依赖（需先评审） | [visual-training-pipeline.md](./visual-training-pipeline.md) |
