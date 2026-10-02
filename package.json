@@ -18,6 +18,9 @@
   "keywords": [],
   "author": "Lucenette",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
     "@xmldom/xmldom": "^0.9.12",

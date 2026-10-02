@@ -9,7 +9,7 @@
 //   · 入口就用裸包名，它注册全部语言定义 + JS/TS 语言服务。
 // ============================================================
 
-import * as monaco from 'monaco-editor';
+import { editor as monacoEditor, languages, typescript } from 'monaco-editor';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker&inline';
 import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker&inline';
 
@@ -37,7 +37,7 @@ declare var __dirname: string;`;
 };
 
 /** 与界面同一套暗色：底色取 .app-main 的 #1e1f22 */
-monaco.editor.defineTheme('plmanager-dark', {
+monacoEditor.defineTheme('plmanager-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
@@ -53,22 +53,22 @@ monaco.editor.defineTheme('plmanager-dark', {
 // 只配 JS 一侧：脚本是 CommonJS 的 .js，typescriptDefaults 不碰。
 // 语义校验关掉——require('sharp') 这类解析不到的模块会被报成假错，真错误源是主进程的编译。
 //
-// 注意走的是具名导出 typescript：0.57 里 monaco.languages.typescript 只剩一个 deprecated 壳，
+// 注意走的是具名导出 typescript：0.57 里 languages.typescript 只剩一个 deprecated 壳，
 // 语言服务整套（javascriptDefaults / ScriptTarget / ModuleKind）挂在包根的 typescript 上。
-monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
+typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
   noSyntaxValidation: false,
   // 建议类诊断（如 80001「这是 CommonJS，可以转成 ES 模块」）也关掉：
   // 我们的脚本就是 CJS，这条建议是错的，它只会出现在悬停里干扰人
   noSuggestionDiagnostics: true,
 });
-monaco.typescript.javascriptDefaults.setCompilerOptions({
+typescript.javascriptDefaults.setCompilerOptions({
   allowJs: true,
   allowNonTsExtensions: true,
-  target: monaco.typescript.ScriptTarget.ESNext,
-  module: monaco.typescript.ModuleKind.CommonJS,
+  target: typescript.ScriptTarget.ESNext,
+  module: typescript.ModuleKind.CommonJS,
 });
-monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.ts');
+typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.ts');
 
 /** 等语言激活的上限：超时就当没点着，让这次预热以失败收场，而不是无声地挂住 */
 const WARM_UP_TIMEOUT_MS = 5000;
@@ -89,7 +89,7 @@ const WARM_UP_TIMEOUT_MS = 5000;
 export async function warmUpTypeScript(): Promise<void> {
   // 先订阅再建编辑器：激活是一次性的，错过就永远等不到
   const ready = new Promise<void>((resolve) => {
-    const listener = monaco.languages.onLanguage('javascript', () => {
+    const listener = languages.onLanguage('javascript', () => {
       listener.dispose();
       resolve();
     });
@@ -100,9 +100,9 @@ export async function warmUpTypeScript(): Promise<void> {
   host.style.cssText = 'position:absolute;left:-10000px;top:0;width:600px;height:300px;';
   document.body.appendChild(host);
 
-  const model = monaco.editor.createModel('', 'javascript');
+  const model = monacoEditor.createModel('', 'javascript');
   // 预热不关心界面：把只有真编辑时才值得做的活关掉
-  const editor = monaco.editor.create(host, {
+  const editor = monacoEditor.create(host, {
     model,
     minimap: { enabled: false },
     folding: false,
@@ -110,7 +110,7 @@ export async function warmUpTypeScript(): Promise<void> {
 
   try {
     await Promise.race([ready, delay(WARM_UP_TIMEOUT_MS)]);
-    const getWorker = await monaco.typescript.getJavaScriptWorker();
+    const getWorker = await typescript.getJavaScriptWorker();
     await getWorker(model.uri);
   } finally {
     editor.dispose();
@@ -125,5 +125,3 @@ function delay(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-
-export { monaco };
