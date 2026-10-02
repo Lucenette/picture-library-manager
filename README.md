@@ -5,6 +5,8 @@
 **把来源各异的角色图片，整理成按角色分组、可直接用于训练的数据集**
 
 > English overview: [README.en.md](./README.en.md) —— 中文文档为准。
+>
+> 🚧 **截图待补**：`docs/images/` 下还缺 5 张界面截图，清单与拍摄要求见 [docs/images/README.md](docs/images/README.md)。
 
 [![CI](https://github.com/Lucenette/picture-library-manager/actions/workflows/verify.yml/badge.svg)](https://github.com/Lucenette/picture-library-manager/actions/workflows/verify.yml)
 [![Electron](https://img.shields.io/badge/Electron-44.x-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
@@ -87,6 +89,20 @@
 - JetBrains IDE 风格暗色 UI
 - Element Plus 组件全覆盖
 - 自定义滚动条、下拉浮窗等原生体验
+
+---
+
+## 📸 截图（待补）
+
+下面五张图都用样例图库（`node scripts/make-fixture.mjs`）拍摄：角色名用虚构值，不出现真实图片与本地路径。补齐后这一节改成真实图片，并在上面的功能列表里就近引用。
+
+| 文件 | 拍什么 | 用在哪 |
+|---|---|---|
+| `docs/images/task-page.png` | 任务管理页：运行中的任务、进度与阶段描述、导航栏角标 | 任务管理 |
+| `docs/images/tile-view.png` | 图组管理的平铺视图：两级展开相册 | 图组管理 |
+| `docs/images/script-page.png` | 脚本管理页：常驻编辑器与底部状态栏 | 脚本系统 |
+| `docs/images/viewer.png` | 图片查看器：缩略图导航条 | 图片查看器 |
+| `docs/images/dark-theme.png` | 暗色主题下的图库页 | 暗色主题 |
 
 ---
 
