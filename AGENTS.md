@@ -22,7 +22,8 @@
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
-| `node scripts/check-code.mjs` | 代码规范检查：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖 | 用现有 `typescript` 与 `@vue/compiler-sfc`，需先 `yarn install` |
+| `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs` |
+| `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置 | 只跑一侧用 `yarn test:main` / `yarn test:renderer` |
 
 ---
 
@@ -279,6 +280,18 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 
 ---
 
+## 测试覆盖规则
+
+判据只有一条：**这段代码能不能在没有 Electron、也没有浏览器 DOM 的情况下被 import 并驱动**。
+
+- **规则内（必须有用例）**：主进程里运行时不 import `electron` 的模块，以及渲染进程里不依赖 DOM / 组件实例的模块——纯函数、状态机、解析与编排、数据变换。
+- **规则外（人工冒烟即可）**：必须真实窗口（`BrowserWindow` / `dialog` / `Menu` / `nativeTheme`）、原生解码（`sharp`）、真实文件系统副作用或 Vue 组件渲染才能观察行为的代码。
+- 模块自己 import 的纯依赖不构成豁免：一个模块只要不触达 electron 与 DOM，就在规则内。
+
+规则内新增或修改行为（含新增分支）时，同一次提交里要有对应断言；新增可测模块时建对应测试文件。修 bug 不要求「先写失败用例」的步骤，但规则内的最终结果仍要有测试覆盖；规则外的改动用人工验证，并在回复或 PR 里写清验证了什么。测试怎么放、怎么跑见 [docs/design/test-system.md](docs/design/test-system.md)。
+
+---
+
 ## 改完必须自检
 
 提交前至少做到：
@@ -286,13 +299,9 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 1. `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `common`。
 2. `node_modules/.bin/vue-tsc -p tsconfig.web.json` —— 覆盖渲染进程，**含 `.vue`**。
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
-3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
-4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
-5. 导入解析：确认所有 `@/`、`@common/` 与相对路径都能落到真实文件（`?nodeWorker`、`?raw` 除外——
-   它们由 electron-vite / Vite 接管）。
-6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
-7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
-8. `node scripts/check-code.mjs` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）。
+3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译与导入解析，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。
+4. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+5. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 

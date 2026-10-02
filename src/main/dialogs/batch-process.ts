@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { BatchProcessInitData } from '@common/types';
+
 import { createBatchProcess, get } from '@/window-manager';
 
 /** 注册批量处理窗口 */

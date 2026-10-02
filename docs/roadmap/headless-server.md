@@ -134,7 +134,7 @@ dirs:
 
 | 风险 | 应对 |
 |---|---|
-| 无测试框架，重构没有回归网 | 与 [test-system.md](./test-system.md) 一起做，先钉住 task 状态机、DB CRUD、bus 路由 |
+| 无测试框架，重构没有回归网 | 与 [测试系统](../design/test-system.md) 一起做，先钉住 task 状态机、DB CRUD、bus 路由 |
 | 对话框 / 子窗口收编牵动 UI 语义 | 先只做「文件查看」一个样板，验证后再推其它 |
 | `?nodeWorker` 在非 electron-vite 构建下失效 | 先验证 server 构建能产出 worker chunk |
 | `node:sqlite` 在纯 Node 上未验证 | 在目标 Node 版本上实测开库与读写 |
@@ -144,7 +144,7 @@ dirs:
 
 ## 6. 验证方法
 
-1. 静态：给 `node scripts/check-code.mjs` 加一条「`src/core/**` 不得 import electron」的规则，先只在 CI 统计。
+1. 静态：给 `eslint.config.mjs` 加一条「`src/core/**` 不得 import electron」的规则，先只在 CI 统计。
 2. 纯 Node：不启动 Electron，用 Node 跑起 core 的开库与一次扫描任务。
 3. bus：同一组命令分别经 IPC 与 HTTP 调用，返回一致。
 4. 人工冒烟：桌面路径全功能回归；server 模式起服务，浏览器完成「添加来源 → 扫描 → 选图 → 导出」。

@@ -1,6 +1,7 @@
-import { app, BrowserWindow, type WebPreferences } from 'electron';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
+
+import { app, BrowserWindow, type WebPreferences } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
 
@@ -162,7 +163,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   }
 
   window.setMenu(null);
-  window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
+  void window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
   window.on('closed', () => {
     log.info(`window closed: ${id}`);
     if (windows.get(id) === window) {

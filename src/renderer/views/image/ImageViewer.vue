@@ -55,10 +55,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ImageFile, ProcessedImageView, ViewerFile, ViewerOpenRequest, ViewerSource } from '@common/types';
+
 import {
   countImageFiles, countImageFilesBefore, countProcessedImages, countProcessedImagesBefore,
   getImageFilePage, getProcessedImagePage,
@@ -387,7 +389,7 @@ async function init(): Promise<void> {
   source = request.source;
 
   // 先按起始 id 算出它在整个序列里的下标，取好这一段再赋值，避免监听器重复取一次
-  let anchor = 0;
+  let anchor: number;
   if (source.kind === 'processed') {
     total.value = await countProcessedImages(source.filter);
     anchor = await countProcessedImagesBefore(source.filter, source.sort, source.startId);

@@ -1,19 +1,21 @@
 import type { BrowserWindow } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type {
   ExportTaskPayload, ProcessTaskPayload, ScanTaskPayload,
-  TaskMoveDirection, TaskPayload, TaskProgressEvent, TaskResult, TaskRow, TaskStatus, TaskType, TaskView,
+  TaskMoveDirection, TaskPayload, TaskResult, TaskRow, TaskStatus, TaskType, TaskView,
 } from '@common/types';
+
 import {
   deleteFinishedTasks, finishTask, getAllTasks, getSourceById, getMaxQueueOrder, getTaskRow,
   insertTask, markTaskPaused, markTaskRunning, resumeTask, updateTaskProgress, updateTaskQueueOrder,
 } from '@/database/db';
 import { createLogger } from '@/log';
-import { TaskCancelledError, TaskControl } from '@/task/task-control';
 import { runExport } from '@/task/runners/export';
 import { runProcess } from '@/task/runners/process';
 import { runScan } from '@/task/runners/scan';
 import { runSimilar } from '@/task/runners/similar';
+import { TaskCancelledError, TaskControl } from '@/task/task-control';
 
 /** 本模块的日志（category `main.task`） */
 const log = createLogger('task');
@@ -326,7 +328,7 @@ class TaskManager {
     const value = Math.max(0, Math.min(100, Math.round(progress)));
     task.row.progress = value;
     task.row.message = message;
-    this.send(IPC.TASK_PROGRESS, { id: task.row.id, progress: value, message } as TaskProgressEvent);
+    this.send(IPC.TASK_PROGRESS, { id: task.row.id, progress: value, message });
 
     const now = Date.now();
     if (now - this.lastPersistAt < PROGRESS_PERSIST_INTERVAL_MS) {

@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { TaskMoveDirection, TaskPayload, TaskSubmitResult, TaskType, TaskView } from '@common/types';
 

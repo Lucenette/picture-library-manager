@@ -30,15 +30,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import DEFAULT_SCRIPT_SOURCE from '@static/default-script.js?raw';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type {
   ProcessScript, PromptInitData, PromptResult, ScriptCompileError, ScriptDraft, ScriptGroup, ScriptMenuEntry,
   ScriptType,
 } from '@common/types';
-import DEFAULT_SCRIPT_SOURCE from '@static/default-script.js?raw';
+
+
 import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import { createLogger } from '@/services/log-service';
@@ -48,10 +51,11 @@ import {
   putScriptDraft, readScript, renameScript, renameScriptGroup, resetBuiltinScript, saveScript,
   setScriptGroupCollapsed,
 } from '@/services/script-service';
-import ScriptEditor from './scripts/ScriptEditor.vue';
-import ScriptSideList from './scripts/ScriptSideList.vue';
+
 import { diffLineChanges, type ScriptLineChange } from './scripts/diff';
 import type { ScriptGroupView, SideAction, SideItem } from './scripts/script-list';
+import ScriptEditor from './scripts/ScriptEditor.vue';
+import ScriptSideList from './scripts/ScriptSideList.vue';
 
 /** 本模块的日志（category `renderer.script`） */
 const log = createLogger('script');

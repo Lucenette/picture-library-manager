@@ -16,3 +16,4 @@
 | 日志系统：三个文件、category、控制台来源与兜底捕获 | [logging.md](./logging.md) |
 | 排序键：派生排序列与可插拔的文字排序模块 | [sort-keys.md](./sort-keys.md) |
 | 平铺视图：两级相册式渲染、行窗口化与分片取数 | [view-layouts.md](./view-layouts.md) |
+| 测试与静态检查：vitest 两份配置、根目录 test/ 的组织、ESLint 规则与自检边界 | [test-system.md](./test-system.md) |

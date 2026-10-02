@@ -32,12 +32,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type Component } from 'vue';
-import { useRoute } from 'vue-router';
 import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
 import appIcon from '@static/icon.png';
-import { isMac } from '@/entries/shell/window-chrome';
+import { computed, type Component } from 'vue';
+import { useRoute } from 'vue-router';
+
 import { useTasks } from '@/composables/useTasks';
+import { isMac } from '@/entries/shell/window-chrome';
 
 /** 导航栏一项：40px 宽的栏放不下文字，名称走 tooltip */
 interface NavItem {

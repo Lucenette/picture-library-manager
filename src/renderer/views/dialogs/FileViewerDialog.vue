@@ -35,8 +35,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { FileViewerInitData, ImageFile, ViewerOpenRequest } from '@common/types';
 
@@ -81,7 +82,7 @@ function formatSize(bytes: number | null): string {
 
 /** 选定当前图片作为该图片组的处理结果 */
 function pick(file: ImageFile): void {
-  ipcRenderer.invoke(IPC.FILE_VIEWER_SELECT, file.filePath);
+  void ipcRenderer.invoke(IPC.FILE_VIEWER_SELECT, file.filePath);
   window.close();
 }
 
@@ -90,7 +91,7 @@ function openViewer(target: ImageFile): void {
     source: { kind: 'group', groupId: groupId.value, startId: target.id },
     title: `${groupName.value} - ${target.fileName}`,
   };
-  ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
+  void ipcRenderer.invoke(IPC.VIEWER_OPEN, request);
 }
 
 onMounted(loadInitData);

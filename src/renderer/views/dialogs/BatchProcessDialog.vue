@@ -14,10 +14,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { BatchProcessInitData, ScriptOption } from '@common/types';
+
 import DropdownControl from '@/components/DropdownControl.vue';
 
 const scriptId = ref<number | null>(null);

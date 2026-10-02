@@ -1,5 +1,7 @@
 import { parentPort } from 'worker_threads';
+
 import type { ThumbnailEngineName } from '@common/types';
+
 import { generateThumbnail } from '@/image/thumbnail-sharp';
 
 // ------------------------------------------------------------

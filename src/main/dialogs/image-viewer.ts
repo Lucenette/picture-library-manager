@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { ViewerOpenRequest } from '@common/types';
+
 import { createViewer } from '@/window-manager';
 
 /** 图片查看器待读取的数据，按渲染进程 id 暂存 */

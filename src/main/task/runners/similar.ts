@@ -1,4 +1,5 @@
 import type { SimilarTaskResult } from '@common/types';
+
 import {
   beginBatch, clearSimilarData, endBatch, getSimilarInputRows,
   insertSimilarGroup, insertSimilarMember, insertSimilarRun,

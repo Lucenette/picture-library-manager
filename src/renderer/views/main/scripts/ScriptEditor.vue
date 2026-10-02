@@ -27,9 +27,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+
 import type { ScriptCompileError, ScriptType } from '@common/types';
-import MonacoEditor from './MonacoEditor.vue';
+
 import type { ScriptLineChange } from './diff';
+import MonacoEditor from './MonacoEditor.vue';
 import { TYPE_LABELS } from './script-list';
 
 const props = defineProps<{

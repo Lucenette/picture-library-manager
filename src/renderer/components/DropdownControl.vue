@@ -9,8 +9,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { computed, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScriptListOpenData, ScriptOption } from '@common/types';
 
@@ -49,7 +50,7 @@ function open(): void {
 
   ipcRenderer.removeAllListeners(IPC.DROPDOWN_SELECTED);
   ipcRenderer.once(IPC.DROPDOWN_SELECTED, (_event, id: number) => emit('update:modelValue', id));
-  ipcRenderer.invoke(IPC.DROPDOWN_OPEN, data);
+  void ipcRenderer.invoke(IPC.DROPDOWN_OPEN, data);
 }
 </script>
 

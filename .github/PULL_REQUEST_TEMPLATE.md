@@ -28,6 +28,7 @@
 - [ ] `.vue` 能通过 `@vue/compiler-sfc` 编译
 - [ ] 所有 `@/`、`@common/` 导入都指向真实文件
 - [ ] 符合 [AGENTS.md](../AGENTS.md)：无 `import *`、控制语句均带大括号、渲染进程未引用 Node 模块
+- [ ] `yarn test` 通过；规则内的改动带了对应测试（判据见 [AGENTS.md](../AGENTS.md) 的「测试覆盖规则」）
 
 ## 手工验证
 

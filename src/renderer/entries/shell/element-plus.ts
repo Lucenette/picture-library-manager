@@ -1,6 +1,6 @@
-import type { App as VueApp } from 'vue';
 import ElementPlus from 'element-plus';
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs';
+import type { App as VueApp } from 'vue';
 import 'element-plus/dist/index.css';
 
 /**

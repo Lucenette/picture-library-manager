@@ -12,8 +12,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { nextTick, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ConfirmDialogData } from '@common/types';
 
@@ -37,12 +38,12 @@ async function loadInitData(): Promise<void> {
   cancelText.value = data.cancelText ?? '取消';
   mode.value = data.mode ?? 'confirm';
   danger.value = data.danger ?? false;
-  nextTick(() => rootEl.value?.focus());
+  void nextTick(() => rootEl.value?.focus());
 }
 
 /** 作答并关闭；主进程保证每次打开只回发一次结果 */
 function answer(confirmed: boolean): void {
-  ipcRenderer.invoke(IPC.CONFIRM_SUBMIT, confirmed);
+  void ipcRenderer.invoke(IPC.CONFIRM_SUBMIT, confirmed);
   window.close();
 }
 

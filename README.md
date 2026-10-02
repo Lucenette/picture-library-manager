@@ -124,6 +124,9 @@ yarn install
 yarn dev        # 启动开发环境
 yarn preview    # 构建后预览生产产物（不打包）
 yarn typecheck  # 类型检查：主进程 tsc + 渲染进程 vue-tsc
+
+yarn lint       # ESLint：规范、.vue 模板编译、导入解析与类型感知规则
+yarn test       # 单元测试：主进程与渲染进程两份 vitest 配置
 ```
 
 > Electron 42 起官方不再在 install 阶段下载二进制（改成首次运行 `electron .` 时按需拉取）。本项目在 `postinstall` 里显式把它装好，所以 `yarn install` 之后可以直接 `yarn dev`；GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指定镜像。
@@ -156,6 +159,7 @@ shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图。sharp 是
 | 图片解码 | sharp（libvips） | 按需缩放解码 + 裁剪；原生依赖，各平台各自安装预编译包 |
 | 并发 | Node `worker_threads` | 解码跑在工作线程，不阻塞主进程 |
 | 任务调度 | 自研 TaskManager | 单并发队列，支持暂停 / 继续 / 强制结束 / 重试 |
+| 静态检查 | ESLint 10 + typescript-eslint + eslint-plugin-vue | 类型感知规则；`.vue` 模板编译与导入解析一并覆盖 |
 | 构建工具 | electron-vite + electron-builder | 一键打包三平台安装程序 |
 
 ## 目录结构
@@ -164,7 +168,8 @@ shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图。sharp 是
 picture-library-manager/
 ├── docs/            # 设计说明、路线图、排障（入口见 docs/README.md）
 │   └── images/      # README 引用的界面截图
-├── scripts/         # 仓库自检与开发脚本（文档、代码规范、样例图库、发布说明）
+├── scripts/         # 仓库脚本（文档检查、样例图库、发布说明）
+├── test/            # 单元测试：主进程与渲染进程两棵树（见 docs/design/test-system.md）
 ├── src/
 │   ├── common/      # 主进程与渲染进程共用的契约（类型、IPC 通道名）
 │   ├── main/        # 主进程：窗口、数据库、任务、图片流水线、脚本

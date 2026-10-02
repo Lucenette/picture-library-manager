@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type {
   Character, CharacterCover, CharacterTile, GroupCover, Source, ImageFile, ImageGroupFilter, ImageGroupSort,

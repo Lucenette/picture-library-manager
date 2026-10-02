@@ -1,6 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScanConfigInitData, ScanConfigResult } from '@common/types';
+
 import { createScanConfig } from '@/window-manager';
 
 /** 注册扫描配置窗口 */

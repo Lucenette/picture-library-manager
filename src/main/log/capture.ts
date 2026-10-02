@@ -44,7 +44,7 @@ function patchStream(stream: NodeJS.WriteStream, source: 'stdout' | 'stderr'): v
     }
     return result;
   };
-  stream.write = patched as unknown as typeof stream.write;
+  stream.write = patched;
 }
 
 /** 渲染进程 console 的级别名换成我们的四个级别 */

@@ -436,7 +436,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
   // 备份要复制整个库，可能要几百毫秒；先把加载页点起来，别让它空着等
   onProgress?.(makeProgress('running', total, 0, '正在备份数据库', '', ''));
 
-  let backupPath = '';
+  let backupPath: string;
   try {
     backupPath = await backupDatabase(store, backupsDir, log);
     log.info(`database backed up: ${backupPath}`);

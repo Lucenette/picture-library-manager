@@ -11,8 +11,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { nextTick, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { PromptInitData } from '@common/types';
 
@@ -34,7 +35,7 @@ async function loadInitData(): Promise<void> {
   placeholder.value = data.placeholder ?? '';
   value.value = data.value ?? '';
   initData = data;
-  nextTick(() => {
+  void nextTick(() => {
     inputEl.value?.focus();
     if (data.selectAll) {
       // 预填的名字全选：回车用默认名，直接打字就把它覆盖掉
@@ -49,7 +50,7 @@ function confirm(): void {
     return;
   }
 
-  ipcRenderer.invoke(IPC.PROMPT_CONFIRM, { ...initData, value: input });
+  void ipcRenderer.invoke(IPC.PROMPT_CONFIRM, { ...initData, value: input });
   window.close();
 }
 

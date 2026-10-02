@@ -72,10 +72,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { CSSProperties } from 'vue';
 import { PictureFilled } from '@element-plus/icons-vue';
 import type { ScrollbarInstance } from 'element-plus';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import type { CSSProperties } from 'vue';
+
 import type { TileItem, TileSelectState } from './TileBoard.types';
 
 /**
@@ -241,7 +242,7 @@ const bottomSpacerHeight = computed(() => {
 onMounted(() => {
   measure();
   resizeObserver = new ResizeObserver(measure);
-  const root = scrollbarRef.value?.$el;
+  const root = scrollbarRef.value?.$el as HTMLElement | undefined;
   if (root) {
     resizeObserver.observe(root);
   }
@@ -315,7 +316,7 @@ function onScroll({ scrollTop: top }: { scrollTop: number }): void {
 
 /** el-scrollbar 的滚动视口；量高度与判断触底都靠它 */
 function viewport(): HTMLElement | undefined {
-  return scrollbarRef.value?.wrapRef as HTMLElement | undefined;
+  return scrollbarRef.value?.wrapRef;
 }
 
 /**
@@ -370,14 +371,14 @@ function syncPanel(): void {
 
 /** 量容器：宽度决定列数，高度决定视口里有几行 */
 function measure(): void {
-  const root = scrollbarRef.value?.$el;
+  const root = scrollbarRef.value?.$el as HTMLElement | undefined;
   const wrap = viewport();
   if (!root || !wrap) {
     return;
   }
   readSizes(root);
   // 栅格的可用宽度取自行元素（它已经扣掉了内容区的内边距），不是滚动容器的宽度
-  const row = root.querySelector('.tile-row') as HTMLElement | null;
+  const row = root.querySelector<HTMLElement>('.tile-row');
   const available = row ? row.getBoundingClientRect().width : root.clientWidth;
   columnCount.value = Math.max(1, Math.floor((available + cardGap.value) / (cardSize.value + cardGap.value)));
   viewportHeight.value = root.clientHeight;

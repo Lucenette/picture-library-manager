@@ -99,11 +99,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Download } from '@element-plus/icons-vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
-import { Download } from '@element-plus/icons-vue';
 import type { TableInstance } from 'element-plus';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import { IPC } from '@common/ipcChannels';
 import type {
@@ -111,10 +111,10 @@ import type {
   ProcessScript, Source, TaskView, ViewerOpenRequest,
 } from '@common/types';
 
-import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
-import TileBoard from '@/components/TileBoard.vue';
+import CategorySearch from '@/components/CategorySearch.vue';
 import type { TileItem, TileSelectState } from '@/components/TileBoard.types';
+import TileBoard from '@/components/TileBoard.vue';
 import ViewSwitchButton from '@/components/ViewSwitchButton.vue';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
@@ -724,7 +724,7 @@ async function recognizeSimilar(): Promise<void> {
 
 /** 选中目录后把待导出记录固化成 id 快照，实际复制交给主进程 */
 async function exportImages(): Promise<void> {
-  const targetDir: string | null = await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR);
+  const targetDir = (await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR)) as string | null;
   if (!targetDir) {
     return;
   }
