@@ -134,7 +134,7 @@ dirs:
 
 | 风险 | 应对 |
 |---|---|
-| 无测试框架，重构没有回归网 | 与 [test-system.md](./test-system.md) 一起做，先钉住 task 状态机、DB CRUD、bus 路由 |
+| 无测试框架，重构没有回归网 | 与 [测试系统](../design/test-system.md) 一起做，先钉住 task 状态机、DB CRUD、bus 路由 |
 | 对话框 / 子窗口收编牵动 UI 语义 | 先只做「文件查看」一个样板，验证后再推其它 |
 | `?nodeWorker` 在非 electron-vite 构建下失效 | 先验证 server 构建能产出 worker chunk |
 | `node:sqlite` 在纯 Node 上未验证 | 在目标 Node 版本上实测开库与读写 |
