@@ -3,10 +3,14 @@
 </template>
 
 <script setup lang="ts">
+import { editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity, Range } from 'monaco-editor';
+import type { IDisposable } from 'monaco-editor';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
 import type { ScriptCompileError } from '@common/types';
+
 import type { ScriptLineChange } from './diff';
-import { monaco } from './monaco-env';
+import './monaco-env';
 
 /** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，与主题里那三个语义色一致 */
 const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
@@ -37,35 +41,35 @@ const emit = defineEmits<{
 }>();
 
 const hostEl = ref<HTMLElement | null>(null);
-let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+let editor: monacoEditor.IStandaloneCodeEditor | null = null;
 
 /** 一份文档一个 model：换脚本只换 model，撤销栈按 model 的 URI 记账，所以切走再切回来还能撤销 */
-const models = new Map<string, monaco.editor.ITextModel>();
+const models = new Map<string, monacoEditor.ITextModel>();
 /** 每份文档的光标与滚动位置，跟着 model 一起保留 */
-const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>();
+const viewStates = new Map<string, monacoEditor.ICodeEditorViewState | null>();
 
 /** 出错那一行整行染色的装饰集合 */
-let errorLine: monaco.editor.IEditorDecorationsCollection | null = null;
+let errorLine: monacoEditor.IEditorDecorationsCollection | null = null;
 /** 「自上次保存改了哪里」的装饰集合 */
-let changeDecorations: monaco.editor.IEditorDecorationsCollection | null = null;
+let changeDecorations: monacoEditor.IEditorDecorationsCollection | null = null;
 /** marker 变化的订阅：Monaco 的语法诊断是异步算出来的，得靠它上报 */
-let markerSubscription: monaco.IDisposable | null = null;
+let markerSubscription: IDisposable | null = null;
 /** 正在把外部内容灌进编辑器：这一轮的变化不要再抛回去，否则会绕成环 */
 let applying = false;
 
 /** 取当前文档的 model，没有就建一个 */
-function modelFor(key: string): monaco.editor.ITextModel {
+function modelFor(key: string): monacoEditor.ITextModel {
   const existing = models.get(key);
   if (existing !== undefined) {
     return existing;
   }
-  const created = monaco.editor.createModel(props.modelValue, 'javascript');
+  const created = monacoEditor.createModel(props.modelValue, 'javascript');
   models.set(key, created);
   return created;
 }
 
 /** 找出某个 model 挂在哪个 key 上 */
-function keyOfModel(model: monaco.editor.ITextModel): string | undefined {
+function keyOfModel(model: monacoEditor.ITextModel): string | undefined {
   for (const [key, item] of models) {
     if (item === model) {
       return key;
@@ -135,7 +139,7 @@ function reportProblems(): void {
     emit('problems', 0);
     return;
   }
-  const own = monaco.editor.getModelMarkers({ resource: model.uri }).filter((marker) => marker.owner !== 'plmanager');
+  const own = monacoEditor.getModelMarkers({ resource: model.uri }).filter((marker) => marker.owner !== 'plmanager');
   emit('problems', own.length);
 }
 
@@ -148,16 +152,16 @@ function applyMarkers(): void {
 
   const error = props.error;
   if (error === null) {
-    monaco.editor.setModelMarkers(model, 'plmanager', []);
+    monacoEditor.setModelMarkers(model, 'plmanager', []);
     errorLine?.set([]);
     return;
   }
 
   const line = error.line ?? 1;
   const column = error.column ?? 1;
-  monaco.editor.setModelMarkers(model, 'plmanager', [
+  monacoEditor.setModelMarkers(model, 'plmanager', [
     {
-      severity: monaco.MarkerSeverity.Error,
+      severity: MarkerSeverity.Error,
       message: error.message,
       startLineNumber: line,
       startColumn: column,
@@ -166,7 +170,7 @@ function applyMarkers(): void {
     },
   ]);
   errorLine?.set([
-    { range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'plm-error-line' } },
+    { range: new Range(line, 1, line, 1), options: { isWholeLine: true, className: 'plm-error-line' } },
   ]);
   // 不把视口弹到出错行：很多人是边写边存的，写着写着被抢走视线很烦；
   // 那一行有整行染色与概览标尺，找得到
@@ -227,13 +231,13 @@ function applyChanges(): void {
 
   changeDecorations.set(
     props.changes.map((change) => ({
-      range: new monaco.Range(change.startLineNumber, 1, change.endLineNumber, 1),
+      range: new Range(change.startLineNumber, 1, change.endLineNumber, 1),
       options: {
         isWholeLine: true,
         linesDecorationsClassName: `plm-change-${change.kind}`,
         overviewRuler: {
           color: CHANGE_COLORS[change.kind],
-          position: monaco.editor.OverviewRulerLane.Left,
+          position: monacoEditor.OverviewRulerLane.Left,
         },
       },
     })),
@@ -245,7 +249,7 @@ onMounted(() => {
     return;
   }
 
-  editor = monaco.editor.create(hostEl.value, {
+  editor = monacoEditor.create(hostEl.value, {
     model: modelFor(props.documentKey),
     theme: 'plmanager-dark',
     // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
@@ -280,14 +284,14 @@ onMounted(() => {
   });
 
   // 焦点在编辑器里时 Monaco 先吃到按键，所以页面的 Ctrl+S 之外这里也注册一份
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => emit('save'));
+  editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyS, () => emit('save'));
 
   errorLine = editor.createDecorationsCollection([]);
   applyMarkers();
   changeDecorations = editor.createDecorationsCollection([]);
   applyChanges();
   // 我们设的编译标记与 Monaco 的语法诊断都会触发它，状态图标因此能实时反映问题
-  markerSubscription = monaco.editor.onDidChangeMarkers(() => reportProblems());
+  markerSubscription = monacoEditor.onDidChangeMarkers(() => reportProblems());
   reportProblems();
 
   // 状态栏那两栏：光标一动就报，行结束符/缩进随模型走

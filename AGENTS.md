@@ -22,6 +22,7 @@
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
+| `node scripts/check-code.mjs` | 代码规范检查：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖 | 用现有 `typescript` 与 `@vue/compiler-sfc`，需先 `yarn install` |
 
 ---
 
@@ -291,6 +292,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
    它们由 electron-vite / Vite 接管）。
 6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
 7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+8. `node scripts/check-code.mjs` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 
