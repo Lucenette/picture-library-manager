@@ -5,7 +5,7 @@ import { test, expect } from 'vitest';
 
 import { buildDirTree, collectImageFiles } from '@/image/walk';
 
-import { makeTempDir, removeTempDir, writeFiles } from '../../setup/temp-dir';
+import { makeTempDir, removeTempDir, writeFiles } from '@test/setup/temp-dir';
 
 /** 用仓库自带的图标当一张真实可读的图片 */
 const ICON = readFileSync(join(process.cwd(), 'src/static/icon.png'));

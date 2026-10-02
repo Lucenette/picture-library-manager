@@ -5,7 +5,7 @@ import { test, expect } from 'vitest';
 
 import { detectScriptTypes, inspectScript } from '@/script/compile';
 
-import { makeTempDir, removeTempDir, writeFiles } from '../../setup/temp-dir';
+import { makeTempDir, removeTempDir, writeFiles } from '@test/setup/temp-dir';
 
 test('三个导出类型都认得出来', () => {
   const code = "module.exports = { 'select-image': () => 'u', 'identify-character': (n) => n, 'identify-structure': () => [] };";

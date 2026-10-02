@@ -23,6 +23,7 @@
 | 2026-10-02 | 方案定稿：运行器取 vitest、测试集中到根目录 `test/`、主进程与渲染进程各一份配置 | 评审确定选型与组织方式 |
 | 2026-10-03 | 由 `docs/roadmap/test-system.md` 迁入，正文改写为现行说明 | 测试系统落地 |
 | 2026-10-03 | 补「规则内必须带用例」的判据与检查点 | 确定测试覆盖规则 |
+| 2026-10-03 | 测试改用 `@test` / `@scripts` 绝对引用 | 去掉测试里的相对路径 |
 
 ---
 
@@ -40,6 +41,7 @@
 - 两侧都不开全局，测试里显式 `import { test, expect } from 'vitest'`，将来换运行器不必改全局类型。
 - 分两份的主要收益是 `@` 各指各的：主进程测试写 `@/database/sort`，渲染进程测试写 `@/views/...`。
 - `contracts/`、`scripts/` 都是 Node 侧，归主进程那份，目录单独留着。
+- 两侧都定义了 `@test` → `test` 与 `@scripts` → `scripts`：测试引用共用基建与仓库脚本一律走别名，不写相对路径。
 
 ## 3. 目录组织
 
@@ -90,6 +92,7 @@ test/
 - **测试也守规范**：`check-code` 同一套硬规则对 `test/` 生效。
 - **别加 `type: module`**：`package.json` 没有它，vitest 会打 `MODULE_TYPELESS_PACKAGE_JSON` 警告；为了消警告加 `type` 会动 Electron 构建。
 - **子进程要克制**：`check-code` 已能进程内验规则；`check-docs` 没有可 import 的入口，对应测试只能起子进程（约 0.5s / 次）。
+- **别名四处同步**：`@test` / `@scripts` 写在两份 vitest 配置的 `resolve.alias` 与两份 tsconfig 的 `paths` 里，新增或改名要四处一起改。
 - **规则内必须带用例**：不触达 Electron 与 DOM 的模块（纯函数、状态机、解析与编排、数据变换）改了行为就要在 `test/` 对应文件里落断言，规则外的人工冒烟即可；判据与边界见 [AGENTS.md](../../AGENTS.md) 的「测试覆盖规则」。
 
 ## 8. 已知取舍

@@ -13,6 +13,8 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src/renderer', import.meta.url)),
       '@common': fileURLToPath(new URL('./src/common', import.meta.url)),
+      '@scripts': fileURLToPath(new URL('./scripts', import.meta.url)),
+      '@test': fileURLToPath(new URL('./test', import.meta.url)),
     },
   },
   test: {

@@ -15,7 +15,9 @@
     "paths": {
       "@/*": ["src/main/*"],
       "@common/*": ["src/common/*"],
-      "@static/*": ["src/static/*"]
+      "@scripts/*": ["scripts/*"],
+      "@static/*": ["src/static/*"],
+      "@test/*": ["test/*"]
     }
   },
   "include": [

@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 
-import { lintText } from '../../scripts/check-code.mjs';
+import { lintText } from '@scripts/check-code.mjs';
 
 function messages(rel: string, content: string): string {
   return lintText(rel, content).join('\n');

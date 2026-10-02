@@ -5,7 +5,7 @@ import {
   compareVersions,
   formatSections,
   sectionsSinceLastRelease,
-} from '../../scripts/release-notes.mjs';
+} from '@scripts/release-notes.mjs';
 
 const SAMPLE = [
   '# 更新日志',

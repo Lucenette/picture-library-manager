@@ -5,7 +5,7 @@ import { test, expect } from 'vitest';
 
 import { runUps, type ChangeLogVersion, type MigrationProgress, type UpsLogger } from '@/ups/engine';
 
-import { MemoryStore } from '../../setup/memory-store';
+import { MemoryStore } from '@test/setup/memory-store';
 
 const logger: UpsLogger = { error: () => {}, warn: () => {}, info: () => {} };
 
