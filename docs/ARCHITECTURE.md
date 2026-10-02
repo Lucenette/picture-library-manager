@@ -192,6 +192,16 @@ RGBA 位图——一张 15360×8640 的 JPEG 按整图解码要 530 MB。**没�
 
 ---
 
+## 测试与自检
+
+测试集中在根目录 `test/`，按主进程 / 渲染进程分成两棵树，各配一份 vitest 配置：`vitest.main.config.ts`（`@` → `src/main`，收 `test/main`、`test/contracts`、`test/scripts`）与 `vitest.renderer.config.ts`（`@` → `src/renderer`，只收 `test/renderer`）。两边的 `@` 指向不同源码根，必须分开。命令是 `yarn test:main` / `yarn test:renderer` / `yarn test`，CI 的 `test` 作业分两步跑。
+
+静态自检是仓库脚本，按 [AGENTS.md](../AGENTS.md) 的「改完必须自检」跑：`scripts/check-docs.mjs`（文档）、`scripts/check-code.mjs`（命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译、导入解析）、`tsc` / `vue-tsc`（类型）。
+
+测试的组织、覆盖范围与改动注意点见 [design/test-system.md](./design/test-system.md)。
+
+---
+
 ## 关键取舍
 
 | 取舍 | 选择 | 代价 |
