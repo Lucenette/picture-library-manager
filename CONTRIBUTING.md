@@ -1,5 +1,7 @@
 # 贡献指南
 
+> **English summary**: This project is maintained in Chinese. Issues, pull requests and discussions in English are welcome; the maintainer will translate. See [README.en.md](./README.en.md) for an English overview.
+
 感谢你愿意为这个项目出力。开始之前，请先读完本文，以及仓库根目录的 [AGENTS.md](./AGENTS.md)——后者写清了这个项目的分层规则、代码规范与自检清单，**对人和对 AI 一视同仁**。
 
 参与本项目即表示你同意遵守 [行为准则](./CODE_OF_CONDUCT.md)。

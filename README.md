@@ -4,6 +4,9 @@
 
 **把来源各异的角色图片，整理成按角色分组、可直接用于训练的数据集**
 
+> English overview: [README.en.md](./README.en.md) —— 中文文档为准。
+
+[![CI](https://github.com/Lucenette/picture-library-manager/actions/workflows/verify.yml/badge.svg)](https://github.com/Lucenette/picture-library-manager/actions/workflows/verify.yml)
 [![Electron](https://img.shields.io/badge/Electron-44.x-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.x-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)

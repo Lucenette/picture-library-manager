@@ -18,7 +18,7 @@ import { join, relative, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..');
 /** 参与检查的目录与根文件：只覆盖仓库自己写的文档，不含依赖与构建产物。 */
 const SCAN_DIRS = ['docs', '.agents/skills'];
-const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'CONTRIBUTING.md'];
+const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'README.en.md', 'CONTRIBUTING.md'];
 /** 只校验编码、不参与链接与索引检查的目录：changelog 里有中文表名注释，存错编码会静默变成乱码写进账本。 */
 const ENCODING_DIRS = ["src/main/ups/changesets"];
 /** 这两个目录的 README 是索引表，必须与目录内的文件双向一致。 */
