@@ -23,6 +23,7 @@
 | 设置页面 | 待评审 | [settings-page.md](./settings-page.md) |
 | 颜色主题切换 | 待评审 | [theme.md](./theme.md) |
 | 相似图片管理 | 待评审 | [similar-manage.md](./similar-manage.md) |
+| 相似图片识别的语义加强（CLIP + sqlite-vec） | 待评审 | [similar-semantic.md](./similar-semantic.md) |
 | 其余窗口的自绘标题栏 | 待评审 | [window-chrome.md](./window-chrome.md) |
 | 测试系统 | 待评审 | [test-system.md](./test-system.md) |
 | 构建目标：32 位与 arm 架构 | 待评审 | [build-targets.md](./build-targets.md) |
