@@ -90,10 +90,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import type { TableInstance } from 'element-plus';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import { IPC } from '@common/ipcChannels';
 import type {
@@ -101,10 +101,10 @@ import type {
   ImageGroupStatus, ImageGroupView, ProcessScript, Source, TaskView, ViewerOpenRequest,
 } from '@common/types';
 
-import CategorySearch from '@/components/CategorySearch.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
-import TileBoard from '@/components/TileBoard.vue';
+import CategorySearch from '@/components/CategorySearch.vue';
 import type { TileItem, TileSelectState } from '@/components/TileBoard.types';
+import TileBoard from '@/components/TileBoard.vue';
 import ViewSwitchButton from '@/components/ViewSwitchButton.vue';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';

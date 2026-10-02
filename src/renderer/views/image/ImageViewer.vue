@@ -55,10 +55,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ImageFile, ProcessedImageView, ViewerFile, ViewerOpenRequest, ViewerSource } from '@common/types';
+
 import {
   countImageFiles, countImageFilesBefore, countProcessedImages, countProcessedImagesBefore,
   getImageFilePage, getProcessedImagePage,

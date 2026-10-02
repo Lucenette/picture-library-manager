@@ -1,7 +1,7 @@
 import type { ChangeLogVersion } from '@/ups/engine';
 
-import { run as postups } from './postups';
 import dbups from './dbups.xml?raw';
+import { run as postups } from './postups';
 
 /** 账本里这一版的身份：`package.json` 与目录名都是 1.1.1 */
 export const VERSION = '1.1.1';

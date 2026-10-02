@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { FileViewerInitData } from '@common/types';
+
 import { createFileViewer, get } from '@/window-manager';
 
 /** 注册图片组文件查看窗口 */

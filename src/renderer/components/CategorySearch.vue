@@ -70,6 +70,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+
 import type { FilterItem, FilterSection } from './CategorySearch.types';
 
 const props = defineProps<{ sections: FilterSection[]; order: string[] }>();

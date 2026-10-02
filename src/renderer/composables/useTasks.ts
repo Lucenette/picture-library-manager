@@ -1,7 +1,9 @@
 import { ipcRenderer } from 'electron';
 import { computed, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { TaskMoveDirection, TaskPayload, TaskProgressEvent, TaskType, TaskView } from '@common/types';
+
 import {
   cancelTask, clearFinishedTasks, forceStopTask, listTasks, moveTask, pauseTask,
   resumeTask, retryTask, submitTask,

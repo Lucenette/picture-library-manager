@@ -35,8 +35,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { FileViewerInitData, ImageFile, ViewerOpenRequest } from '@common/types';
 

@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { ConfirmDialogData, ConfirmDialogResult } from '@common/types';
 

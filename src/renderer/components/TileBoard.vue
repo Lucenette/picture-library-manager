@@ -72,10 +72,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { CSSProperties } from 'vue';
 import { PictureFilled } from '@element-plus/icons-vue';
 import type { ScrollbarInstance } from 'element-plus';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import type { CSSProperties } from 'vue';
+
 import type { TileItem, TileSelectState } from './TileBoard.types';
 
 /**
@@ -315,7 +316,7 @@ function onScroll({ scrollTop: top }: { scrollTop: number }): void {
 
 /** el-scrollbar 的滚动视口；量高度与判断触底都靠它 */
 function viewport(): HTMLElement | undefined {
-  return scrollbarRef.value?.wrapRef as HTMLElement | undefined;
+  return scrollbarRef.value?.wrapRef;
 }
 
 /**

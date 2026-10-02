@@ -1,8 +1,8 @@
 import type { ChangeLogVersion } from '@/ups/engine';
 
+import dbups from './dbups.xml?raw';
 import { run as postups } from './postups';
 import { run as preups } from './preups';
-import dbups from './dbups.xml?raw';
 
 /**
  * 账本里这一版的身份。

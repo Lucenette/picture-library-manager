@@ -1,6 +1,7 @@
-import { app, BrowserWindow, type WebPreferences } from 'electron';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
+
+import { app, BrowserWindow, type WebPreferences } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
 

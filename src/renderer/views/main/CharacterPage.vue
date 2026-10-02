@@ -45,16 +45,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { computed, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { Character, Source, PromptInitData, PromptResult } from '@common/types';
-import CategorySearch from '@/components/CategorySearch.vue';
+
 import type { FilterSection } from '@/components/CategorySearch.types';
+import CategorySearch from '@/components/CategorySearch.vue';
 import { useFilterOrder } from '@/composables/useFilterOrder';
 import { useIpcListener } from '@/composables/useIpcListener';
-import { alertDialog } from '@/services/dialog-service';
 import { getAllSources, getCharactersBySource, renameCharacter } from '@/db/database';
+import { alertDialog } from '@/services/dialog-service';
 
 /** 列表行：角色实体 + 所属来源名 */
 type CharacterRow = Character & { sourceName: string };

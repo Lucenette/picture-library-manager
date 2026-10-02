@@ -84,12 +84,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
-import { ipcRenderer, type IpcRendererEvent } from 'electron';
 import { Folder, FolderAdd, FolderOpened, Plus, Search } from '@element-plus/icons-vue';
+import { ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { InputInstance } from 'element-plus';
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScriptType, TypeFilterOpenData } from '@common/types';
+
 import { TYPE_LABELS, type ScriptGroupView, type SideItem } from './script-list';
 
 /** 过滤取值：三种已知类型 + 「一个类型都没识别到」 */

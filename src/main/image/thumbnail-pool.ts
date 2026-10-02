@@ -1,8 +1,10 @@
 import { cpus } from 'os';
 import type { Worker } from 'worker_threads';
-import createThumbnailWorker from '@/image/thumbnail-worker?nodeWorker';
+
 import type { ThumbnailEngineName } from '@common/types';
+
 import type { ThumbnailRequest, ThumbnailResponse } from '@/image/thumbnail-worker';
+import createThumbnailWorker from '@/image/thumbnail-worker?nodeWorker';
 
 /** 线程数上限：留出核心给主进程与渲染进程 */
 const MAX_WORKERS = 4;

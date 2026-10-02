@@ -1,7 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { DatabaseSync } from 'node:sqlite';
 import { basename, join } from 'path';
+
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type {
   Character, CharacterCover, CharacterTile, GroupCover, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
@@ -9,9 +11,10 @@ import type {
   ProcessedIndexRow, ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
   SimilarData, SimilarGroup, Source, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
-import type { SimilarInputRow } from '@/image/similar';
+
 import { CHARACTER_NAME_PROFILE, sortKeyOf, type SortKeyTable } from '@/database/sort';
 import { SQL } from '@/database/sql';
+import type { SimilarInputRow } from '@/image/similar';
 import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
 
@@ -117,7 +120,7 @@ function queryAll<T>(sql: string, params: SqlValue[] = []): T[] {
 /** 执行 SELECT 并返回首行，无结果时返回 undefined */
 function queryOne<T>(sql: string, params: SqlValue[] = []): T | undefined {
   const row = db!.prepare(sql).get(...params);
-  return row ? shapeRow<T>(row as Record<string, unknown>) : undefined;
+  return row ? shapeRow<T>(row) : undefined;
 }
 
 /** 执行一条写语句（INSERT / UPDATE / DELETE） */

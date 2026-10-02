@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
+
 import { loadState, quitLoading } from '@/loading';
 
 const router = useRouter();

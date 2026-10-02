@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { PromptInitData, PromptResult } from '@common/types';
+
 import { createPrompt, get } from '@/window-manager';
 
 /** 注册通用输入窗口 */

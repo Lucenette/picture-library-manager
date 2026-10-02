@@ -50,12 +50,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { Plus } from '@element-plus/icons-vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { computed, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { Source, ProcessScript, ScanConfigInitData, ScanConfigResult } from '@common/types';
+
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import {

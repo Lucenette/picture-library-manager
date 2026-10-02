@@ -1,17 +1,19 @@
 import { join } from 'path';
+
 import type {
   Character, ScannedCharacter, ScannedFile, ScannedGroup, ScanTaskPayload, ScanTaskResult,
   StructureInput, StructureOutput, ThumbnailEngineName,
 } from '@common/types';
+
 import {
   beginBatch, clearSourceData, endBatch, getSourceById,
   insertCharacter, insertImageFiles, insertImageGroup, updateSourceScannedAt,
 } from '@/database/db';
+import { ThumbnailPool } from '@/image/thumbnail-pool';
 import { buildDirTree, collectImageFiles } from '@/image/walk';
 import { createLogger } from '@/log';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
-import { ThumbnailPool } from '@/image/thumbnail-pool';
 
 /** 本模块的日志（category `main.scan`） */
 const log = createLogger('scan');

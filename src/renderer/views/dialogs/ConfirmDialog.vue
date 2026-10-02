@@ -12,8 +12,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { nextTick, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ConfirmDialogData } from '@common/types';
 

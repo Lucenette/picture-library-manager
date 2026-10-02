@@ -9,8 +9,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
 import { ipcRenderer } from 'electron';
+import { computed, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScriptListOpenData, ScriptOption } from '@common/types';
 

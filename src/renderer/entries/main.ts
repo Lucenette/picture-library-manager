@@ -1,5 +1,5 @@
-import { createApp } from 'vue';
 import { ipcRenderer } from 'electron';
+import { createApp } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 
 import { IPC, LOAD_TASK } from '@common/ipcChannels';

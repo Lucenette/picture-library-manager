@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { ConfirmDialogData, ConfirmDialogResult } from '@common/types';
+
 import { createConfirm, get } from '@/window-manager';
 
 /**

@@ -1,4 +1,5 @@
 import { dialog, ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 
 /** 注册系统原生对话框 */

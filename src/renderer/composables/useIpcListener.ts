@@ -1,5 +1,5 @@
-import { onBeforeUnmount, onMounted } from 'vue';
 import { ipcRenderer, type IpcRendererEvent } from 'electron';
+import { onBeforeUnmount, onMounted } from 'vue';
 
 /**
  * 在组件挂载时订阅主进程推送，并在卸载时自动注销。
