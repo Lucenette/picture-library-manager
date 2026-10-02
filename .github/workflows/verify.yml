@@ -43,6 +43,25 @@ jobs:
       - name: 代码规范检查
         run: node scripts/check-code.mjs
 
+  test:
+    name: 单元测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - name: 安装依赖
+        # vitest 的 esbuild / rollup 平台包走 optionalDependencies，--ignore-scripts 足够；
+        # 若某次升级后平台包缺失，改成完整 yarn install 即可。
+        run: yarn install --frozen-lockfile --ignore-scripts --network-timeout 600000
+      - name: 主进程与 Node 侧测试
+        run: yarn test:main
+      - name: 渲染进程测试
+        run: yarn test:renderer
+
   verify:
     name: 类型检查与构建
     runs-on: windows-latest
