@@ -31,11 +31,6 @@ const PLACEHOLDERS = ['«', '»'];
  */
 const PLACEHOLDER_ROOTS = ['\u5f85\u586b\u5199', '\u7ef4\u62a4\u8005\u90ae\u7bb1', 'TODO', 'FIXME'];
 const PLACEHOLDER_ANGLE = new RegExp('<[^<>]*(?:' + PLACEHOLDER_ROOTS.join('|') + ')[^<>]*>', 'i');
-/**
- * 临时豁免：该文件引用占位符示例来说明这条检查本身。开源就绪完成后它会按计划删除，
- * 届时连同这条豁免一起删掉。
- */
-const PLACEHOLDER_EXEMPT_FILES = new Set(['docs/roadmap/open-source-readiness.md']);
 /** 外部链接、协议相对、仓库根绝对路径与纯锚点都不做目标存在性检查。 */
 const SKIP_TARGET = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i;
 
@@ -338,9 +333,6 @@ function checkSkills(sources) {
  */
 function checkPlaceholders(sources) {
   for (const [rel, source] of sources) {
-    if (PLACEHOLDER_EXEMPT_FILES.has(rel)) {
-      continue;
-    }
     for (const [index, line] of source.lines.entries()) {
       for (const token of PLACEHOLDERS) {
         if (line.includes(token)) {

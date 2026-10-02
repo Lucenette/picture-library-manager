@@ -27,7 +27,6 @@
 | 其余窗口的自绘标题栏 | 待评审 | 中 | 渲染进程 + 主进程窗口配置 | [window-chrome.md](./window-chrome.md) |
 | 测试系统 | 待评审 | 中 | 构建配置 + 测试（需先评审） | [test-system.md](./test-system.md) |
 | 构建目标：32 位与 arm 架构 | 待评审 | 低 | 构建配置（需先核实 Electron 与 sharp 的架构支持） | [build-targets.md](./build-targets.md) |
-| 开源就绪 | 进行中 | 中 | 构建配置 + 文档 | [open-source-readiness.md](./open-source-readiness.md) |
 
 ## 状态取值
 
