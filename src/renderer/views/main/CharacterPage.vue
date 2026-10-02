@@ -207,7 +207,7 @@ function openSingleRename(row: CharacterRow): void {
     channel: IPC.SINGLE_RENAME_CONFIRMED,
     rowId: row.id,
   };
-  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
+  void ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
 }
 
 function openBatchRename(): void {
@@ -218,7 +218,7 @@ function openBatchRename(): void {
     value: first?.name ?? '',
     channel: IPC.BATCH_RENAME_CONFIRMED,
   };
-  ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
+  void ipcRenderer.invoke(IPC.PROMPT_OPEN, payload);
 }
 
 useIpcListener(IPC.SINGLE_RENAME_CONFIRMED, async (result: PromptResult) => {

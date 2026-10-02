@@ -88,6 +88,14 @@ const { actions } = useTasks();
 // 计算属性
 // ------------------------------------------------------------
 
+/** 排序比较用的文本：只认基本类型，对象给空串，避免 String() 得到 [object Object] */
+function toComparable(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
 const sortedSources = computed(() => {
   const prop = sortProp.value;
   const order = sortOrder.value;
@@ -97,8 +105,8 @@ const sortedSources = computed(() => {
 
   const direction = order === 'ascending' ? 1 : -1;
   return [...sources.value].sort((a, b) => {
-    const left = String((a as Record<string, unknown>)[prop] ?? '');
-    const right = String((b as Record<string, unknown>)[prop] ?? '');
+    const left = toComparable((a as Record<string, unknown>)[prop]);
+    const right = toComparable((b as Record<string, unknown>)[prop]);
     return left.localeCompare(right) * direction;
   });
 });
@@ -128,7 +136,7 @@ function onSelectionChange(rows: Source[]): void {
 
 /** 通过系统对话框添加来源，支持一次选择多个目录 */
 async function addSource(): Promise<void> {
-  const rootPaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR);
+  const rootPaths = (await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR)) as string[] | undefined;
   if (!rootPaths?.length) {
     return;
   }
@@ -195,12 +203,12 @@ async function batchDelete(): Promise<void> {
 // ------------------------------------------------------------
 
 function openScanConfig(source: Source): void {
-  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([source]));
+  void ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([source]));
 }
 
 function openScanConfigForSelection(): void {
   const targets = sources.value.filter((source) => selectedIds.value.includes(source.id));
-  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload(targets));
+  void ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload(targets));
 }
 
 /** 组装扫描配置窗口的初始化数据 */

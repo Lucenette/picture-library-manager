@@ -724,7 +724,7 @@ async function recognizeSimilar(): Promise<void> {
 
 /** 选中目录后把待导出记录固化成 id 快照，实际复制交给主进程 */
 async function exportImages(): Promise<void> {
-  const targetDir: string | null = await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR);
+  const targetDir = (await ipcRenderer.invoke(IPC.DIALOG_EXPORT_DIR)) as string | null;
   if (!targetDir) {
     return;
   }

@@ -597,7 +597,7 @@ async function viewFiles(group: ImageGroupView): Promise<void> {
     groupName: group.dirName,
     groupDirPath: group.dirPath,
   };
-  ipcRenderer.invoke(IPC.FILE_VIEWER_OPEN, payload);
+  void ipcRenderer.invoke(IPC.FILE_VIEWER_OPEN, payload);
 }
 
 function statusTagType(status: ImageGroupStatus): 'info' | 'success' | 'danger' {
@@ -683,7 +683,7 @@ async function openBatchDialog(): Promise<void> {
     scripts: scripts.value.map((script) => ({ id: script.id, name: script.name })),
     count: targets.length,
   };
-  ipcRenderer.invoke(IPC.BATCH_PROCESS_OPEN, payload);
+  void ipcRenderer.invoke(IPC.BATCH_PROCESS_OPEN, payload);
 }
 
 /** 提交时把目标固化成 id 快照，执行期间筛选或数据变化都不影响本次任务 */

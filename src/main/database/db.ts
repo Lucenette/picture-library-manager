@@ -190,14 +190,14 @@ export function initDatabase(): void {
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch (error) {
-    throw new Error(`data dir is not usable: ${dataDir} (${error instanceof Error ? error.message : String(error)})`);
+    throw new Error(`data dir is not usable: ${dataDir} (${error instanceof Error ? error.message : String(error)})`, { cause: error });
   }
   dbPath = join(dataDir, DB_FILE_NAME);
 
   try {
     db = new DatabaseSync(dbPath);
   } catch (error) {
-    throw new Error(`cannot open database: ${dbPath} (${error instanceof Error ? error.message : String(error)})`);
+    throw new Error(`cannot open database: ${dbPath} (${error instanceof Error ? error.message : String(error)})`, { cause: error });
   }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
@@ -394,7 +394,7 @@ export function renameCharacter(id: number, name: string): void {
     run(SQL.RENAME_CHARACTER, [name, sortKeyOf(name, CHARACTER_NAME_PROFILE), id]);
   } catch (error) {
     if (isUniqueViolation(error)) {
-      throw new Error(`角色「${name}」已存在于当前来源`);
+      throw new Error(`角色「${name}」已存在于当前来源`, { cause: error });
     }
     throw error;
   }
@@ -1135,6 +1135,7 @@ export function deleteFinishedTasks(): void {
 // ------------------------------------------------------------
 
 /** 动态调度表：方法名与参数由渲染进程保证，这里只能放宽类型 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC 调度边界，参数类型在渲染进程侧保证
 type DbMethod = (...args: any[]) => unknown;
 
 /** 暴露给渲染进程的数据库方法 */

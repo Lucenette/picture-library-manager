@@ -14,7 +14,7 @@ function openConfirmDialog(data: ConfirmDialogData): Promise<boolean> {
     ipcRenderer.once(IPC.CONFIRM_RESULT, (_event, result: ConfirmDialogResult) => {
       resolve(result.confirmed);
     });
-    ipcRenderer.invoke(IPC.CONFIRM_OPEN, data);
+    void ipcRenderer.invoke(IPC.CONFIRM_OPEN, data);
   });
 }
 

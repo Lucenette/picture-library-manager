@@ -48,7 +48,8 @@ export function formatCause(value: unknown): string {
     try {
       return JSON.stringify(value);
     } catch {
-      return String(value);
+      // 循环引用、BigInt 这类序列化不了的值，给一个明确标记，别落成 [object Object]
+      return '[unserializable]';
     }
   }
   return String(value);

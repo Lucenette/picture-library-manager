@@ -39,7 +39,7 @@ export async function executeScript<T = unknown>(
   try {
     scriptExports = compileScriptModule(code, script.filePath);
   } catch (error) {
-    throw new Error(`failed to load script: ${(error as Error).message}`);
+    throw new Error(`failed to load script: ${(error as Error).message}`, { cause: error });
   }
 
   const handler = scriptExports[method];
