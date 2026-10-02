@@ -55,6 +55,7 @@ Scripts are CommonJS `.js` files stored under the user data directory; the app k
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - process model, task system, data flow
 - [docs/SCRIPTING.md](docs/SCRIPTING.md) - scripting contract and examples
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - troubleshooting by symptom
+- [docs/roadmap/](docs/roadmap/) - planned and in-progress work
 - [CONTRIBUTING.md](CONTRIBUTING.md) - how to contribute
 - [CHANGELOG.md](CHANGELOG.md) - release notes
 
