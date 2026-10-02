@@ -11,7 +11,7 @@
  * 用法：node scripts/check-code.mjs；通过时打印一行，发现问题逐条打印并以退出码 1 结束。
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join, relative, resolve } from 'node:path';
 
@@ -19,7 +19,8 @@ import { parse as parseSfc } from '@vue/compiler-sfc';
 import ts from 'typescript';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const SRC = join(ROOT, 'src');
+/** 参与扫描的根：源码与测试都守同一套硬性规范 */
+const SCAN_ROOTS = [join(ROOT, 'src'), join(ROOT, 'test')];
 
 /** Node 内置模块名；比较前剥掉 node: 前缀 */
 const BUILTINS = new Set(builtinModules);
@@ -36,6 +37,9 @@ function report(file, line, message) {
 
 /** 递归收集 src 下的 .ts 与 .vue */
 function collectSources(dir, out) {
+  if (!existsSync(dir)) {
+    return;
+  }
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -54,7 +58,7 @@ function displayPath(absPath) {
 /** 对一段 TypeScript 源码跑四条规则；baseLine 是这段源码第一行在文件里的行号 */
 function checkTree(rel, absPath, content, baseLine) {
   const source = ts.createSourceFile(absPath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const isRenderer = rel.startsWith('src/renderer/');
+  const isRenderer = rel.startsWith('src/renderer/') || rel.startsWith('test/renderer/');
   const isDatabase = rel.startsWith('src/main/database/');
 
   const lineOf = (node) => baseLine + source.getLineAndCharacterOfPosition(node.getStart(source)).line;
@@ -132,7 +136,9 @@ function checkFile(absPath) {
 }
 
 const files = [];
-collectSources(SRC, files);
+for (const root of SCAN_ROOTS) {
+  collectSources(root, files);
+}
 files.sort();
 for (const file of files) {
   checkFile(file);

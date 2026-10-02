@@ -20,6 +20,10 @@
   "include": [
     "electron.vite.config.ts",
     "src/common/**/*.ts",
-    "src/main/**/*.ts"
+    "src/main/**/*.ts",
+    "test/main/**/*.ts",
+    "test/contracts/**/*.ts",
+    "test/scripts/**/*.ts",
+    "test/setup/**/*.ts"
   ]
 }
