@@ -30,27 +30,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import DEFAULT_SCRIPT_SOURCE from '@static/default-script.js?raw';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type {
   ProcessScript, PromptInitData, PromptResult, ScriptCompileError, ScriptDraft, ScriptGroup, ScriptMenuEntry,
   ScriptType,
 } from '@common/types';
-import DEFAULT_SCRIPT_SOURCE from '@static/default-script.js?raw';
+
+
 import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
+import { createLogger } from '@/services/log-service';
 import {
   assignScriptGroup, checkScript, createScriptGroup, deleteScript, deleteScriptDraft, deleteScriptGroup,
   getScriptUsage, importScripts, listScriptDrafts, listScriptGroups, listScripts, openScriptMenu,
   putScriptDraft, readScript, renameScript, renameScriptGroup, resetBuiltinScript, saveScript,
   setScriptGroupCollapsed,
 } from '@/services/script-service';
-import ScriptEditor from './scripts/ScriptEditor.vue';
-import ScriptSideList from './scripts/ScriptSideList.vue';
+
 import { diffLineChanges, type ScriptLineChange } from './scripts/diff';
 import type { ScriptGroupView, SideAction, SideItem } from './scripts/script-list';
+import ScriptEditor from './scripts/ScriptEditor.vue';
+import ScriptSideList from './scripts/ScriptSideList.vue';
+
+/** 本模块的日志（category `renderer.script`） */
+const log = createLogger('script');
 
 /** 草稿防抖：1 秒。VS Code 的 hot exit 也是这个量级（默认 1000ms，开 autosave 时 2000ms） */
 const DRAFT_DEBOUNCE_MS = 1000;
@@ -286,7 +294,7 @@ async function checkCurrent(): Promise<void> {
     types.value = checked.types;
     lastCheckedCode = checkedCode;
   } catch (caught) {
-    console.error('[script] 检查脚本失败：', caught);
+    log.error('script check failed', caught);
   }
 }
 

@@ -9,7 +9,7 @@
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
 - **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 6 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<你>\.plmanager`），里面分三份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
+- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<用户名>\.plmanager`），里面分四份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿、`logs/` 放三个日志文件（`root.log` / `external.log` / `script.log`，位置与读法见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
@@ -21,6 +21,10 @@
 | `yarn build` | 打包**当前平台**（Windows → NSIS，macOS → dmg，Linux → AppImage / deb） | 产物在 `dist/`；指定平台用 `yarn build:win` / `build:mac` / `build:linux` |
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
+| `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
+| `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs` |
+| `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置 | 只跑一侧用 `yarn test:main` / `yarn test:renderer` |
+| `yarn bench` | 基准测试：排序键、相似分组 | 不进 CI，只用于同机前后对比；见 [benchmarks/README.md](benchmarks/README.md) |
 
 ---
 
@@ -41,7 +45,7 @@
 | `src/main/task/` | 后台任务的编排：队列、状态机、runner | 具体的重计算（交给 `image/` 的线程） |
 | `src/main/ups/` | **升级模块**：版本目录（`preups.ts` / `dbups.xml` / `postups.ts`）、引擎；作为加载服务的一项任务运行，调用 `database/` 跑 SQL 与读写账本 | 反向依赖业务模块；把升级塞回启动流程或 `database/` |
 | `src/main/loading/` | **加载服务**：启动阶段任务的登记与调度（谁阻塞、谁可以预热、跑在哪个进程）、加载页状态与跨进程下发 | 具体任务本身——升级在 `ups/`、预热在渲染进程入口；把业务逻辑写进调度 |
-| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度 | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
+| `src/main/database/` | 开库（没有就建文件）、CRUD、账本读写、DB 的 IPC 调度；`sort/` 子目录把文本算成可比较的排序键（见 [docs/design/sort-keys.md](docs/design/sort-keys.md)） | 升级的编排与版本目录——那是 `ups/` 的事；建表语句——写进 `ups/changesets/<版本>/dbups.xml` |
 | `src/main/dialogs/` | **自己创建 `BrowserWindow`** 的模块 | 不持有窗口的 IPC——跟业务模块放一起 |
 | `src/main/script/` | 脚本文件与草稿的落盘（用户目录的 `scripts/`、`temp/scripts/`）、编译与调用 | SQL 与表结构——那是 `database/` 的事 |
 | `src/renderer/` | 界面、状态、IPC 包装 | **任何 Node 内置模块或 Node 专属依赖**（`electron` 的 `ipcRenderer` 除外） |
@@ -166,7 +170,7 @@ function upsertScript(...) {}
 ### 4. 新增 IPC 的归属
 
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
-- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见第 8 节）。
+- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见 [docs/design/loading.md](docs/design/loading.md)）。
 
 ### 5. 弹窗一律用原生窗口
 
@@ -188,6 +192,9 @@ function upsertScript(...) {}
 - **状态变化推送整张列表**（`task:changed` 携带排好序的完整列表），渲染进程整表替换、不自行插入；
   高频进度只发 `{ id, progress, message }` 就地打补丁（`task:progress`）。顺序的唯一来源是主进程。
   曾经的实现让渲染进程把新任务插到列表末尾，导致顺序漂移与"卡在识别中"。
+- **任务列表的订阅挂在模块上**（`useTasks.ts`），不要改成页面级的 `useIpcListener`：那样它会跟着第一个调用它的页面一起注销，
+  而 `subscribed` 守卫不会再订阅一次——切换页面之后整个窗口的任务列表就不再更新（表现为「任务一直卡在 5%」）。
+  页面自己订阅 `task:changed` 时，收到的是**整张列表**，要按 id 找自己那条，不要按单条任务写判断。
 - **提交命令额外返回新任务 id**（`TaskSubmitResult`）：它是唯一带额外返回值的命令，调用方不应去列表里猜。
 - **取消与强制结束必须经 `ctx.onAbort(...)` 立刻释放资源**（线程池、句柄），不能等 runner 走到下一个检查点：
   worker 线程会阻止主进程退出，等待检查点会让"关窗不退出"复发。
@@ -196,31 +203,7 @@ function upsertScript(...) {}
 
 ### 8. 升级模块与版本目录
 
-- 升级独立成 `src/main/ups/`，`src/main/database/` 是它的下层：升级模块调用数据库模块跑 SQL、读写账本，
-  **`database/` 里不出现 `@/ups`**。
-- 一个版本 = `src/main/ups/changesets/<package.json 的版本号>/` 一个目录，最多三件东西：
-  `preups.ts`（SQL 之前跑）、`dbups.xml`（`<changeSet>`）、`postups.ts`（SQL 之后跑），缺哪个就跳过哪个。
-  目录里的 `index.ts` 写死 `VERSION` 并导出 `changelog`——**版本号以代码里的常量为准，目录名只给人看**；
-  外层 `changesets/index.ts` 只 import 各版本目录的 `index.ts`。清单里出现相同版本号直接抛错。
-- 建表语句不进代码，写进 `dbups.xml` 的 `<changeSet>` 里，一条用 `<comment>` 说明它做了什么。
-- **账本按身份记账、执行过的不再执行**：changeSet 是 `(author, id, filename)`（`id` 用 20 位定长数字时间戳），
-  脚本是 `(script, 'preups' | 'postups', 版本号)`。**已发布版本的目录冻结**：改一条已执行的 changeset 或脚本
-  都不会生效，要重跑得先删掉 `schema_migration` 里那一行。账本表由引擎用代码创建，不要写进 changelog。
-- 升级脚本是普通模块（可以 import 任何东西），但：一律异步 IO；不要自己写 `BEGIN` / `COMMIT`；
-  不要吞异常（抛错才回滚，脚本写进库的东西随事务一起不留）；**文件操作不受事务保护**，
-  要改或删已有文件就自己先备份，并保证重复执行是安全的。
-- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ 升级 → 其余初始化。三者都是**加载服务**
-  （`src/main/loading/`，见 [docs/design/loading.md](docs/design/loading.md)）里的任务：升级与其余初始化
-  都是 `essential`，按登记顺序串行。加载服务的终态在所有 `essential` 任务之后才公布，因此
-  「加载页收到终态时通道必然已经注册好了」是登记表的结论，不再需要额外的时序约定。
-- 启动阶段的活一律 `registerLoadTask()` 登记，不要写在 `startLoading()` 之后。`essential` 跑完才进主界面、
-  失败即整轮失败；`warmup` 与必须的任务并行、跑完不放行、失败只记日志。渲染进程的预热用
-  `target: 'renderer'` 登记，id 加在 `common/ipcChannels.ts` 的 `LOAD_TASK` 里，实现写在渲染进程入口。
-- **破坏性结构变更（删列、删表、改名）之前，先在 preups 里把要保留的数据落成文件并自校验**：列一旦丢掉，
-  除了升级前的库备份之外没有第二份副本，而备份是整库回滚、不能只捞回一个字段。落盘放在 SQL 之前、校验放在同一段脚本末尾，
-  任一步失败就中止整轮升级——那时列还在。
-- 转义由写的人负责：`<sql>` 里出现 `<` 写成 `&lt;`（漏写可能被 XML 当成标签吞掉），`&` 写成 `&amp;`。
-- 需要图片解码的补数据仍归任务系统，不要塞进 changeSet。
+规则见 [src/main/ups/AGENTS.md](src/main/ups/AGENTS.md)。启动阶段谁阻塞、谁预热、跑在哪个进程，见 [docs/design/loading.md](docs/design/loading.md)。
 
 ### 9. 自绘标题栏
 
@@ -242,6 +225,17 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 
 细节与取舍见 [docs/design/window-management.md](docs/design/window-management.md)。
 
+### 10. 日志
+
+- **一律用封装，不直接 `console.*`**：主进程 `import { createLogger } from '@/log'`、渲染进程 `import { createLogger } from '@/services/log-service'`，
+  一个模块一个 logger（category 为 `main.<模块>` / `renderer.<模块>`，模块名自取、能认出是哪个文件）。直接 `console.*` 会被 stdout 补丁当成第三方输出记进 `external.log`，来源与级别都是错的。
+- 消息用模板字符串就地拼好：`log.warn(`failed to open file: ${path}`)`；要附带错误对象时作为第二个参数传入（`log.error(msg, error)`，Error 记栈、对象记 JSON），**不要用占位符**。
+- **日志消息一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）可以是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码。
+- **异常消息按去向定语言**：会进日志的用英文——任务失败、加载失败、升级校验与升级脚本、脚本执行、DB 打不开都会作为 `cause` 落进 `root.log`；不会进日志的纯界面文案（任务状态词、输入校验、对话框标题、进度标题）保持中文。
+- **关键节点用 `info` 落盘**：启动与退出、窗口开关、开库、加载任务的开始与结束、升级步骤、任务的提交与终态、各 runner 的汇总。文件侧只收 INFO 及以上，写成 `debug` 等于只在控制台可见。
+- worker 线程（`image/` 里的解码）够不着日志文件、也没有 electron：它不写日志，失败靠返回值交给调用方记录。
+- 三个文件在哪、级别怎么调，见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节；不变量与改动注意点见 [docs/design/logging.md](docs/design/logging.md)。
+
 ---
 
 ## 已知环境限制
@@ -253,13 +247,25 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
   本仓库在 `package.json` 的 `postinstall` 里显式跑 `node node_modules/electron/install.js`（幂等，装过就跳过），
   让 `yarn install` 之后直接就能开发。GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指镜像——
   别再往 `.npmrc` 写 `electron_mirror`，npm 已警告这类未知配置下个大版本会失效。
-- **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，日志在终端显示为乱码；`chcp 65001` 后正常。文件内容不受影响。
+- **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，中文在终端显示为乱码；`chcp 65001` 后正常，文件内容不受影响。应用自己写出的日志消息已改成英文（见运行时约定第 10 节），仍会乱码的是第三方库自己打的中文。
 - **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
   要清理只点具体产物：`dist/icons`、`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。
-- **`yarn.lock` 被 `.gitignore` 忽略**：CI 无法使用冻结锁文件，依赖版本以 `package.json` 为准。
+- **依赖可复现**：`yarn.lock` 已入库，CI 用 `yarn install --frozen-lockfile` 安装；Node 版本由 `.nvmrc`（`22`）与 `package.json` 的 `engines.node`（`>=22.12`）固定。
 - **`?nodeWorker` 是 electron-vite 的虚拟模块**：静态的"导入路径是否存在"检查工具会把它报成无法解析，这是正常的，不是错误。
 - **`ReplaceFileW EIO (Win32 32)`**：`yarn dev` 或 IDE 正在占用该文件，稍后重试即可。
+
+---
+
+## 测试覆盖规则
+
+判据只有一条：**这段代码能不能在没有 Electron、也没有浏览器 DOM 的情况下被 import 并驱动**。
+
+- **规则内（必须有用例）**：主进程里运行时不 import `electron` 的模块，以及渲染进程里不依赖 DOM / 组件实例的模块——纯函数、状态机、解析与编排、数据变换。
+- **规则外（人工冒烟即可）**：必须真实窗口（`BrowserWindow` / `dialog` / `Menu` / `nativeTheme`）、原生解码（`sharp`）、真实文件系统副作用或 Vue 组件渲染才能观察行为的代码。
+- 模块自己 import 的纯依赖不构成豁免：一个模块只要不触达 electron 与 DOM，就在规则内。
+
+规则内新增或修改行为（含新增分支）时，同一次提交里要有对应断言；新增可测模块时建对应测试文件。修 bug 不要求「先写失败用例」的步骤，但规则内的最终结果仍要有测试覆盖；规则外的改动用人工验证，并在回复或 PR 里写清验证了什么。测试怎么放、怎么跑见 [docs/design/test-system.md](docs/design/test-system.md)。
 
 ---
 
@@ -270,12 +276,11 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 1. `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `common`。
 2. `node_modules/.bin/vue-tsc -p tsconfig.web.json` —— 覆盖渲染进程，**含 `.vue`**。
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
-3. `.vue` 的模板编译：用 `@vue/compiler-sfc` 的 `parse` + `compileScript` + `compileTemplate` 逐个编译。
-4. 控制语句大括号：用 `typescript` 的 AST 遍历 `IfStatement` / `ForStatement` / `ForInStatement` / `ForOfStatement` / `WhileStatement` / `DoStatement`，检查语句体是否为 `Block`。
-5. 导入解析：确认所有 `@/`、`@common/` 与相对路径都能落到真实文件（`?nodeWorker`、`?raw` 除外——
-   它们由 electron-vite / Vite 接管）。
-6. 渲染进程不得引用 Node 模块（见上面第 1 条约定）。
-7. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译与导入解析，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。
+4. `node scripts/check-jsdoc.mjs` —— 覆盖硬性规范 4：`src/**/*.ts` 的顶层导出符号必须有 JSDoc。
+5. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+6. `node scripts/check-doc-budgets.mjs` —— 常驻文档的字数预算（`scripts/doc-budgets.json`）。超了先搬走内容、再压缩，最后才提额并在提交信息里写明理由。
+7. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 
@@ -286,6 +291,6 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 - 不要擅自 `git commit` / `git push`，除非明确要求。
 - 不要顺手改动目录结构或文件位置（见开头"动手前的边界"）。
 - 不要改动 `src/static/default-script.js`（内置默认脚本）的语义：它随应用发布，改了等于改所有新库的默认行为。
-- **不要改动 `package.json`、不要自行安装或卸载依赖**（包括 `yarn add`）：需要新依赖时说明理由与命令，等使用者执行。
+- **动 `package.json` 前必须先确认，未获授权不准动**（加一条 `scripts` 命令也算）。不要自行安装或卸载依赖（`yarn add` / `yarn remove`）：需要新依赖时说明理由与命令，等使用者执行。
 - **不要结束进程、不要改系统状态**（杀他人的进程、改环境变量、动用户目录）：只报告现象，由使用者决定。
 - 不要把"静默降级"当作容错：功能性失败要能被看见（写进任务错误、日志或界面提示），而不是悄悄退回慢路径。

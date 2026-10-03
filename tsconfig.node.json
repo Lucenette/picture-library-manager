@@ -9,17 +9,25 @@
     "esModuleInterop": true,
     "types": ["node"],
     "skipLibCheck": true,
+    "allowJs": true,
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/main/*"],
       "@common/*": ["src/common/*"],
-      "@static/*": ["src/static/*"]
+      "@scripts/*": ["scripts/*"],
+      "@static/*": ["src/static/*"],
+      "@test/*": ["test/*"]
     }
   },
   "include": [
     "electron.vite.config.ts",
+    "benchmarks/**/*.ts",
     "src/common/**/*.ts",
-    "src/main/**/*.ts"
+    "src/main/**/*.ts",
+    "test/main/**/*.ts",
+    "test/contracts/**/*.ts",
+    "test/scripts/**/*.ts",
+    "test/setup/**/*.ts"
   ]
 }

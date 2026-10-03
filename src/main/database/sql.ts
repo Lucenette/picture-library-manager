@@ -38,7 +38,7 @@ export const SQL = {
   // Source
   // ----------------------------------------------------------
 
-  INSERT_SOURCE: 'INSERT INTO source (name, root_path) VALUES (?, ?)',
+  INSERT_SOURCE: 'INSERT INTO source (name, name_sort, root_path, root_path_sort) VALUES (?, ?, ?, ?)',
   SELECT_SOURCE_ALL: 'SELECT * FROM source ORDER BY created_at DESC',
   SELECT_SOURCE_BY_ID: 'SELECT * FROM source WHERE id = ?',
   DELETE_SOURCE: 'DELETE FROM source WHERE id = ?',
@@ -58,16 +58,16 @@ export const SQL = {
   // Character
   // ----------------------------------------------------------
 
-  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (source_id, name, source_path) VALUES (?, ?, ?)',
+  INSERT_CHARACTER: 'INSERT OR IGNORE INTO character (source_id, name, name_sort, source_path) VALUES (?, ?, ?, ?)',
   SELECT_CHARACTER_BY_SOURCE_NAME: 'SELECT * FROM character WHERE source_id = ? AND name = ?',
   SELECT_CHARACTERS_BY_SOURCE: 'SELECT * FROM character WHERE source_id = ? ORDER BY name',
-  RENAME_CHARACTER: 'UPDATE character SET name = ? WHERE id = ?',
+  RENAME_CHARACTER: 'UPDATE character SET name = ?, name_sort = ? WHERE id = ?',
 
   // ----------------------------------------------------------
   // ImageGroup
   // ----------------------------------------------------------
 
-  INSERT_IMAGE_GROUP: 'INSERT OR IGNORE INTO image_group (character_id, dir_name, dir_path, file_count) VALUES (?, ?, ?, ?)',
+  INSERT_IMAGE_GROUP: 'INSERT OR IGNORE INTO image_group (character_id, dir_name, dir_name_sort, dir_path, dir_path_sort, file_count) VALUES (?, ?, ?, ?, ?, ?)',
   SELECT_IMAGE_GROUP_BY_PATH: 'SELECT * FROM image_group WHERE dir_path = ?',
   UPDATE_IMAGE_GROUP_STATUS: 'UPDATE image_group SET status = ? WHERE id = ?',
   UPDATE_IMAGE_GROUP_PROCESSED: "UPDATE image_group SET status = 'processed' WHERE id = ?",
@@ -84,7 +84,7 @@ export const SQL = {
   // ImageFile
   // ----------------------------------------------------------
 
-  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_path, file_size, width, height, extension, thumbnail, phash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  INSERT_IMAGE_FILE: 'INSERT OR IGNORE INTO image_file (image_group_id, file_name, file_name_sort, file_path, file_size, width, height, extension, thumbnail, phash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   SELECT_IMAGE_FILES_BY_GROUP: 'SELECT * FROM image_file WHERE image_group_id = ? ORDER BY file_name',
   SELECT_GROUP_ID_BY_FILE_PATH: 'SELECT image_group_id FROM image_file WHERE file_path = ?',
 
@@ -114,6 +114,8 @@ export const SQL = {
   SELECT_SCRIPTS_ALL: 'SELECT * FROM process_script ORDER BY name',
   /** 改名：正文在文件里，这里只动名称与时间戳；图库那份名字副本由调用方在同一个事务里跟着改 */
   RENAME_SCRIPT: "UPDATE process_script SET name = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
+  /** 脚本行的排序键：单独一条 UPDATE——老库升级途中还没有这一列，见 db.ts 的说明 */
+  SET_SCRIPT_SORT: 'UPDATE process_script SET name_sort = ? WHERE id = ?',
   /** 接管旧脚本与内置脚本落盘：只回填文件路径 */
   SET_SCRIPT_FILE_PATH: "UPDATE process_script SET file_path = ?, loaded_at = datetime('now','localtime') WHERE id = ?",
   TOUCH_SCRIPT_LOADED_AT: "UPDATE process_script SET loaded_at = datetime('now','localtime') WHERE id = ?",
@@ -121,6 +123,8 @@ export const SQL = {
   SET_SCRIPT_GROUP: 'UPDATE process_script SET group_id = ? WHERE id = ?',
   /** 改写图库里的脚本名副本（改名级联） */
   RENAME_PROCESSED_SCRIPT_NAME: 'UPDATE processed_image SET script_name = ? WHERE script_id = ?',
+  /** 图库里脚本名副本的排序键，同上 */
+  SET_PROCESSED_SCRIPT_SORT: 'UPDATE processed_image SET script_name_sort = ? WHERE script_id = ?',
   COUNT_PROCESSED_BY_SCRIPT: 'SELECT COUNT(*) AS processed FROM processed_image WHERE script_id = ?',
   /** 老库接管用：库里还有 code 列时，把每一条的源码读出来 */
   SELECT_LEGACY_SCRIPTS: 'SELECT id, name, file_path, code FROM process_script',
@@ -139,10 +143,10 @@ export const SQL = {
   // ----------------------------------------------------------
 
   /** 图库行里存一份「当时是哪个脚本选的」名字副本：脚本删掉之后仍然显示得出来 */
-  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, script_name, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, (SELECT name FROM process_script WHERE id = ?), datetime('now','localtime'))",
+  INSERT_PROCESSED: "INSERT INTO processed_image (image_group_id, character_id, source_id, original_path, selected_file, script_id, script_name, script_name_sort, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
   SELECT_PROCESSED_BY_GROUP: 'SELECT * FROM processed_image WHERE image_group_id = ?',
   SELECT_PROCESSED_BY_ID_GROUP: 'SELECT image_group_id FROM processed_image WHERE id = ?',
-  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, script_name = (SELECT name FROM process_script WHERE id = ?), confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
+  UPDATE_PROCESSED: "UPDATE processed_image SET selected_file = ?, script_id = ?, script_name = ?, script_name_sort = ?, confirmed_at = datetime('now','localtime') WHERE image_group_id = ?",
   DELETE_PROCESSED: 'DELETE FROM processed_image WHERE id = ?',
   DELETE_PROCESSED_BY_GROUP: 'DELETE FROM processed_image WHERE image_group_id = ?',
 
@@ -179,6 +183,94 @@ export const SQL = {
   JOIN source g ON pi.source_id = g.id
   LEFT JOIN image_file f ON pi.selected_file = f.file_path
   WHERE 1 = 1`,
+
+  /** 图库行总数：与 `SELECT_PROCESSED_VIEW_BASE` 同一套 join 与谓词，页码才和分片对得上 */
+  COUNT_PROCESSED_VIEW_BASE: `SELECT COUNT(*) AS total
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  JOIN source g ON pi.source_id = g.id
+  LEFT JOIN image_file f ON pi.selected_file = f.file_path
+  WHERE 1 = 1`,
+
+  /** 图库轻量索引行：平铺的三态与「全选本分组」靠它，不带缩略图 */
+  SELECT_PROCESSED_INDEX_BASE: `SELECT pi.id AS id, c.name AS characterName
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  WHERE 1 = 1`,
+
+  /**
+   * 图库平铺一级：角色 + 当前筛选下的图片数；调用方追加 WHERE / GROUP BY / LIMIT。
+   *
+   * 按 `c.name` 归组（不是 `c.id`）：同一个角色可能出现在多个来源里，那是同一张卡。
+   * `characterId` 取该名字下最小的 id，只当卡片的稳定句柄用。
+   */
+  SELECT_PROCESSED_CHARACTER_TILES_BASE: `SELECT MIN(c.id) AS characterId, c.name AS characterName, COUNT(*) AS count
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  WHERE 1 = 1`,
+
+  /** 图库平铺一级的总数：当前筛选下有图可显示的角色名数 */
+  COUNT_PROCESSED_CHARACTERS_BASE: `SELECT COUNT(DISTINCT c.name) AS total
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  WHERE 1 = 1`,
+
+  /**
+   * 角色封面：每个角色名最多三张缩略图（按文件名），卡片叠着放。
+   *
+   * 按**名字**分组取，和一级卡片同一个口径：同一个角色可能散在多个来源里，
+   * 只按某一个 character.id 取会漏掉其它来源的图（卡片上就只有一张封面）。
+   * `%NAMES%` 由调用方换成占位符。
+   */
+  SELECT_CHARACTER_COVERS: `SELECT name, thumbnail, rn FROM (
+    SELECT c.name AS name, f.thumbnail AS thumbnail,
+      ROW_NUMBER() OVER (PARTITION BY c.name ORDER BY f.file_name_sort, f.id) AS rn
+    FROM processed_image pi
+    JOIN character c ON pi.character_id = c.id
+    JOIN image_file f ON f.file_path = pi.selected_file
+    WHERE c.name IN (%NAMES%)
+  ) WHERE rn <= 3 ORDER BY name, rn`,
+
+  /** 图组页一级总数：与 `SELECT_IMAGE_GROUPS_VIEW_BASE` 同一套 join */
+  COUNT_IMAGE_GROUPS_VIEW_BASE: `SELECT COUNT(*) AS total
+  FROM image_group ig
+  JOIN character c ON ig.character_id = c.id
+  JOIN source g ON c.source_id = g.id
+  WHERE 1 = 1`,
+
+  /** 图组页二级：图组内图片文件的一页，按文件名 */
+  SELECT_IMAGE_FILES_PAGE: `SELECT * FROM image_file WHERE image_group_id = ?
+  ORDER BY file_name_sort, id LIMIT ? OFFSET ?`,
+
+  /** 图组内图片总数 */
+  COUNT_IMAGE_FILES: 'SELECT COUNT(*) AS total FROM image_file WHERE image_group_id = ?',
+
+  /** 图组内排在锚点之前的图片数，顺序与二级分页一致（文件名 + id） */
+  COUNT_IMAGE_FILES_BEFORE: `SELECT COUNT(*) AS total FROM image_file WHERE image_group_id = ?
+  AND (file_name_sort, id) < (SELECT file_name_sort, id FROM image_file WHERE id = ?)`,
+
+  /**
+   * 图库分片用的「排序键视图」：把四个排序键都选出来。
+   *
+   * 查看器要按起始 id 算出它在整个序列里的下标，就得让排序键是这一层的普通列，
+   * 才能用 `(键, id)` 的行值比较一次算出来。
+   */
+  SELECT_PROCESSED_SORT_VIEW_BASE: `SELECT pi.id AS id, c.name_sort AS characterSort,
+    f.file_name_sort AS fileNameSort, pi.script_name_sort AS scriptNameSort, pi.confirmed_at AS confirmedAt
+  FROM processed_image pi
+  JOIN character c ON pi.character_id = c.id
+  JOIN source g ON pi.source_id = g.id
+  LEFT JOIN image_file f ON pi.selected_file = f.file_path
+  WHERE 1 = 1`,
+
+  /** 图组封面：每个图组最多三张缩略图（按文件名），卡片叠着放；`%IDS%` 由调用方换成占位符 */
+  SELECT_GROUP_COVERS: `SELECT id, thumbnail, rn FROM (
+    SELECT ig.id AS id, f.thumbnail AS thumbnail,
+      ROW_NUMBER() OVER (PARTITION BY ig.id ORDER BY f.file_name_sort, f.id) AS rn
+    FROM image_group ig
+    JOIN image_file f ON f.image_group_id = ig.id
+    WHERE ig.id IN (%IDS%)
+  ) WHERE rn <= 3 ORDER BY id, rn`,
 
   // ----------------------------------------------------------
   // 升级账本

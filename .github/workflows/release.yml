@@ -38,8 +38,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: yarn
       - name: 安装依赖
-        run: yarn install --network-timeout 600000
+        run: yarn install --frozen-lockfile --network-timeout 600000
       - name: 类型检查
         run: yarn typecheck
 
@@ -66,8 +67,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: yarn
       - name: 安装依赖
-        run: yarn install --network-timeout 600000
+        run: yarn install --frozen-lockfile --network-timeout 600000
       - name: 打包（yarn icon 已串在 build:* 里）
         env:
           # 没有签名证书：不去自动发现身份，省掉一轮等待与告警
@@ -92,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # 取上一个 tag 需要完整历史，发布说明里有对比链接
+          # 取上一个 tag 需要完整历史：发布说明的对比链接与「更新详情」都从它起算
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:

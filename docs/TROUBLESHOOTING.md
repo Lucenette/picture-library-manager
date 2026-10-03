@@ -12,8 +12,8 @@
 
 **现在不应该再出现**——图片解码已迁移到 `worker_threads`。如果仍然卡：
 
-1. 看「任务管理」页里该任务的错误栏有没有 `缩略图工作线程...` 字样。有的话说明线程池没起来，扫描在退化的路径上跑。
-2. 主进程控制台（运行 `yarn dev` 的终端）里找 `缩略图工作线程启动失败` 一类的日志。
+1. 看「任务管理」页里该任务的错误栏有没有 `thumbnail worker...` 字样（这类失败信息一律英文，见「日志消息为什么是英文」）。有的话说明线程池没起来，扫描在退化的路径上跑。
+2. 主进程控制台（运行 `yarn dev` 的终端）里找 `thumbnail worker failed to start` 一类的日志。
 3. 相关代码：`src/main/image/thumbnail-pool.ts`、`src/main/image/walk.ts`（遍历的分片让出）。
 
 ### 点暂停 / 强制结束后没有立刻停
@@ -24,7 +24,7 @@
 
 强制结束会**立刻**把状态置为「已取消」并释放队列，只是后台还有一张图在收尾——不会留下半成品，因为写库是最后一步且同步完成。
 
-### 任务卡在「生成缩略图 N/M」不动，或日志里出现「缩略图处理超时」
+### 任务卡在「生成缩略图 N/M」不动，或日志里出现 `thumbnail processing timed out`
 
 修复过两轮，两个原因都值得知道：
 
@@ -75,7 +75,7 @@ yarn add sharp
 - 任务页的进度与耗时每秒刷新；如果长时间不动，看主进程控制台有没有未捕获异常。
 - 应用正常退出时，进行中的任务会被标记为「已取消（应用退出）」；崩溃则会标记为「失败（任务中断）」。
 
-### 扫描报错「脚本未导出方法：identify-structure」
+### 扫描报错 `script does not export method: identify-structure`
 
 扫描配置里选的脚本没有导出 `identify-structure`。到「脚本管理」页看该脚本的**类型标签**，空的就说明检测不到可用导出。
 
@@ -124,7 +124,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 | 运行方式 | 路径 |
 |---|---|
 | 开发（`yarn dev`） | `dist/data/picture-lib.db` |
-| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<你>\.plmanager\data\picture-lib.db`） |
+| 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<用户名>\.plmanager\data\picture-lib.db`） |
 
 打包后固定落在用户主目录，**不放安装目录**：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录，
 库放那儿等于每次更新都可能丢；而 Linux 的 deb 装在 root 所有的 `/opt/PLManager`、macOS 的 exe 在 `.app` 内部，
@@ -150,6 +150,41 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 缩略图以 WebP 字节存放在 `image_file.thumbnail`（BLOB），是库体积里最大的一块。这是「预览零开销」的代价，属于已知取舍（见 [ARCHITECTURE](./ARCHITECTURE.md) 的关键取舍一节）。
 
+## 日志
+
+### 日志文件在哪
+
+| 运行方式 | 目录 |
+|---|---|
+| 开发（`yarn dev`） | `dist/logs/` |
+| 打包后 | `~/.plmanager/logs/`（Windows 为 `C:\Users\<用户名>\.plmanager\logs`） |
+
+三个文件各管一类来源，文件由主进程独占写入：
+
+| 文件 | 内容 |
+|---|---|
+| `root.log` | 应用自己的日志：`main.*`（主进程）与 `renderer.*`（渲染进程） |
+| `external.log` | 第三方与噪声：依赖库写到 stdout / stderr 的内容、渲染进程控制台里的框架警告、Electron 的进程异常事件 |
+| `script.log` | 用户脚本里的 `console.*` |
+
+按天滚动，前一天的写成 `root.log.<日期>.gz`。保留三条上限：单文件 50 MB（压缩前）、最多 20 个文件、启动时删掉超过 14 天的。固定 UTF-8 + LF，任何文本编辑器都能打开。
+
+### 日志消息为什么是英文
+
+**消息文本一律英文 ASCII**，只有变量值（路径、脚本名、任务标题）是中文。Windows 终端默认 GBK 而 Node 按 UTF-8 输出，中文消息在终端里就是乱码，文件与终端之间也没有两边都对的编码；英文正文让终端、文件与检索工具都读得通。定位问题时直接搜 category（`main.scan`、`main.ups`）或消息里的关键词。
+
+### 想把日志调详细 / 调安静
+
+三个环境变量，取值 `error` / `warn` / `info` / `debug`，给了别的值一律退回默认：
+
+| 变量 | 管什么 | 默认 |
+|---|---|---|
+| `PLM_LOG_LEVEL` | 应用自己的日志（`main.*` / `renderer.*`） | 开发态 `debug`、打包态 `info` |
+| `PLM_LOG_LEVEL_EXTERNAL` | `external.log` | `warn` |
+| `PLM_LOG_LEVEL_SCRIPT` | `script.log`（含脚本的 `console.*`） | `warn` |
+
+**控制台始终输出、且不额外过滤**；文件侧的 `root.log` 套了一层 INFO 过滤，所以把 `PLM_LOG_LEVEL` 调到 `debug` 只在控制台多出调试行，不会把文件撑大。
+
 ---
 
 ## 开发 / 构建
@@ -160,9 +195,9 @@ esbuild 需要启动子进程并用命名管道通信。**受限沙箱环境会�
 
 ### 主进程日志在终端里是乱码
 
-Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文变成
-`缂╃暐鍥剧敓鎴愬け璐ワ細` 这样的一串。执行 `chcp 65001` 切到 UTF-8 即可正常显示，
-这不影响日志本身的内容。
+应用自己写出的消息已改为英文 ASCII（见「日志消息为什么是英文」），终端里仍会乱码的是**第三方库自己打的中文**。
+Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文变成 `缂╃暐鍥剧敓鎴愬け璐ワ細` 这样的一串；
+执行 `chcp 65001` 切到 UTF-8 即可正常显示，日志文件里的内容不受影响。
 
 ### `yarn typecheck` 报找不到 `vue-tsc`
 
@@ -201,7 +236,8 @@ Windows 终端默认代码页是 GBK，而 Node 按 UTF-8 输出，于是中文�
 
 ### 脚本里的 console.log 在窗口 DevTools 里看不到
 
-脚本运行在主进程，日志在**运行 `yarn dev` 的终端**，不在窗口的 DevTools。
+脚本运行在主进程：输出在**运行 `yarn dev` 的终端**，同时写进用户日志目录的 `script.log`（见「日志文件在哪」），
+不在窗口的 DevTools。
 
 ### 脚本里的 `require('./helper')` 报找不到模块
 

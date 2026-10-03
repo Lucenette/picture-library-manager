@@ -1,6 +1,7 @@
 import type { ScriptType } from '@common/types';
 
 import { getScriptById } from '@/database/db';
+import { withScriptLogChannel } from '@/log';
 import { compileScriptModule } from '@/script/compile';
 import { readScriptSource } from '@/script/files';
 
@@ -24,27 +25,28 @@ export async function executeScript<T = unknown>(
 ): Promise<T> {
   const script = getScriptById(scriptId);
   if (!script) {
-    throw new Error(`脚本不存在（id=${scriptId}）`);
+    throw new Error(`script not found (id=${scriptId})`);
   }
 
   let code: string;
   try {
     code = await readScriptSource(script.filePath);
   } catch {
-    throw new Error(`脚本文件不存在：${script.filePath}`);
+    throw new Error(`script file not found: ${script.filePath}`);
   }
 
   let scriptExports: Record<string, unknown>;
   try {
     scriptExports = compileScriptModule(code, script.filePath);
   } catch (error) {
-    throw new Error(`脚本加载失败：${(error as Error).message}`);
+    throw new Error(`failed to load script: ${(error as Error).message}`, { cause: error });
   }
 
   const handler = scriptExports[method];
   if (typeof handler !== 'function') {
-    throw new Error(`脚本未导出方法：${method}`);
+    throw new Error(`script does not export method: ${method}`);
   }
 
-  return (handler as (...handlerArgs: unknown[]) => T)(...args);
+  // 脚本执行期间它自己的 console.* 归到 script 通道（落 script.log 并进控制台）
+  return withScriptLogChannel(() => (handler as (...handlerArgs: unknown[]) => T)(...args));
 }

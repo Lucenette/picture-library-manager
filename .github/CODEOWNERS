@@ -1,0 +1,7 @@
+# 代码归属。单人维护：默认全部归维护者。
+# 下面三个目录会动数据与任务不变量，改动前请先开 Issue 讨论——不是要求 review，是提示影响面。
+* @Lucenette
+
+/src/main/ups/      @Lucenette
+/src/main/database/ @Lucenette
+/src/main/task/     @Lucenette

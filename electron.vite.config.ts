@@ -1,9 +1,11 @@
 import { resolve } from 'path';
+
+import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'electron-vite';
 import type { Plugin } from 'vite';
-import { FIRST_PAINT } from './src/renderer/entries/shell/first-paint';
-import vue from '@vitejs/plugin-vue';
 import renderer from 'vite-plugin-electron-renderer';
+
+import { FIRST_PAINT } from './src/renderer/entries/shell/first-paint';
 
 /** 主进程与渲染进程共用的路径别名 */
 const aliases = {

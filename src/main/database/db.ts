@@ -1,16 +1,25 @@
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { DatabaseSync } from 'node:sqlite';
 import { basename, join } from 'path';
+
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type {
-  Character, Source, ImageFile, ImageGroup, ImageGroupStatus, ImageGroupView,
-  ProcessedImage, ProcessedImageView, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
-  SimilarData, SimilarGroup, TaskRow, TaskStatus, TaskType,
+  Character, CharacterCover, CharacterTile, GroupCover, ImageFile, ImageGroup, ImageGroupFilter, ImageGroupSort,
+  ImageGroupSortKey, ImageGroupStatus, ImageGroupView, ProcessedFilter, ProcessedImage, ProcessedImageView,
+  ProcessedIndexRow, ProcessedSort, ProcessedSortKey, ProcessScript, ScannedFile, ScriptGroup, ScriptType,
+  SimilarData, SimilarGroup, Source, TaskRow, TaskStatus, TaskType,
 } from '@common/types';
-import type { SimilarInputRow } from '@/image/similar';
+
+import { CHARACTER_NAME_PROFILE, sortKeyOf, type SortKeyTable } from '@/database/sort';
 import { SQL } from '@/database/sql';
+import type { SimilarInputRow } from '@/image/similar';
+import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
+
+/** 本模块的日志（category `main.db`） */
+const log = createLogger('db');
 
 // ------------------------------------------------------------
 // 常量
@@ -45,6 +54,15 @@ let batchDepth = 0;
 /** 上次写入备份的时间戳 */
 let lastBackupAt = 0;
 
+/**
+ * 脚本表的排序键列在不在（1.1.1 才加）。
+ *
+ * 老库升级到 1.1.1 时，1.1.0 的 postups 会调用 `insertScript` / `renameScript`，那时列还不存在；
+ * 这两个写入点因此把键单独写成一条 UPDATE，并在缺列时跳过——升级收尾的整表回填会补上。
+ * `null` 表示还没问过。
+ */
+let scriptSortColumnReady: boolean | null = null;
+
 // ------------------------------------------------------------
 // 底层：查询
 // ------------------------------------------------------------
@@ -71,9 +89,20 @@ function thumbnailToDataUrl(value: unknown): unknown {
   return `data:image/webp;base64,${Buffer.from(value).toString('base64')}`;
 }
 
-/** 读出来的行统一整形：缩略图字节转成 data URL */
+/** 排序键列是给 SQL 排序用的派生数据，不进业务对象 */
+function stripSortKeys(row: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (!key.endsWith('_sort')) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/** 读出来的行统一整形：缩略图字节转成 data URL，排序键列丢掉 */
 function shapeRow<T>(row: Record<string, unknown>): T {
-  const shaped = snakeToCamel(row);
+  const shaped = snakeToCamel(stripSortKeys(row));
   if ('thumbnail' in shaped) {
     shaped.thumbnail = thumbnailToDataUrl(shaped.thumbnail);
   }
@@ -91,7 +120,7 @@ function queryAll<T>(sql: string, params: SqlValue[] = []): T[] {
 /** 执行 SELECT 并返回首行，无结果时返回 undefined */
 function queryOne<T>(sql: string, params: SqlValue[] = []): T | undefined {
   const row = db!.prepare(sql).get(...params);
-  return row ? shapeRow<T>(row as Record<string, unknown>) : undefined;
+  return row ? shapeRow<T>(row) : undefined;
 }
 
 /** 执行一条写语句（INSERT / UPDATE / DELETE） */
@@ -116,9 +145,17 @@ function insert(sql: string, params: SqlValue[] = []): number {
  *
  * 复制前先做一次 FULL checkpoint，把 WAL 里的改动落回主文件，
  * 否则复制出来的可能缺最近几次事务。
+ *
+ * **事务进行中不做备份**：那时 checkpoint 必定报 `database table is locked`。
+ * 升级回填、批量改名这类写入整段跑在事务里，逐行触发的备份一次也做不成，
+ * 反而会每行写一条错误日志——实测一次 1.1.1 回填刷了 33907 条、把日志写到 35 MB，
+ * 主进程被同步写日志拖住、界面无响应。升级自己已经在开始前备份过一次。
  */
 function backupDatabase(): void {
   if (!db || !existsSync(dbPath)) {
+    return;
+  }
+  if (batchDepth > 0) {
     return;
   }
   const now = Date.now();
@@ -126,12 +163,13 @@ function backupDatabase(): void {
     return;
   }
 
+  // 先记下这次尝试再动手：真失败也只按间隔重试一次，不会退化成每次写入都报一遍
+  lastBackupAt = now;
   try {
     db.exec('PRAGMA wal_checkpoint(FULL)');
     copyFileSync(dbPath, `${dbPath}.bak`);
-    lastBackupAt = now;
   } catch (error) {
-    console.error('[db] 备份失败：', error);
+    log.error('database backup failed', error);
   }
 }
 
@@ -147,22 +185,23 @@ function backupDatabase(): void {
  */
 export function initDatabase(): void {
   const dataDir = getDataDir();
-  console.log('[db] 数据目录：', dataDir);
+  log.info(`data dir: ${dataDir}`);
 
   try {
     mkdirSync(dataDir, { recursive: true });
   } catch (error) {
-    throw new Error(`数据目录不可用：${dataDir}（${error instanceof Error ? error.message : String(error)}）`);
+    throw new Error(`data dir is not usable: ${dataDir} (${error instanceof Error ? error.message : String(error)})`, { cause: error });
   }
   dbPath = join(dataDir, DB_FILE_NAME);
 
   try {
     db = new DatabaseSync(dbPath);
   } catch (error) {
-    throw new Error(`打不开数据库：${dbPath}（${error instanceof Error ? error.message : String(error)}）`);
+    throw new Error(`cannot open database: ${dbPath} (${error instanceof Error ? error.message : String(error)})`, { cause: error });
   }
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
+  log.info(`database opened: ${dbPath}`);
 
   // 数据库相关的初始化只在这一个函数里：开库 + 注册 DB 通道
   registerDbIpc();
@@ -175,8 +214,9 @@ export function closeDatabase(): void {
   }
   try {
     db.close();
+    log.info('database closed');
   } catch (error) {
-    console.error('[db] 关闭数据库失败：', error);
+    log.error('failed to close database', error);
   }
   db = null;
 }
@@ -225,7 +265,7 @@ export function execSql(sql: string): void {
 export async function runInMigrationTransaction<T>(fn: () => T | Promise<T>): Promise<T> {
   if (batchDepth > 0) {
     // 迁移只应该是最外层（它在启动阶段跑，那时还没有任何任务）；跑在别的批里说明用错了地方
-    throw new Error('迁移事务不能嵌套在别的事务里：先结束那次批处理再升级');
+    throw new Error('migration transaction cannot be nested in another transaction: finish that batch first');
   }
 
   const handle = db!;
@@ -299,7 +339,8 @@ export function endBatch(): void {
 
 /** 新增来源，名称取目录名；root_path 重复时由 SQLite 抛出唯一约束错误 */
 export function addSource(rootPath: string): Source {
-  const id = insert(SQL.INSERT_SOURCE, [basename(rootPath), rootPath]);
+  const name = basename(rootPath);
+  const id = insert(SQL.INSERT_SOURCE, [name, sortKeyOf(name), rootPath, sortKeyOf(rootPath)]);
   return queryOne<Source>(SQL.SELECT_SOURCE_BY_ID, [id])!;
 }
 
@@ -338,7 +379,7 @@ export function updateSourceScannedAt(sourceId: number): void {
 
 /** 写入角色；同来源下同名已存在时忽略并返回既有记录 */
 export function insertCharacter(sourceId: number, name: string, sourcePath: string): Character {
-  run(SQL.INSERT_CHARACTER, [sourceId, name, sourcePath]);
+  run(SQL.INSERT_CHARACTER, [sourceId, name, sortKeyOf(name, CHARACTER_NAME_PROFILE), sourcePath]);
   return queryOne<Character>(SQL.SELECT_CHARACTER_BY_SOURCE_NAME, [sourceId, name])!;
 }
 
@@ -350,10 +391,10 @@ export function getCharactersBySource(sourceId: number): Character[] {
 /** 重命名角色；与同来源内的角色重名时抛出可读错误 */
 export function renameCharacter(id: number, name: string): void {
   try {
-    run(SQL.RENAME_CHARACTER, [name, id]);
+    run(SQL.RENAME_CHARACTER, [name, sortKeyOf(name, CHARACTER_NAME_PROFILE), id]);
   } catch (error) {
     if (isUniqueViolation(error)) {
-      throw new Error(`角色「${name}」已存在于当前来源`);
+      throw new Error(`角色「${name}」已存在于当前来源`, { cause: error });
     }
     throw error;
   }
@@ -375,23 +416,108 @@ export function insertImageGroup(
   dirPath: string,
   fileCount: number,
 ): ImageGroup {
-  run(SQL.INSERT_IMAGE_GROUP, [characterId, dirName, dirPath, fileCount]);
+  run(SQL.INSERT_IMAGE_GROUP, [characterId, dirName, sortKeyOf(dirName), dirPath, sortKeyOf(dirPath), fileCount]);
   return queryOne<ImageGroup>(SQL.SELECT_IMAGE_GROUP_BY_PATH, [dirPath])!;
 }
 
-/** 查询图片组列表，可按状态与来源过滤 */
-export function getImageGroupsView(status?: ImageGroupStatus, sourceId?: number): ImageGroupView[] {
-  let sql = SQL.SELECT_IMAGE_GROUPS_VIEW_BASE;
+/** 图组筛选的谓词：分片与计数共用，别名固定为 `ig` / `c` / `g` */
+function buildImageGroupWhere(filter: ImageGroupFilter): { sql: string; params: SqlValue[] } {
+  let sql = '';
   const params: SqlValue[] = [];
-  if (status) {
+  if (filter.status) {
     sql += ' AND ig.status = ?';
-    params.push(status);
+    params.push(filter.status);
   }
-  if (sourceId) {
+  if (filter.sourceId !== undefined) {
     sql += ' AND g.id = ?';
-    params.push(sourceId);
+    params.push(filter.sourceId);
   }
-  return queryAll<ImageGroupView>(`${sql} ORDER BY g.name, c.name, ig.dir_name`, params);
+  if (filter.characterName) {
+    sql += ' AND c.name = ?';
+    params.push(filter.characterName);
+  }
+  if (filter.dirPath) {
+    sql += " AND ig.dir_path LIKE ? ESCAPE '\\'";
+    params.push(`%${escapeLike(filter.dirPath)}%`);
+  }
+  return { sql, params };
+}
+
+/** 图组排序的列名白名单，同图库 */
+const IMAGE_GROUP_SORT_COLUMNS: Record<ImageGroupSortKey, string> = {
+  source: 'g.name_sort',
+  character: 'c.name_sort',
+  dirName: 'ig.dir_name_sort',
+  dirPath: 'ig.dir_path_sort',
+  fileCount: 'ig.file_count',
+  status: 'ig.status',
+};
+
+/** 不传排序就用「来源 → 角色 → 目录名」，与页面上的默认顺序一致 */
+function buildImageGroupOrderBy(sort?: ImageGroupSort): string {
+  if (!sort) {
+    return ' ORDER BY g.name_sort, c.name_sort, ig.dir_name_sort, ig.id';
+  }
+  const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+  return ` ORDER BY ${IMAGE_GROUP_SORT_COLUMNS[sort.key]} ${direction}, ig.id ${direction}`;
+}
+
+/** 图组页的一页图组 */
+export function getImageGroupPage(
+  filter: ImageGroupFilter,
+  sort: ImageGroupSort | undefined,
+  limit: number,
+  offset: number,
+): ImageGroupView[] {
+  const where = buildImageGroupWhere(filter);
+  return queryAll<ImageGroupView>(
+    `${SQL.SELECT_IMAGE_GROUPS_VIEW_BASE}${where.sql}${buildImageGroupOrderBy(sort)} LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/** 当前筛选下的图组总数 */
+export function countImageGroups(filter: ImageGroupFilter): number {
+  const where = buildImageGroupWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_IMAGE_GROUPS_VIEW_BASE}${where.sql}`, where.params)?.total ?? 0;
+}
+
+/** 图组页二级：图组内图片文件的一页，按文件名 */
+export function getImageFilePage(groupId: number, limit: number, offset: number): ImageFile[] {
+  return queryAll<ImageFile>(SQL.SELECT_IMAGE_FILES_PAGE, [groupId, limit, offset]);
+}
+
+/** 图组内图片总数：查看器要用它显示「第几张 / 共几张」 */
+export function countImageFiles(groupId: number): number {
+  return queryOne<{ total: number }>(SQL.COUNT_IMAGE_FILES, [groupId])?.total ?? 0;
+}
+
+/** 图组内排在锚点之前的图片数，顺序与 `getImageFilePage` 一致 */
+export function countImageFilesBefore(groupId: number, anchorId: number): number {
+  return queryOne<{ total: number }>(SQL.COUNT_IMAGE_FILES_BEFORE, [groupId, anchorId])?.total ?? 0;
+}
+
+/**
+ * 按角色名取封面缩略图：每个名字最多三张，卡片叠着放。
+ *
+ * 按名字而不是 `character.id`：同一个角色可能散在多个来源里，只按一个 id 取会让
+ * 卡片上只剩那个来源的封面（明明有几十张图却只显示一张）。一条 SQL 拿完当前可见的卡片，不逐卡查。
+ */
+export function getCharacterCovers(names: string[]): CharacterCover[] {
+  if (names.length === 0) {
+    return [];
+  }
+  const placeholders = names.map(() => '?').join(', ');
+  return queryAll<CharacterCover>(SQL.SELECT_CHARACTER_COVERS.replace('%NAMES%', placeholders), names);
+}
+
+/** 按图组 id 取封面缩略图：每个图组最多三张，同上 */
+export function getGroupCovers(ids: number[]): GroupCover[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  const placeholders = ids.map(() => '?').join(', ');
+  return queryAll<GroupCover>(SQL.SELECT_GROUP_COVERS.replace('%IDS%', placeholders), ids);
 }
 
 /** 更新图片组状态；标记为已排除时同步清除其已处理记录 */
@@ -510,7 +636,7 @@ export function getImageGroupIdByFilePath(filePath: string): number | null {
 export function insertImageFiles(groupId: number, files: ScannedFile[]): void {
   for (const file of files) {
     run(SQL.INSERT_IMAGE_FILE, [
-      groupId, file.fileName, file.filePath, file.fileSize,
+      groupId, file.fileName, sortKeyOf(file.fileName), file.filePath, file.fileSize,
       file.width ?? 0, file.height ?? 0, file.extension, file.thumbnail, file.phash,
     ]);
   }
@@ -590,6 +716,7 @@ export function insertScript(
   groupId: number | null,
 ): ProcessScript {
   const id = insert(SQL.INSERT_SCRIPT, [name, filePath, builtin ? 1 : 0, groupId]);
+  writeScriptSortKey(id, name);
   return getScriptById(id)!;
 }
 
@@ -604,8 +731,36 @@ export function renameScript(id: number, name: string): void {
   try {
     run(SQL.RENAME_SCRIPT, [name, id]);
     run(SQL.RENAME_PROCESSED_SCRIPT_NAME, [name, id]);
+    writeScriptSortKey(id, name);
+    writeProcessedScriptSortKey(id, name);
   } finally {
     endBatch();
+  }
+}
+
+/** 脚本表的排序键列在不在；进程内只问一次库 */
+function hasScriptSortColumn(): boolean {
+  if (scriptSortColumnReady === null) {
+    scriptSortColumnReady = queryAll<{ name: string }>('PRAGMA table_info(process_script)')
+      .some((column) => column.name === 'name_sort');
+    if (!scriptSortColumnReady) {
+      log.info('script sort keys are not available yet, rows written during the upgrade are backfilled by 1.1.1');
+    }
+  }
+  return scriptSortColumnReady;
+}
+
+/** 写脚本行的排序键；列还没建出来时交给 1.1.1 的回填 */
+function writeScriptSortKey(id: number, name: string): void {
+  if (hasScriptSortColumn()) {
+    run(SQL.SET_SCRIPT_SORT, [sortKeyOf(name), id]);
+  }
+}
+
+/** 写图库里脚本名副本的排序键，同上 */
+function writeProcessedScriptSortKey(scriptId: number, name: string): void {
+  if (hasScriptSortColumn()) {
+    run(SQL.SET_PROCESSED_SCRIPT_SORT, [sortKeyOf(name), scriptId]);
   }
 }
 
@@ -639,6 +794,36 @@ export function hasScriptCodeColumn(): boolean {
 /** 老库接管：把每一条的旧源码读出来 */
 export function listLegacyScriptSources(): { id: number; name: string; filePath: string; code: string }[] {
   return queryAll<{ id: number; name: string; filePath: string; code: string }>(SQL.SELECT_LEGACY_SCRIPTS);
+}
+
+/**
+ * 回填 / 重建排序键用的一行：id 与各文本列的当前值，顺序与 `table.fields` 一致。
+ */
+export interface SortKeyRow {
+  id: number;
+  texts: string[];
+}
+
+/** 取一张表里所有要重算排序键的行；表名与列名都来自 `SORT_KEY_TABLES`，不接外部输入 */
+export function listSortKeyRows(table: SortKeyTable): SortKeyRow[] {
+  const columns = table.fields.map((field, index) => `${field.textColumn} AS t${index}`).join(', ');
+  const rows = db!.prepare(`SELECT id, ${columns} FROM ${table.table}`).all() as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: Number(row.id),
+    texts: table.fields.map((_, index) => (row[`t${index}`] === null ? '' : String(row[`t${index}`]))),
+  }));
+}
+
+/** 写回一行算好的排序键，顺序与 `table.fields` 一致 */
+export function updateSortKeyRow(table: SortKeyTable, id: number, keys: readonly string[]): void {
+  const assignments = table.fields.map((field) => `${field.sortColumn} = ?`).join(', ');
+  run(`UPDATE ${table.table} SET ${assignments} WHERE id = ?`, [...keys, id]);
+}
+
+/** 自校验：这张表还有多少行的排序键是空的。回填与重建收尾都问它一句 */
+export function countRowsMissingSortKeys(table: SortKeyTable): number {
+  const missing = table.fields.map((field) => `${field.sortColumn} IS NULL`).join(' OR ');
+  return queryOne<{ missing: number }>(`SELECT COUNT(*) AS missing FROM ${table.table} WHERE ${missing}`)?.missing ?? 0;
 }
 
 
@@ -719,30 +904,133 @@ export function upsertProcessedImage(
   scriptId: number | null,
 ): ProcessedImage {
   const existing = queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId]);
+  // 脚本名在这里查一次：INSERT 与 UPDATE 都要它，而 SQL 里的子查询给不出排序键
+  const scriptName = scriptId === null
+    ? null
+    : (queryOne<{ name: string }>(SQL.SELECT_SCRIPT_BY_ID, [scriptId])?.name ?? null);
+  const scriptNameSort = scriptName === null ? null : sortKeyOf(scriptName);
   if (existing) {
-    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptId, imageGroupId]);
+    run(SQL.UPDATE_PROCESSED, [selectedFile, scriptId, scriptName, scriptNameSort, imageGroupId]);
   } else {
     run(SQL.INSERT_PROCESSED, [
-      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptId,
+      imageGroupId, characterId, sourceId, originalPath, selectedFile, scriptId, scriptName, scriptNameSort,
     ]);
   }
   run(SQL.UPDATE_IMAGE_GROUP_PROCESSED, [imageGroupId]);
   return queryOne<ProcessedImage>(SQL.SELECT_PROCESSED_BY_GROUP, [imageGroupId])!;
 }
 
-/** 查询图库列表，可按来源与角色过滤 */
-export function getAllProcessedImages(sourceId?: number, characterName?: string): ProcessedImageView[] {
-  let sql = SQL.SELECT_PROCESSED_VIEW_BASE;
+/** LIKE 的通配符要转义，否则用户输入的 `%` 会匹配一切 */
+function escapeLike(keyword: string): string {
+  return keyword.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/** 图库筛选的谓词：分片、计数、平铺一级共用同一套，别名固定为 `pi` 与 `c` */
+function buildProcessedWhere(filter: ProcessedFilter): { sql: string; params: SqlValue[] } {
+  let sql = '';
   const params: SqlValue[] = [];
-  if (sourceId) {
+  if (filter.sourceId !== undefined) {
     sql += ' AND pi.source_id = ?';
-    params.push(sourceId);
+    params.push(filter.sourceId);
   }
-  if (characterName) {
+  if (filter.characterName) {
     sql += ' AND c.name = ?';
-    params.push(characterName);
+    params.push(filter.characterName);
   }
-  return queryAll<ProcessedImageView>(`${sql} ORDER BY c.name`, params);
+  if (filter.fileName) {
+    sql += " AND pi.selected_file LIKE ? ESCAPE '\\'";
+    params.push(`%${escapeLike(filter.fileName)}%`);
+  }
+  if (filter.scriptName) {
+    sql += " AND COALESCE(pi.script_name, '手动确认') = ?";
+    params.push(filter.scriptName);
+  }
+  return { sql, params };
+}
+
+/** 图库排序的列名白名单：用户只给键，列名永远出自这里 */
+const PROCESSED_SORT_COLUMNS: Record<ProcessedSortKey, string> = {
+  character: 'c.name_sort',
+  fileName: 'f.file_name_sort',
+  scriptName: 'pi.script_name_sort',
+  confirmedAt: 'pi.confirmed_at',
+};
+
+/** 排序键在「排序键视图」里的列别名，定位锚点下标时按它比较 */
+const PROCESSED_SORT_ALIASES: Record<ProcessedSortKey, string> = {
+  character: 'characterSort',
+  fileName: 'fileNameSort',
+  scriptName: 'scriptNameSort',
+  confirmedAt: 'confirmedAt',
+};
+
+/** 排序子句：`pi.id` 当次键，同键的行才有稳定顺序，分片不会重复或漏行 */
+function buildProcessedOrderBy(sort: ProcessedSort): string {
+  const direction = sort.direction === 'desc' ? 'DESC' : 'ASC';
+  return ` ORDER BY ${PROCESSED_SORT_COLUMNS[sort.key]} ${direction}, pi.id ${direction}`;
+}
+
+/** 当前筛选下的图库图片总数 */
+export function countProcessedImages(filter: ProcessedFilter): number {
+  const where = buildProcessedWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_PROCESSED_VIEW_BASE}${where.sql}`, where.params)?.total ?? 0;
+}
+
+/** 图库页的一页图片：表格跳页与平铺「加载更多」共用同一套参数 */
+export function getProcessedImagePage(
+  filter: ProcessedFilter,
+  sort: ProcessedSort,
+  limit: number,
+  offset: number,
+): ProcessedImageView[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<ProcessedImageView>(
+    `${SQL.SELECT_PROCESSED_VIEW_BASE}${where.sql}${buildProcessedOrderBy(sort)} LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/**
+ * 锚点在整个分片序列里的下标。
+ *
+ * 查看器打开时只知道「从哪一张开始」，用 `(排序键, id)` 的行值比较一次算出它前面有多少行，
+ * 排序方向跟着排序一起翻，降序时算的是排在它后面的行数。
+ */
+export function countProcessedImagesBefore(filter: ProcessedFilter, sort: ProcessedSort, anchorId: number): number {
+  const where = buildProcessedWhere(filter);
+  const view = `${SQL.SELECT_PROCESSED_SORT_VIEW_BASE}${where.sql}`;
+  const alias = PROCESSED_SORT_ALIASES[sort.key];
+  const comparison = sort.direction === 'desc' ? '>' : '<';
+  return queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM (${view}) WHERE (${alias}, id) ${comparison} (SELECT ${alias}, id FROM (${view}) WHERE id = ?)`,
+    [...where.params, ...where.params, anchorId],
+  )?.total ?? 0;
+}
+
+/**
+ * 图库的轻量索引行：只要 id 与角色名。
+ *
+ * 平铺视图的卡片三态（这个角色的图是不是都选了）与「全选本分组」都按它判断——
+ * 带缩略图的行一律分片，这份不带缩略图的索引才留在渲染进程内存里。
+ */
+export function listProcessedIndex(filter: ProcessedFilter): ProcessedIndexRow[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<ProcessedIndexRow>(`${SQL.SELECT_PROCESSED_INDEX_BASE}${where.sql} ORDER BY c.name_sort, pi.id`, where.params);
+}
+
+/** 图库平铺一级：当前筛选下有图的角色，按角色名分片 */
+export function listProcessedCharacters(filter: ProcessedFilter, limit: number, offset: number): CharacterTile[] {
+  const where = buildProcessedWhere(filter);
+  return queryAll<CharacterTile>(
+    `${SQL.SELECT_PROCESSED_CHARACTER_TILES_BASE}${where.sql} GROUP BY c.name ORDER BY MIN(c.name_sort), MIN(c.id) LIMIT ? OFFSET ?`,
+    [...where.params, limit, offset],
+  );
+}
+
+/** 图库平铺一级的总数：有图可显示的角色数 */
+export function countProcessedCharacters(filter: ProcessedFilter): number {
+  const where = buildProcessedWhere(filter);
+  return queryOne<{ total: number }>(`${SQL.COUNT_PROCESSED_CHARACTERS_BASE}${where.sql}`, where.params)?.total ?? 0;
 }
 
 /** 导出任务唯一需要的字段 */
@@ -847,6 +1135,7 @@ export function deleteFinishedTasks(): void {
 // ------------------------------------------------------------
 
 /** 动态调度表：方法名与参数由渲染进程保证，这里只能放宽类型 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- IPC 调度边界，参数类型在渲染进程侧保证
 type DbMethod = (...args: any[]) => unknown;
 
 /** 暴露给渲染进程的数据库方法 */
@@ -859,7 +1148,13 @@ const DB_METHODS: Record<string, DbMethod> = {
   getCharactersBySource,
   renameCharacter,
 
-  getImageGroupsView,
+  getImageGroupPage,
+  countImageGroups,
+  getImageFilePage,
+  countImageFiles,
+  countImageFilesBefore,
+  getCharacterCovers,
+  getGroupCovers,
   updateImageGroupStatus,
   getImageFilesByGroup,
   getImageGroupIdByFilePath,
@@ -867,7 +1162,12 @@ const DB_METHODS: Record<string, DbMethod> = {
   getScriptsByType,
 
   upsertProcessedImage,
-  getAllProcessedImages,
+  countProcessedImages,
+  getProcessedImagePage,
+  listProcessedIndex,
+  listProcessedCharacters,
+  countProcessedCharacters,
+  countProcessedImagesBefore,
   deleteProcessedImage,
 };
 
@@ -881,7 +1181,7 @@ function registerDbIpc(): void {
   ipcMain.handle(IPC.DB, (_event, method: string, ...args: unknown[]) => {
     const handler = DB_METHODS[method];
     if (!handler) {
-      throw new Error(`未知的数据库方法：${method}`);
+      throw new Error(`unknown database method: ${method}`);
     }
     return handler(...args);
   });

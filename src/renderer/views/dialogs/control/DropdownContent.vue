@@ -16,8 +16,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
+import { nextTick, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { ScriptListInitData } from '@common/types';
 
@@ -37,12 +38,12 @@ watch(
 
 /** 选中后回传，结果由主进程转交给发起方；窗口不销毁，由主进程收起 */
 function pick(id: number): void {
-  ipcRenderer.invoke(IPC.DROPDOWN_SELECT, id);
+  void ipcRenderer.invoke(IPC.DROPDOWN_SELECT, id);
 }
 
 /** 收起（Esc）：窗口留着给下次复用 */
 function hide(): void {
-  ipcRenderer.invoke(IPC.POPUP_HIDE);
+  void ipcRenderer.invoke(IPC.POPUP_HIDE);
 }
 </script>
 

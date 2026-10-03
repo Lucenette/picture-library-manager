@@ -1,8 +1,14 @@
-import { app, BrowserWindow, type WebPreferences } from 'electron';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 
+import { app, BrowserWindow, type WebPreferences } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
+
+import { createLogger } from '@/log';
+
+/** 本模块的日志（category `main.window`） */
+const log = createLogger('window');
 
 // ------------------------------------------------------------
 // 常量
@@ -157,8 +163,9 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   }
 
   window.setMenu(null);
-  window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
+  void window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
   window.on('closed', () => {
+    log.info(`window closed: ${id}`);
     if (windows.get(id) === window) {
       windows.delete(id);
     }
@@ -167,6 +174,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   logWindowTiming(window, id, startedAt);
 
   windows.set(id, window);
+  log.info(`window opened: ${id} (entry=${config.entry ?? 'index'}, route=${config.route})`);
   return window;
 }
 
@@ -451,10 +459,10 @@ function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): 
     return;
   }
   window.webContents.once('did-finish-load', () => {
-    console.log(`[窗口] ${id} 文档加载完成 ${Date.now() - startedAt}ms`);
+    log.debug(`window ${id} document loaded in ${Date.now() - startedAt}ms`);
   });
   window.once('ready-to-show', () => {
-    console.log(`[窗口] ${id} 首帧就绪 ${Date.now() - startedAt}ms`);
+    log.debug(`window ${id} first frame ready in ${Date.now() - startedAt}ms`);
   });
 }
 

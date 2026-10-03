@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
+
 import { IPC } from '@common/ipcChannels';
 import type { TaskMoveDirection, TaskPayload, TaskSubmitResult, TaskType } from '@common/types';
+
 import { taskManager } from '@/task/manager';
 
 /**

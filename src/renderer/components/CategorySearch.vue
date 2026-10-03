@@ -70,6 +70,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+
 import type { FilterItem, FilterSection } from './CategorySearch.types';
 
 const props = defineProps<{ sections: FilterSection[]; order: string[] }>();
@@ -253,7 +254,7 @@ function onKey(event: KeyboardEvent): void {
 
 /** 键盘移动高亮时把对应项滚动到可视区域 */
 watch(selectedIdx, () => {
-  nextTick(() => {
+  void nextTick(() => {
     const wrap = scrollRef.value?.$el?.querySelector('.el-scrollbar__wrap');
     if (!wrap) {
       return;

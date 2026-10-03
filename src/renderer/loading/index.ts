@@ -7,8 +7,8 @@
 //   · 把「已就绪」告诉主进程——它收到之后才开始下发渲染进程任务。
 // ============================================================
 
-import { ref, type Ref } from 'vue';
 import { ipcRenderer, type IpcRendererEvent } from 'electron';
+import { ref, type Ref } from 'vue';
 
 import { IPC } from '@common/ipcChannels';
 import type { LoadProgress, LoadTaskRequest, LoadTaskResult } from '@common/types';
@@ -55,7 +55,7 @@ async function runTask(request: LoadTaskRequest): Promise<void> {
   let error = '';
   try {
     if (run === undefined) {
-      throw new Error(`渲染进程不认识的加载任务：${request.id}`);
+      throw new Error(`unknown load task in renderer: ${request.id}`);
     }
     await run();
   } catch (caught: unknown) {

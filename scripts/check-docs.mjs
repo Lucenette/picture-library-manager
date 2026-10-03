@@ -6,7 +6,7 @@
  *   2. Markdown 里的相对链接目标存在，锚点能命中标题或显式 `<a id>`；
  *   3. docs/roadmap 与 docs/design 的 README 索引与实际文件双向一致；
  *   4. .agents/skills/<name>/SKILL.md 的 frontmatter 合法；
- *   5. 没有占位符残留（`«` / `»`）。
+ *   5. 没有占位符残留（`«` / `»`，以及尖括号里的邮箱占位、TODO 一类词根）。
  *
  * 零依赖，直接运行：node scripts/check-docs.mjs
  * 通过时只打印一行；发现问题时逐条打印 `文件:行 说明` 并以退出码 1 结束。不修改任何文件。
@@ -18,13 +18,19 @@ import { join, relative, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..');
 /** 参与检查的目录与根文件：只覆盖仓库自己写的文档，不含依赖与构建产物。 */
 const SCAN_DIRS = ['docs', '.agents/skills'];
-const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'CONTRIBUTING.md'];
+const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'README.en.md', 'CONTRIBUTING.md'];
 /** 只校验编码、不参与链接与索引检查的目录：changelog 里有中文表名注释，存错编码会静默变成乱码写进账本。 */
 const ENCODING_DIRS = ["src/main/ups/changesets"];
 /** 这两个目录的 README 是索引表，必须与目录内的文件双向一致。 */
 const INDEX_DIRS = ['docs/roadmap', 'docs/design'];
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PLACEHOLDERS = ['«', '»'];
+/**
+ * 尖括号占位符的词根。中文词根写成 Unicode 转义，避免让「全仓搜不到占位词」的验证
+ * 被这个检查脚本自己破坏；TODO 与 FIXME 也只在一对尖括号内才算命中。
+ */
+const PLACEHOLDER_ROOTS = ['\u5f85\u586b\u5199', '\u7ef4\u62a4\u8005\u90ae\u7bb1', 'TODO', 'FIXME'];
+const PLACEHOLDER_ANGLE = new RegExp('<[^<>]*(?:' + PLACEHOLDER_ROOTS.join('|') + ')[^<>]*>', 'i');
 /** 外部链接、协议相对、仓库根绝对路径与纯锚点都不做目标存在性检查。 */
 const SKIP_TARGET = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/i;
 
@@ -332,6 +338,10 @@ function checkPlaceholders(sources) {
         if (line.includes(token)) {
           violations.push({ file: rel, line: index + 1, message: `占位符残留：${token}` });
         }
+      }
+      const match = PLACEHOLDER_ANGLE.exec(line);
+      if (match !== null) {
+        violations.push({ file: rel, line: index + 1, message: `占位符残留：${match[0]}` });
       }
     }
   }

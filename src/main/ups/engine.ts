@@ -6,7 +6,8 @@
 // 之前成功的都留下，下次启动从这一条接着来。
 //
 // 这里只依赖 Node 内置与第三方解析器：数据库能力由调用方以 MigrationStore 注入
-// （见 database/db.ts），所以引擎可以在纯 Node 下用内存库验证，完全不认识 electron。
+// （见 database/db.ts），日志能力也由调用方注入（见 UpsLogger），所以引擎可以在
+// 纯 Node 下用内存库验证，完全不认识 electron，也不认识 logger。
 // ============================================================
 
 import { copyFile, mkdir, readdir, unlink } from 'fs/promises';
@@ -146,11 +147,25 @@ export interface MigrationOutcome {
   backupPath: string;
 }
 
+/**
+ * 引擎需要的日志能力。
+ *
+ * 只声明用到的三档，注入完整 Logger 也兼容；**刻意不 import `@/log`**——那个模块依赖
+ * electron，而本引擎要能在纯 Node 下跑（见文件头）。
+ */
+export interface UpsLogger {
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+}
+
 /** 执行一次升级所需的全部外部输入 */
 export interface RunOptions {
   store: MigrationStore;
   /** 版本清单，顺序即执行顺序 */
   versions: readonly ChangeLogVersion[];
+  /** 诊断输出的去处；由调用方注入 */
+  log: UpsLogger;
   onProgress?: (progress: MigrationProgress) => void;
   /** 主窗口已经关掉时收手 */
   shouldAbort?: () => boolean;
@@ -193,7 +208,7 @@ function parseChangeSets(version: ChangeLogVersion): ParsedChangeSet[] {
   const parser = new DOMParser({
     // 不接这个回调，解析器只记一条日志就继续，返回的可能是半个文档
     onError: (_level, message) => {
-      throw new Error(`changelog「${version.version}」解析失败：${message}`);
+      throw new Error(`cannot parse changelog ${version.version}: ${message}`);
     },
   });
   const doc = parser.parseFromString(version.dbups, 'text/xml');
@@ -207,11 +222,11 @@ function parseChangeSets(version: ChangeLogVersion): ParsedChangeSet[] {
     const author = node.getAttribute('author') ?? '';
     const id = node.getAttribute('id') ?? '';
     if (author === '' || id === '') {
-      throw new Error(`changelog「${version.version}」里有 changeSet 缺少 id 或 author`);
+      throw new Error(`changelog ${version.version} has a changeSet without id or author`);
     }
     const sql = readSql(node);
     if (sql === '') {
-      throw new Error(`changelog「${version.version}」的 changeset ${author}:${id} 里没有可执行的 <sql>`);
+      throw new Error(`changeset ${author}:${id} in changelog ${version.version} has no executable <sql>`);
     }
     result.push({ author, id, filename: version.version, title: readTitle(node, author, id), sql });
   }
@@ -227,7 +242,7 @@ function buildSteps(versions: readonly ChangeLogVersion[]): ChangeStep[] {
     if (seen.has(version.version)) {
       // 复制版本目录时忘了改 VERSION：新版本的 changeSet 会顶用旧版本的身份，
       // 被账本判定为已执行而静默跳过——宁可启动就失败
-      throw new Error(`版本清单里的版本号重复：${version.version}（检查各版本目录 index.ts 里的 VERSION）`);
+      throw new Error(`duplicate version in changelog list: ${version.version} (check VERSION in each version directory's index.ts)`);
     }
     seen.add(version.version);
 
@@ -266,7 +281,11 @@ function buildSteps(versions: readonly ChangeLogVersion[]): ChangeStep[] {
  *
  * 「跑过没有」按身份判断：账本里有这个三元组就是跑过，失败行不算。
  */
-function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly ChangeLogVersion[]): ChangeStep[] {
+function planSteps(
+  ledger: readonly MigrationLedgerRow[],
+  versions: readonly ChangeLogVersion[],
+  log: UpsLogger,
+): ChangeStep[] {
   const all = buildSteps(versions);
   const known = new Map<string, number>();
   all.forEach((step, index) => {
@@ -282,7 +301,7 @@ function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly Cha
     const key = keyOf(row.author, row.id, row.filename);
     const index = known.get(key);
     if (index === undefined) {
-      console.warn(`[ups] 账本里的「${row.filename} / ${row.author}:${row.id}」不在当前代码中，可能来自更新版本的应用`);
+      log.warn(`ledger entry not found in current code, maybe from a newer version: ${row.filename} / ${row.author}:${row.id}`);
       continue;
     }
     if (row.exectype === 'executed') {
@@ -297,7 +316,7 @@ function planSteps(ledger: readonly MigrationLedgerRow[], versions: readonly Cha
       return;
     }
     if (index < maxAppliedIndex) {
-      console.warn(`[ups]「${step.filename} / ${step.author}:${step.id}」排在已执行的步骤之前，只应往后追加`);
+      log.warn(`step is ordered before an already executed one, only appending is allowed: ${step.filename} / ${step.author}:${step.id}`);
     }
     pending.push(step);
   });
@@ -321,7 +340,7 @@ function backupStamp(now: Date): string {
  *
  * 每次启动都跑（见 runUps）：只在「真的备份了」的时候清，不升级的库会一直堆着旧备份。
  */
-async function pruneBackups(backupsDir: string): Promise<void> {
+async function pruneBackups(backupsDir: string, log: UpsLogger): Promise<void> {
   let names: string[];
   try {
     names = (await readdir(backupsDir)).filter((name) => name.startsWith(BACKUP_PREFIX) && name.endsWith('.db')).sort();
@@ -332,9 +351,9 @@ async function pruneBackups(backupsDir: string): Promise<void> {
   for (const name of names.slice(0, Math.max(0, names.length - BACKUP_KEEP))) {
     try {
       await unlink(join(backupsDir, name));
-      console.log(`[ups] 清理旧备份：${name}`);
+      log.info(`removed old backup: ${name}`);
     } catch (error) {
-      console.error(`[ups] 删除旧备份失败：${name}`, error);
+      log.error(`remove old backup failed: ${name}`, error);
     }
   }
 }
@@ -344,12 +363,12 @@ async function pruneBackups(backupsDir: string): Promise<void> {
  *
  * 复制前先做一次 checkpoint，把 WAL 里的改动落回主文件，否则复制出来的可能缺最近几次事务。
  */
-async function backupDatabase(store: MigrationStore, backupsDir: string): Promise<string> {
+async function backupDatabase(store: MigrationStore, backupsDir: string, log: UpsLogger): Promise<string> {
   store.execSql('PRAGMA wal_checkpoint(TRUNCATE)');
   await mkdir(backupsDir, { recursive: true });
   const target = join(backupsDir, `${BACKUP_PREFIX}${backupStamp(new Date())}.db`);
   await copyFile(store.getDbPath(), target);
-  await pruneBackups(backupsDir);
+  await pruneBackups(backupsDir, log);
   return target;
 }
 
@@ -399,15 +418,16 @@ function stepTitle(step: ChangeStep): string {
  * 每一步都在自己的事务里：脚本抛错时它写进数据库的东西随事务一起回滚，账本也不会记成已执行。
  */
 export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
-  const { store, versions, onProgress, shouldAbort } = options;
+  const { store, versions, log, onProgress, shouldAbort } = options;
   const backupsDir = join(store.getDataDir(), 'backups');
 
   store.execSql(LEDGER_DDL);
-  await pruneBackups(backupsDir);
+  await pruneBackups(backupsDir, log);
 
-  const pending = planSteps(store.readMigrationLedger(), versions);
+  const pending = planSteps(store.readMigrationLedger(), versions, log);
   const total = pending.length;
   if (total === 0) {
+    log.info('no pending upgrade steps');
     // 没有待执行的也要给一个终态：加载页靠它决定什么时候切回主界面
     onProgress?.(makeProgress('succeeded', 0, 0, '', '', ''));
     return { ok: true, aborted: false, applied: 0, error: '', backupPath: '' };
@@ -416,11 +436,12 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
   // 备份要复制整个库，可能要几百毫秒；先把加载页点起来，别让它空着等
   onProgress?.(makeProgress('running', total, 0, '正在备份数据库', '', ''));
 
-  let backupPath = '';
+  let backupPath: string;
   try {
-    backupPath = await backupDatabase(store, backupsDir);
+    backupPath = await backupDatabase(store, backupsDir, log);
+    log.info(`database backed up: ${backupPath}`);
   } catch (error) {
-    const text = `升级前备份失败，已中止升级：${describeError(error)}`;
+    const text = `pre-upgrade backup failed, upgrade aborted: ${describeError(error)}`;
     onProgress?.(makeProgress('failed', total, 0, stepTitle(pending[0]), text, ''));
     return { ok: false, aborted: false, applied: 0, error: text, backupPath: '' };
   }
@@ -432,6 +453,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
       return { ok: false, aborted: true, applied: done, error: '', backupPath };
     }
     onProgress?.(makeProgress('running', total, done, stepTitle(step), '', backupPath));
+    log.info(`upgrade step started: ${step.filename} / ${step.author}:${step.id}`);
 
     const startedAt = Date.now();
     try {
@@ -454,6 +476,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
       });
     } catch (error) {
       // 事务已经回滚：脚本写进库的东西一条都不留，这里只补一行失败记录供排查
+      log.error(`upgrade step failed: ${step.filename} / ${step.author}:${step.id}`, error);
       const message = describeError(error);
       store.writeMigrationLedger({
         author: step.author,
@@ -464,11 +487,12 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
         order,
         executionMs: Date.now() - startedAt,
       });
-      const text = `${step.filename} / ${step.author}:${step.id}（${step.title}）执行失败：${message}`;
+      const text = `${step.filename} / ${step.author}:${step.id} (${step.title}) failed: ${message}`;
       onProgress?.(makeProgress('failed', total, done, stepTitle(step), text, backupPath));
       return { ok: false, aborted: false, applied: done, error: text, backupPath };
     }
 
+    log.info(`upgrade step done: ${step.filename} / ${step.author}:${step.id} (${Date.now() - startedAt}ms)`);
     order += 1;
     done += 1;
     onProgress?.(makeProgress('running', total, done, stepTitle(step), '', backupPath));
@@ -477,6 +501,7 @@ export async function runUps(options: RunOptions): Promise<MigrationOutcome> {
     await new Promise((resolve) => setImmediate(resolve));
   }
 
+  log.info(`upgrade finished: ${done} step(s) applied`);
   onProgress?.(makeProgress('succeeded', total, done, stepTitle(pending[total - 1]), '', backupPath));
   return { ok: true, aborted: false, applied: done, error: '', backupPath };
 }

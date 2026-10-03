@@ -95,9 +95,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+
 import type {
   ExportTaskResult, SimilarTaskResult, ProcessTaskResult, ScanTaskResult, TaskStatus, TaskType, TaskView,
 } from '@common/types';
+
 import { useTasks } from '@/composables/useTasks';
 import { confirmDialog } from '@/services/dialog-service';
 

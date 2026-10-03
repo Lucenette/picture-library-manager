@@ -1,16 +1,22 @@
 import { join } from 'path';
+
 import type {
   Character, ScannedCharacter, ScannedFile, ScannedGroup, ScanTaskPayload, ScanTaskResult,
   StructureInput, StructureOutput, ThumbnailEngineName,
 } from '@common/types';
+
 import {
   beginBatch, clearSourceData, endBatch, getSourceById,
   insertCharacter, insertImageFiles, insertImageGroup, updateSourceScannedAt,
 } from '@/database/db';
+import { ThumbnailPool } from '@/image/thumbnail-pool';
 import { buildDirTree, collectImageFiles } from '@/image/walk';
+import { createLogger } from '@/log';
 import { executeScript } from '@/script/script-service';
 import type { TaskContext } from '@/task/manager';
-import { ThumbnailPool } from '@/image/thumbnail-pool';
+
+/** 本模块的日志（category `main.scan`） */
+const log = createLogger('scan');
 
 /** 已入库的图片组：带上 group 行 id，逐张插图时要用 */
 interface StoredGroup extends ScannedGroup {
@@ -32,12 +38,13 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   const { sourceId, scriptId } = ctx.payload as ScanTaskPayload;
   const source = getSourceById(sourceId);
   if (!source) {
-    throw new Error(`来源不存在（id=${sourceId}）`);
+    throw new Error(`source not found (id=${sourceId})`);
   }
+
+  log.info(`scan started: source ${source.name} (id=${sourceId})`);
 
   const characters: StoredCharacter[] = [];
   let collectedGroups = 0;
-  let totalFiles = 0;
   let failedWrites = 0;
   let thumbnailFailures = 0;
   let thumbnailEngine: ThumbnailEngineName | 'none' = 'none';
@@ -45,7 +52,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   /** 记下写入失败但继续扫描：一个目录写不进去不该拖垮整轮 */
   const recordWriteFailure = (what: string, error: unknown): void => {
     failedWrites += 1;
-    console.error(`写入失败：${what}`, (error as Error).message);
+    log.error(`write failed: ${what}`, error);
   };
 
   // 先清除本来源的旧数据，清除立刻提交
@@ -103,7 +110,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   }
 
     // ---- 3. 逐张生成缩略图并立刻入库：一张一条 INSERT，写一张落一张 ----
-  totalFiles = characters.reduce(
+  const totalFiles = characters.reduce(
     (sum, character) => sum + character.groups.reduce((count, group) => count + group.files.length, 0),
     0,
   );
@@ -117,7 +124,7 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
   updateSourceScannedAt(sourceId);
 
   if (failedWrites > 0) {
-    console.error(`扫描写入结束：${failedWrites} 处写入失败，来源数据可能不完整`);
+    log.error(`scan finished with ${failedWrites} write failures, source data may be incomplete`);
   }
 
   const thumbnails = characters.reduce(
@@ -126,6 +133,8 @@ export async function runScan(ctx: TaskContext): Promise<ScanTaskResult> {
     ),
     0,
   );
+
+  log.info(`scan finished: ${characters.length} characters, ${collectedGroups} groups, ${totalFiles} files, ${thumbnails} thumbnails (${thumbnailFailures} failed, engine=${thumbnailEngine})`);
 
   return {
     characters: characters.length,
@@ -156,7 +165,6 @@ async function generateThumbnails(
   ctx.onAbort(() => pool.terminate());
   const batchSize = pool.concurrency;
   let doneFiles = 0;
-  let storedFiles = 0;
   let failures = 0;
 
   const analyzeFile = async (group: StoredGroup, file: ScannedFile): Promise<void> => {
@@ -176,21 +184,20 @@ async function generateThumbnails(
       if (outcome.thumbnail === null) {
         // 解码失败也要计数并报出来，不能只剩一个「这张图没有缩略图」
         failures += 1;
-        console.error(`缩略图生成失败：${file.filePath}（${size}）`, '解码器读不出这张图');
+        log.error(`thumbnail generation failed: ${file.filePath} (${size}) - decoder cannot read this image`);
       }
     } catch (error) {
       failures += 1;
       // 带上像素数与实际耗时，只报「超时」看不出是图太大还是解码器卡死
       const seconds = Math.round((Date.now() - startedAt) / 1000);
-      console.error(`缩略图生成失败：${file.filePath}（${size}，${seconds}s）`, (error as Error).message);
+      log.error(`thumbnail generation failed: ${file.filePath} (${size}, ${seconds}s)`, error);
     }
 
     // 无论这张有没有缩略图都立刻入库；写失败只让它自己缺一行
     try {
       insertImageFiles(group.groupId, [file]);
-      storedFiles += 1;
     } catch (error) {
-      console.error(`图片入库失败：${file.filePath}`, (error as Error).message);
+      log.error(`store image failed: ${file.filePath}`, error);
     }
 
     doneFiles += 1;

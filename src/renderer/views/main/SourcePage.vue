@@ -50,18 +50,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { Plus } from '@element-plus/icons-vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { computed, onMounted, ref } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { Source, ProcessScript, ScanConfigInitData, ScanConfigResult } from '@common/types';
+
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import {
   addSource as dbAddSource, clearSourceData, deleteSource, getAllSources, getScriptsByType,
 } from '@/db/database';
 import { confirmDialog } from '@/services/dialog-service';
+import { createLogger } from '@/services/log-service';
+
+/** 本模块的日志（category `renderer.source`） */
+const log = createLogger('source');
 
 // ------------------------------------------------------------
 // 状态
@@ -82,6 +88,14 @@ const { actions } = useTasks();
 // 计算属性
 // ------------------------------------------------------------
 
+/** 排序比较用的文本：只认基本类型，对象给空串，避免 String() 得到 [object Object] */
+function toComparable(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
 const sortedSources = computed(() => {
   const prop = sortProp.value;
   const order = sortOrder.value;
@@ -91,8 +105,8 @@ const sortedSources = computed(() => {
 
   const direction = order === 'ascending' ? 1 : -1;
   return [...sources.value].sort((a, b) => {
-    const left = String((a as Record<string, unknown>)[prop] ?? '');
-    const right = String((b as Record<string, unknown>)[prop] ?? '');
+    const left = toComparable((a as Record<string, unknown>)[prop]);
+    const right = toComparable((b as Record<string, unknown>)[prop]);
     return left.localeCompare(right) * direction;
   });
 });
@@ -122,7 +136,7 @@ function onSelectionChange(rows: Source[]): void {
 
 /** 通过系统对话框添加来源，支持一次选择多个目录 */
 async function addSource(): Promise<void> {
-  const rootPaths: string[] = await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR);
+  const rootPaths = (await ipcRenderer.invoke(IPC.DIALOG_OPEN_DIR)) as string[] | undefined;
   if (!rootPaths?.length) {
     return;
   }
@@ -133,7 +147,7 @@ async function addSource(): Promise<void> {
     } catch (error) {
       // 目录已添加过会命中 root_path 唯一约束，属于预期内的忽略
       if (!(error as Error).message?.includes('UNIQUE')) {
-        console.error(`添加来源失败：${rootPath}`, error);
+        log.error(`add source failed: ${rootPath}`, error);
       }
     }
   }
@@ -189,12 +203,12 @@ async function batchDelete(): Promise<void> {
 // ------------------------------------------------------------
 
 function openScanConfig(source: Source): void {
-  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([source]));
+  void ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload([source]));
 }
 
 function openScanConfigForSelection(): void {
   const targets = sources.value.filter((source) => selectedIds.value.includes(source.id));
-  ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload(targets));
+  void ipcRenderer.invoke(IPC.SCAN_CONFIG_OPEN, buildScanConfigPayload(targets));
 }
 
 /** 组装扫描配置窗口的初始化数据 */

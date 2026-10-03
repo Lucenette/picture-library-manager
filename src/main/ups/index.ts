@@ -2,10 +2,14 @@ import {
   execSql, getDbPath, readMigrationLedger, runInMigrationTransaction, writeMigrationLedger,
 } from '@/database/db';
 import type { LoadTaskReport } from '@/loading';
+import { createLogger } from '@/log';
 import { getDataDir } from '@/paths';
 import { CHANGELOG_VERSIONS } from '@/ups/changesets';
 import { runUps } from '@/ups/engine';
 import { get } from '@/window-manager';
+
+/** 本模块的日志（category `main.ups`） */
+const log = createLogger('ups');
 
 /**
  * 升级任务：登记给加载服务的一步（见 docs/design/loading.md）。
@@ -24,6 +28,7 @@ export async function initUps(report: LoadTaskReport): Promise<void> {
       writeMigrationLedger,
     },
     versions: CHANGELOG_VERSIONS,
+    log,
     onProgress: (progress) => {
       // 升级自己的终态不转发：切主界面还是停在这一页，由加载服务在所有必须任务之后统一公布
       if (progress.status !== 'running') {

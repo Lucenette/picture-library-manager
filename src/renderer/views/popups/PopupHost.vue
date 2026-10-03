@@ -1,15 +1,17 @@
 <template>
-  <Dropdown v-if="state?.kind === 'script-list'" :payload="state.payload" />
+  <DropdownContent v-if="state?.kind === 'script-list'" :payload="state.payload" />
   <TypeFilter v-else-if="state?.kind === 'type-filter'" :payload="state.payload" />
 </template>
 
 <script setup lang="ts">
-import { onMounted, shallowRef } from 'vue';
 import { ipcRenderer } from 'electron';
+import { onMounted, shallowRef } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { PopupShowData } from '@common/types';
+
 import { useIpcListener } from '@/composables/useIpcListener';
-import Dropdown from '@/views/dialogs/control/Dropdown.vue';
+import DropdownContent from '@/views/dialogs/control/DropdownContent.vue';
 import TypeFilter from '@/views/dialogs/control/TypeFilter.vue';
 
 /**

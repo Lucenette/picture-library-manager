@@ -18,13 +18,16 @@
     "paths": {
       "@/*": ["src/renderer/*"],
       "@common/*": ["src/common/*"],
-      "@static/*": ["src/static/*"]
+      "@scripts/*": ["scripts/*"],
+      "@static/*": ["src/static/*"],
+      "@test/*": ["test/*"]
     }
   },
   "include": [
     "src/common/**/*.ts",
     "src/renderer/**/*.ts",
     "src/renderer/**/*.d.ts",
-    "src/renderer/**/*.vue"
+    "src/renderer/**/*.vue",
+    "test/renderer/**/*.ts"
   ]
 }

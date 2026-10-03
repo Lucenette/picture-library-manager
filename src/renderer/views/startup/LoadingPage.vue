@@ -4,7 +4,7 @@
       <div class="loading-header">{{ title }}</div>
       <div class="loading-body">
         <el-progress :percentage="percent" :status="barStatus" :stroke-width="8" />
-        <p class="loading-title">{{ done }} / {{ total }}　{{ step }}</p>
+        <p class="loading-title">{{ done }} / {{ total }} {{ step }}</p>
         <template v-if="failed">
           <p class="loading-error">{{ error }}</p>
           <p v-if="note" class="loading-note">{{ note }}</p>
@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
+
 import { loadState, quitLoading } from '@/loading';
 
 const router = useRouter();

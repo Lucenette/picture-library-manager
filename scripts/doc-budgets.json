@@ -1,0 +1,13 @@
+{
+  "AGENTS.md": 12230,
+  "scripts/AGENTS.md": 750,
+  "src/main/ups/AGENTS.md": 1170,
+  "docs/README.md": 1750,
+  "docs/ARCHITECTURE.md": 7250,
+  "CONTRIBUTING.md": 5040,
+  ".agents/skills/code-metrics/SKILL.md": 2680,
+  ".agents/skills/commit-convention/SKILL.md": 3620,
+  ".agents/skills/db-maintenance/SKILL.md": 6210,
+  ".agents/skills/doc-convention/SKILL.md": 3140,
+  ".agents/skills/gitflow-release/SKILL.md": 6800
+}

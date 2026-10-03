@@ -1,7 +1,6 @@
-// ============================================================
-// IPC 通道名 —— 全局统一引用，避免任何硬编码字符串
-// ============================================================
-
+/**
+ * IPC 通道名 —— 全局统一引用，避免任何硬编码字符串。
+ */
 export const IPC = {
   /** 数据库统一调度通道：调用方需携带方法名与参数 */
   DB: 'db',
@@ -75,6 +74,9 @@ export const IPC = {
   SCRIPT_GROUP_ASSIGN: 'script:groupAssign',
   /** 分组输入弹框确认后的回发通道：带 groupId 是改名，不带是新建 */
   SCRIPT_GROUP_CONFIRMED: 'script:groupConfirmed',
+
+  // 日志：渲染进程把记录交给主进程落盘（文件只有主进程一个写者）
+  LOG_WRITE: 'log:write',
 
   // 后台任务
   TASK_SUBMIT: 'task:submit',

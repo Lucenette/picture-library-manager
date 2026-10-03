@@ -12,11 +12,12 @@
 
 import { readdirSync, statSync } from 'fs';
 import { extname, join } from 'path';
+
 import type { DirNode, ScannedFile } from '@common/types';
 
 // 只读图片头几 KB 就能拿到宽高；扫描器需要它来估算解码内存，决定哪些图能并发。
 // 同样用 require：与其它图像库一致，不交给打包器内联。
-const { imageSize } = require('image-size');
+const { imageSize } = require('image-size') as typeof import('image-size');
 
 /** 每处理这么多条目就让出一次事件循环，避免长时间霸占主进程 */
 const YIELD_EVERY = 200;

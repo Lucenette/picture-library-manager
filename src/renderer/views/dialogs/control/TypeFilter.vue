@@ -13,8 +13,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
 import { ipcRenderer } from 'electron';
+import { nextTick, ref, watch } from 'vue';
+
 import { IPC } from '@common/ipcChannels';
 import type { TypeFilterInitData } from '@common/types';
 
