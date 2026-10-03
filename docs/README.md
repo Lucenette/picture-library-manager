@@ -11,9 +11,12 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 跨子系统的结构：进程模型、目录归属、数据流 | 单个子系统的细节（→ `design/`）、代码规范（→ `AGENTS.md`） |
 | [roadmap/](./roadmap/) | **尚未实施**的方案 | 已落地的事实（按 `design/README.md` 的约定迁走）、跨子系统结构（→ `ARCHITECTURE.md`） |
 | [design/](./design/) | **已落地**子系统的设计说明：为什么是这样、有哪些不变量、改动时注意什么 | 还在讨论的方案（→ `roadmap/`）、代码已经表达清楚的实现细节 |
+| [postmortem/](./postmortem/) | 事故复盘：坏在哪、机制是什么、为什么没被拦住、补了哪些守卫 | 设计取舍（→ `design/`）、按现象排障（→ `TROUBLESHOOTING.md`） |
+| [cookbook/](./cookbook/) | 面向人的分步操作：按顺序做、每步可验证 | 判据与可复用工作流（→ `.agents/skills/`）、设计理由（→ `design/`） |
 | [requirements.md](./requirements.md) | 最初的需求规格（顶部注记了哪些已被实现取代） | 当前行为（→ `README.md`、`ARCHITECTURE.md`、`SCRIPTING.md`） |
 | [SCRIPTING.md](./SCRIPTING.md) | 处理脚本的编写契约：导出什么、框架怎么识别、可用 API | 脚本引擎的内部实现（→ `design/`） |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 按现象查的排障：怎么确认、根因在哪 | 事故叙事与设计理由（→ `design/`） |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 按现象查的排障：怎么确认、根因在哪 | 事故叙事与设计理由（→ `design/`、`postmortem/`） |
+| [glossary.md](./glossary.md) | 领域术语的一行定义与归属 | 术语的完整契约（→ 各自的 `design/` 或代码） |
 | [.agents/skills/](../.agents/skills/) | 可复用的工作流与判据，按需加载 | 常驻约定（→ `AGENTS.md`）、产品与运行时契约（→ 本表其余各层） |
 
 ## 迁移
