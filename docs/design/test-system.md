@@ -114,7 +114,7 @@ test/
 - `yarn test`（两侧依次跑）、`yarn test:main`、`yarn test:renderer`；只跑一个文件用 `yarn test:main test/main/database/sort.test.ts`。
 - `yarn lint`（不加 `lint:fix`）。
 - `.github/workflows/verify.yml`：`docs` 作业跑 `check-docs` 与 `check-doc-budgets`（零依赖，不装依赖），`check` 作业跑 `yarn lint` 与 `node scripts/check-jsdoc.mjs`，`test` 作业分两步跑 `yarn test:main` 与 `yarn test:renderer`，失败能一眼看出是哪一侧。
-- **基准**（不进 CI）：`npx vitest run --config vitest.bench.config.ts`。Vitest 5 移除了内置 bench API，基准写成普通 `test`、计时在 `benchmarks/harness.ts`，产物是打印出的 `xxx ms/次`；只压不依赖 Electron 与文件系统的纯函数。见 [benchmarks/README.md](../../benchmarks/README.md)。
+- **基准**（`yarn bench`，不进 CI）：Vitest 5 移除了内置 bench API，基准写成普通 `test`；计时在 [benchmarks/harness.ts](../../benchmarks/harness.ts)（热身一次后取多轮**中位数**）并由配置串行执行，产物是打印出的 `中位数 xxx ms/次`。只压不依赖 Electron 与文件系统的纯函数，输入由命名常量合成；工作量与参考机记在 [benchmarks/README.md](../../benchmarks/README.md)。
 
 ## 7. 覆盖范围
 

@@ -15,6 +15,7 @@
     "build:linux": "yarn build --linux",
     "typecheck": "tsc -p tsconfig.node.json && vue-tsc -p tsconfig.web.json",
     "lint": "eslint .",
+    "bench": "vitest run --config vitest.bench.config.ts",
     "test": "vitest run --config vitest.main.config.ts && vitest run --config vitest.renderer.config.ts",
     "test:main": "vitest run --config vitest.main.config.ts",
     "test:renderer": "vitest run --config vitest.renderer.config.ts"

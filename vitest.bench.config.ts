@@ -25,6 +25,11 @@ export default defineConfig({
     include: ['benchmarks/**/*.bench.ts'],
     environment: 'node',
     globals: false,
+    // 墙钟计时不能被别的基准挤 CPU：同一时刻只跑一个
+    fileParallelism: false,
+    maxWorkers: 1,
+    // 基准的产物就是 stdout，别让 vitest 把它拦下来再补打
+    disableConsoleIntercept: true,
     // 基准是长任务：默认 5s 会把「5000 个样本跑三轮」直接掐掉
     testTimeout: 120000,
   },

@@ -24,6 +24,7 @@
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
 | `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs` |
 | `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置 | 只跑一侧用 `yarn test:main` / `yarn test:renderer` |
+| `yarn bench` | 基准测试：排序键、相似分组 | 不进 CI，只用于同机前后对比；见 [benchmarks/README.md](benchmarks/README.md) |
 
 ---
 
