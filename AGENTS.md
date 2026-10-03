@@ -278,7 +278,8 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译与导入解析，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。
 4. `node scripts/check-jsdoc.mjs` —— 覆盖硬性规范 4：`src/**/*.ts` 的顶层导出符号必须有 JSDoc。
 5. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
-6. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
+6. `node scripts/check-doc-budgets.mjs` —— 常驻文档的字数预算（`scripts/doc-budgets.json`）。超了先搬走内容、再压缩，最后才提额并在提交信息里写明理由。
+7. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
 
 改动涉及运行时行为时（尤其是新起的窗口、worker、IPC 通道），**静态检查通过不等于功能正常**，要在回复里明确说清哪些是"已验证"、哪些需要使用者手动冒烟。
 

@@ -27,7 +27,7 @@
 | 2026-10-03 | 测试改用 `@test` / `@scripts` 绝对引用 | 去掉测试里的相对路径 |
 | 2026-10-03 | 引入 ESLint：四条硬规则迁入，新增格式与类型感知规则，`scripts/check-code.mjs` 退役 | 用成熟 lint 取代自研检查 |
 | 2026-10-03 | 把 lint 并入本文档，标题改「测试与静态检查」 | 两者同属质量保障，分两处写会漂移 |
-| 2026-10-04 | 补导出符号 JSDoc 检查（`scripts/check-jsdoc.mjs`）与基准测试（`benchmarks/`） | 把口头约定变成检查，并钉住性能热点 |
+| 2026-10-04 | 补导出符号 JSDoc 检查（`scripts/check-jsdoc.mjs`）、基准测试（`benchmarks/`）与常驻文档预算（`scripts/check-doc-budgets.mjs`） | 把口头约定变成检查，钉住性能热点与文档体量 |
 
 ---
 
@@ -105,14 +105,15 @@ test/
 - `test/` 的对应目录已并入两份 tsconfig 的 `include`，`@` 按各自的映射解析，`yarn typecheck` 连测试一起查；`tsconfig.node.json` 开 `allowJs`，测试才能 import `scripts/release-notes.mjs`（同目录的 `release-notes.d.mts` 提供类型）。
 - `node scripts/check-jsdoc.mjs` 管硬性规范 4：`src/**/*.ts` 的顶层导出符号必须有 JSDoc（零依赖，只看顶层声明）。
 - `node scripts/check-docs.mjs` 管文档：编码、相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill frontmatter、占位符。
+- `node scripts/check-doc-budgets.mjs` 管常驻文档的字数预算（`scripts/doc-budgets.json`，单位是非空白字符数）。
 - `scripts/check-code.mjs` 已删除：四条规则迁进 ESLint，模板编译与导入解析分别由 `vue/no-parsing-error` 与 `typecheck` 覆盖。
-- AGENTS.md 的「改完必须自检」收敛到 6 条：`tsc` / `vue-tsc` / `yarn lint` / `check-jsdoc` / `check-docs` / `yarn test`。
+- AGENTS.md 的「改完必须自检」收敛到 7 条：`tsc` / `vue-tsc` / `yarn lint` / `check-jsdoc` / `check-docs` / `check-doc-budgets` / `yarn test`。
 
 ## 6. 命令与 CI
 
 - `yarn test`（两侧依次跑）、`yarn test:main`、`yarn test:renderer`；只跑一个文件用 `yarn test:main test/main/database/sort.test.ts`。
 - `yarn lint`（不加 `lint:fix`）。
-- `.github/workflows/verify.yml`：`check` 作业跑 `yarn lint` 与 `node scripts/check-jsdoc.mjs`，`test` 作业分两步跑 `yarn test:main` 与 `yarn test:renderer`，失败能一眼看出是哪一侧。
+- `.github/workflows/verify.yml`：`docs` 作业跑 `check-docs` 与 `check-doc-budgets`（零依赖，不装依赖），`check` 作业跑 `yarn lint` 与 `node scripts/check-jsdoc.mjs`，`test` 作业分两步跑 `yarn test:main` 与 `yarn test:renderer`，失败能一眼看出是哪一侧。
 - **基准**（不进 CI）：`npx vitest run --config vitest.bench.config.ts`。Vitest 5 移除了内置 bench API，基准写成普通 `test`、计时在 `benchmarks/harness.ts`，产物是打印出的 `xxx ms/次`；只压不依赖 Electron 与文件系统的纯函数。见 [benchmarks/README.md](../../benchmarks/README.md)。
 
 ## 7. 覆盖范围

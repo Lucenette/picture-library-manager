@@ -30,3 +30,6 @@
 `node scripts/check-docs.mjs` 检查编码（无 BOM 的合法 UTF-8，含 `ups/changesets/**/dbups.xml`）、相对链接与锚点、
 `roadmap/` 与 `design/` 的 README 索引、skill 的 frontmatter、占位符残留。零依赖，CI 与
 [AGENTS.md](../AGENTS.md) 的「改完必须自检」都会跑它。
+
+`node scripts/check-doc-budgets.mjs` 按 `scripts/doc-budgets.json` 检查常驻文档的字数预算（非空白字符数）：
+超了先搬走内容、再压缩，最后才提额。

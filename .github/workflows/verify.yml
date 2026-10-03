@@ -25,6 +25,8 @@ jobs:
           node-version: 22
       - name: 文档与 skill 检查（零依赖）
         run: node scripts/check-docs.mjs
+      - name: 文档预算检查（零依赖）
+        run: node scripts/check-doc-budgets.mjs
 
   check:
     name: 代码规范检查
