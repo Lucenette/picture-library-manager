@@ -7,7 +7,7 @@ export interface ChangelogSection {
 /** 把 CHANGELOG 拆成有序小节；顺序与文件一致（新的在前） */
 export function changelogSections(text: string): ChangelogSection[];
 
-/** 只比 x.y.z 三段；非版本号（`未发布`）按「更新」处理，返回 1 */
+/** 只比 x.y.z 三段；非版本号的标题（历史格式或手写）按「更新」处理，返回 1 */
 export function compareVersions(left: string, right: string): number;
 
 /** 上次发布以来的小节；找不到那一节时退回按版本号比较 */

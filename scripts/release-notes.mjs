@@ -5,7 +5,9 @@
  * 版本（跳过的 z 补丁、只落到 master 而没打 tag 的版本）会一并带上；多节时按版本分块、节内标题降一级。
  *
  * 运行：node scripts/release-notes.mjs > RELEASE_NOTES.md
- * CI 由 .github/workflows/release.yml 的 release job 调用；本地可用环境变量覆盖：
+ * **只在 master（tag 线）上跑**：tag 只打在 master 上，develop 看不到它们，`git describe` 会给出过期的 tag，
+ * 把已经发布过的小节也算进「更新详情」；遇到这种情况脚本会往 stderr 打一行 warning。
+ * CI 由 .github/workflows/release.yml 的 release job 调用（在那个 tag 的提交上）；本地可用环境变量覆盖：
  *   GITHUB_SHA / GITHUB_REF_NAME / GITHUB_REPOSITORY / ARTIFACTS_DIR
  * 缺少 git 或没有产物目录时降级输出，不报错——说明本身仍要能生成。
  */
@@ -49,7 +51,7 @@ export function changelogSections(text) {
   return sections;
 }
 
-/** 只比 x.y.z 三段；非版本号（`未发布`）按「更新」处理，返回 1 */
+/** 只比 x.y.z 三段；非版本号的标题（历史格式或手写）按「更新」处理，返回 1 */
 export function compareVersions(left, right) {
   const parse = (value) => {
     const match = /^(\d+)\.(\d+)\.(\d+)/.exec(value);
@@ -73,7 +75,7 @@ export function compareVersions(left, right) {
  *
  * 上次发布 = 最近一个 tag：取它对应那一节**上面**的全部小节（文件是新的在前）。找不到那一节时退回按
  * 版本号比较；连 tag 都没有（首次发布，或环境里没有 git）就全部带上——宁可多带，不能漏掉没发布过的版本。
- * 空小节（例如刚定稿后补回的 `[未发布]`）不进结果。
+ * 空小节（例如刚定稿后补回的 `[<下一版>] - 未发布`）不进结果。
  */
 export function sectionsSinceLastRelease(sections, previousTag) {
   const usable = sections.filter((section) => section.body !== '');
@@ -133,6 +135,23 @@ function collectArtifacts() {
   return groups;
 }
 
+/**
+ * 跑错线时的提醒：tag 只打在 master 上，develop 看不到它们。
+ *
+ * 在 develop 上 `git describe` 会取到过期的 tag，把已经发布过的小节也算进「更新详情」；
+ * 排除当前 tag 之后的最新 tag 若不是 previous，就说明当前分支不在发布线上。
+ */
+function warnIfWrongLine(tag, previous) {
+  const released = git(['tag', '--sort=-v:refname'])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && line !== tag);
+  const newest = released[0] ?? '';
+  if (previous !== '' && newest !== '' && previous !== newest) {
+    console.error(`warning: previous tag resolved to ${previous}, but the newest released tag is ${newest}; run this on the master branch`);
+  }
+}
+
 /** 生成说明正文；被 import 时不执行，测试才能只拿上面的纯函数 */
 function generate() {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
@@ -141,6 +160,7 @@ function generate() {
   const tag = process.env.GITHUB_REF_NAME || git(['describe', '--tags', '--exact-match']) || ('v' + pkg.version);
   const repo = process.env.GITHUB_REPOSITORY || '';
   const previous = sha ? git(['describe', '--tags', '--abbrev=0', sha + '^']) : '';
+  warnIfWrongLine(tag, previous);
   const sections = sectionsSinceLastRelease(changelogSections(changelog), previous);
 
   const out = [];

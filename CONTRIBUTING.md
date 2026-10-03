@@ -135,7 +135,7 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 
 - **提问出口**：用法问题与想法走 [GitHub Discussions](https://github.com/Lucenette/picture-library-manager/discussions) 的 Q&A / Ideas；先查 [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)，查不到再问。
 - **响应节奏**：Issue 与 PR 的首次回应通常在 3 个工作日内；合入 `develop` 后由维护者安排发布。
-- **发布流程**：版本由维护者按 `.agents/skills/gitflow-release/SKILL.md` 的 gitflow 流程发布（`develop` → `release/<x.y>` → 合入 `master` → 打 tag → CI 出三平台产物）。贡献者只需在 `CHANGELOG.md` 的 `[未发布]` 段补条目，不需要关心版本号与发布段。
+- **发布流程**：版本由维护者按 `.agents/skills/gitflow-release/SKILL.md` 的 gitflow 流程发布（`develop` → `release/<版本>` → 合入 `master` → 打 tag → CI 出三平台产物；`develop` 的 `package.json` 版本号就是下一次 release 的版本号）。贡献者只需在 `CHANGELOG.md` 顶部的 `[<下一版>] - 未发布` 段补条目，不需要关心版本号与发布段。
 - **`.agents/skills/`**：那是给编码代理（AI）用的可复用工作流，人类贡献者可以选读；常驻的硬性约定看 [AGENTS.md](./AGENTS.md)。
 
 ---
@@ -175,7 +175,7 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 - `README.md` 的**功能**列表（用户能看到什么）
 - `docs/ARCHITECTURE.md`（结构或数据流变了）
 - `docs/SCRIPTING.md`（脚本接口变了）
-- `CHANGELOG.md` 的 `[未发布]` 段
+- `CHANGELOG.md` 顶部的 `[<下一版>] - 未发布` 段
 
 文档与代码不一致一律按 Bug 处理。
 
