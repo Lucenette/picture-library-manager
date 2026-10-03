@@ -169,7 +169,7 @@ function upsertScript(...) {}
 ### 4. 新增 IPC 的归属
 
 - 需要创建窗口的 → `src/main/dialogs/`，并在 `dialogs/index.ts` 注册。
-- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见第 8 节）。
+- 不需要窗口的 → 跟业务模块放一起（如 `task/ipc.ts` / `script/ipc.ts`），由各自模块的 `initXxx()` 注册；**启动阶段要跑的事登记给加载服务**（见 [docs/design/loading.md](docs/design/loading.md)）。
 
 ### 5. 弹窗一律用原生窗口
 
@@ -202,31 +202,7 @@ function upsertScript(...) {}
 
 ### 8. 升级模块与版本目录
 
-- 升级独立成 `src/main/ups/`，`src/main/database/` 是它的下层：升级模块调用数据库模块跑 SQL、读写账本，
-  **`database/` 里不出现 `@/ups`**。
-- 一个版本 = `src/main/ups/changesets/<package.json 的版本号>/` 一个目录，最多三件东西：
-  `preups.ts`（SQL 之前跑）、`dbups.xml`（`<changeSet>`）、`postups.ts`（SQL 之后跑），缺哪个就跳过哪个。
-  目录里的 `index.ts` 写死 `VERSION` 并导出 `changelog`——**版本号以代码里的常量为准，目录名只给人看**；
-  外层 `changesets/index.ts` 只 import 各版本目录的 `index.ts`。清单里出现相同版本号直接抛错。
-- 建表语句不进代码，写进 `dbups.xml` 的 `<changeSet>` 里，一条用 `<comment>` 说明它做了什么。
-- **账本按身份记账、执行过的不再执行**：changeSet 是 `(author, id, filename)`（`id` 用 20 位定长数字时间戳），
-  脚本是 `(script, 'preups' | 'postups', 版本号)`。**已发布版本的目录冻结**：改一条已执行的 changeset 或脚本
-  都不会生效，要重跑得先删掉 `schema_migration` 里那一行。账本表由引擎用代码创建，不要写进 changelog。
-- 升级脚本是普通模块（可以 import 任何东西），但：一律异步 IO；不要自己写 `BEGIN` / `COMMIT`；
-  不要吞异常（抛错才回滚，脚本写进库的东西随事务一起不留）；**文件操作不受事务保护**，
-  要改或删已有文件就自己先备份，并保证重复执行是安全的。
-- 启动顺序固定：`initDatabase()`（开库 + DB 通道）→ 升级 → 其余初始化。三者都是**加载服务**
-  （`src/main/loading/`，见 [docs/design/loading.md](docs/design/loading.md)）里的任务：升级与其余初始化
-  都是 `essential`，按登记顺序串行。加载服务的终态在所有 `essential` 任务之后才公布，因此
-  「加载页收到终态时通道必然已经注册好了」是登记表的结论，不再需要额外的时序约定。
-- 启动阶段的活一律 `registerLoadTask()` 登记，不要写在 `startLoading()` 之后。`essential` 跑完才进主界面、
-  失败即整轮失败；`warmup` 与必须的任务并行、跑完不放行、失败只记日志。渲染进程的预热用
-  `target: 'renderer'` 登记，id 加在 `common/ipcChannels.ts` 的 `LOAD_TASK` 里，实现写在渲染进程入口。
-- **破坏性结构变更（删列、删表、改名）之前，先在 preups 里把要保留的数据落成文件并自校验**：列一旦丢掉，
-  除了升级前的库备份之外没有第二份副本，而备份是整库回滚、不能只捞回一个字段。落盘放在 SQL 之前、校验放在同一段脚本末尾，
-  任一步失败就中止整轮升级——那时列还在。
-- 转义由写的人负责：`<sql>` 里出现 `<` 写成 `&lt;`（漏写可能被 XML 当成标签吞掉），`&` 写成 `&amp;`。
-- 需要图片解码的补数据仍归任务系统，不要塞进 changeSet。
+规则见 [src/main/ups/AGENTS.md](src/main/ups/AGENTS.md)。启动阶段谁阻塞、谁预热、跑在哪个进程，见 [docs/design/loading.md](docs/design/loading.md)。
 
 ### 9. 自绘标题栏
 
