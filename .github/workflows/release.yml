@@ -20,7 +20,7 @@ jobs:
     name: 校验 tag 分支
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: tag 必须指向 ${{ env.RELEASE_BRANCH }} 上的提交
@@ -63,7 +63,7 @@ jobs:
             platform: linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -92,7 +92,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # 取上一个 tag 需要完整历史：发布说明的对比链接与「更新详情」都从它起算
           fetch-depth: 0
