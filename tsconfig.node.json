@@ -22,6 +22,7 @@
   },
   "include": [
     "electron.vite.config.ts",
+    "benchmarks/**/*.ts",
     "src/common/**/*.ts",
     "src/main/**/*.ts",
     "test/main/**/*.ts",
