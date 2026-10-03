@@ -19,6 +19,7 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+/** 任务运行期的控制面：暂停 / 恢复、中止，以及中止时释放资源 */
 export class TaskControl {
   private paused = false;
   private aborted = false;

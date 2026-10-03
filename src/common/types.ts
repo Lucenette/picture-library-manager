@@ -494,11 +494,13 @@ export interface SimilarTaskResult {
   similarGroups: number;
 }
 
+/** 提交任务时随命令带上的载荷，按任务类型取其一 */
 export type TaskPayload = ScanTaskPayload | ProcessTaskPayload | ExportTaskPayload | SimilarTaskPayload;
 
 /** 缩略图实际使用的解码引擎 */
 export type ThumbnailEngineName = 'sharp' | 'builtin';
 
+/** 扫描任务的汇总结果 */
 export interface ScanTaskResult {
   characters: number;
   groups: number;
@@ -544,16 +546,19 @@ export interface SimilarData {
   skipped: number;
 }
 
+/** 批量处理任务的汇总结果 */
 export interface ProcessTaskResult {
   processed: number;
   failed: number;
 }
 
+/** 导出任务的汇总结果 */
 export interface ExportTaskResult {
   copied: number;
   failed: number;
 }
 
+/** 任务完成后的汇总结果，按任务类型取其一 */
 export type TaskResult = ScanTaskResult | ProcessTaskResult | ExportTaskResult | SimilarTaskResult;
 
 /** 任务在数据库中的存储形态 */

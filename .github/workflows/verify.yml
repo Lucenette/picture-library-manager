@@ -42,6 +42,8 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-scripts --network-timeout 600000
       - name: 代码规范检查
         run: yarn lint
+      - name: 导出符号 JSDoc 检查
+        run: node scripts/check-jsdoc.mjs
 
   test:
     name: 单元测试

@@ -36,6 +36,7 @@ export interface RendererLoadTask {
   id: string;
 }
 
+/** 一条已登记的启动任务：主进程「必须」任务或渲染进程预热任务 */
 export type LoadTask = MainLoadTask | RendererLoadTask;
 
 /** 登记的任务；主进程「必须」任务的执行顺序就是登记顺序 */
