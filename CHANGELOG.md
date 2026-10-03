@@ -4,7 +4,7 @@
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。未发布小节的标题带下一次 release 的版本号（`## [<版本>] - 未发布`），定稿时只把 `未发布` 换成日期。
 
-## [1.1.1] - 未发布
+## [1.1.1] - 2026-10-04
 
 ### 新增
 
@@ -107,7 +107,7 @@
 - **暗色主题**：IDEA Darcula 风格，Element Plus 全覆盖
 - 本地 SQLite（sql.js）存储，零原生依赖，绿色便携
 
-[1.1.1]: https://github.com/Lucenette/picture-library-manager/compare/v1.0.0...HEAD
+[1.1.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.0.0
 [0.0.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v0.0.1
