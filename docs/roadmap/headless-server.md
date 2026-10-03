@@ -18,6 +18,7 @@
 | 日期 | 变更 | 原因 |
 |---|---|---|
 | 2026-10-02 | 首次定稿 | 讨论 Electron 剥离、server 模式与窗口收编 |
+| 2026-10-04 | 补 §3.10「Electron 壳的边界与共用 UI」，§3.8 补 asar / 更新子系统 | 收敛壳与 core 的边界 |
 
 ---
 
@@ -107,11 +108,21 @@ dirs:
 - `build:desktop`：现状（electron-vite + electron-builder）。
 - `build:server`：`core` + server 打成纯 JS，`sharp` 按平台带预编译包，**不含 Electron / Chromium**；静态资源取自同一份 web 构建。
 - `?nodeWorker` 是 electron-vite 的虚拟模块，server 构建要给出等价的 worker chunk 方案。
+- 打包用 `asar` + `asarUnpack`（`**/*.{node,dylib,dll,so,exe}`、`sharp` 的原生件与 worker 产物）；`extraMetadata` 把 build commit 塞进包内 manifest，更新器才有得比对。
+- 更新是一等子系统（electron-updater + 排期 / 强制更新 / 签名与公证）。本条目只把 `build:desktop` 的结构留出位置，不在这里实现。
 - 可选 Docker 镜像（多架构）。
 
 ### 3.9 对外接入面
 
 无头模式下暴露 `/metrics`（供外部监控定时拉取）、能力描述符与 MCP 端点；`--register` 运行时开关决定是否向注册中心报到。注册中心选型见待决事项。
+
+### 3.10 Electron 壳的边界与共用 UI
+
+**壳只做 OS 集成，业务一行都不留。** 除 `main.ts` 外只保留：窗口与布局、托盘、单实例、原生目录 / 文件选择、preload、自定义协议、更新；`window-manager`、`dialogs` 归 `shells/electron/`，`database` / `task` / `image` / `script` / `ups` 全部进 `core`。这样 `build:server` 与桌面共用同一份 core，而不是两份实现。
+
+**桌面模式也拆成两个进程：薄壳 + 一个 Node 宿主进程。** Electron 主进程 `spawn` 宿主（`shells/server/` 的入口复用同一份 core），宿主就绪后回 `{ url, injections }`；主进程只负责监督——致命错误、shutdown，以及退出前确认「有没有在跑的任务 / 排期」。代价是多一层进程边界与退出协商（`app.quit` 前先问宿主），换来桌面与 server 走同一条 core 路径、壳可以整体替换。
+
+**一份 web UI 两处加载，用 boot 注入区分形态。** 桌面窗口与浏览器模式加载同一份构建产物：宿主把一次性 boot promise 注入 `index.html` 的 `<head>`（如 `globalThis.__PLM_BOOT_READY__`），页面等宿主把运行时数据（配置、能力清单、鉴权）注入后再挂载。**静态资源由 Electron 自己伺服（自定义协议或本地 document），只有 API 走宿主的本地 HTTP**，用一次性换取、绑定到窗口的 token / cookie 鉴权——界面本身不经过网络。
 
 ## 4. 改动清单
 
