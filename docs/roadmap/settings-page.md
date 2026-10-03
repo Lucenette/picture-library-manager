@@ -48,7 +48,7 @@
 
 - 现在 `package.json` 的 dependencies 里**没有** YAML 解析器；`node_modules/js-yaml` 存在只是 electron-builder 传递带进来的，不能直接 `require`（打包后不保证在，也不是我们的依赖）。
 - 三个选项：(a) 明确加 `js-yaml`（成熟、体积小、会丢注释）；(b) 加 `yaml`（能保留注释与格式）；(c) 自己写极简子集（键值 + 一层嵌套）——**不推荐**，手写解析是长期负债。
-- 按 AGENTS「不自行安装或卸载依赖」，这条要先由使用者批准再加。
+- 按 [AGENTS.md](../../AGENTS.md)「动 `package.json` 前必须先确认，未获授权不准动」，这条要先获得使用者确认再加。
 
 ### 3.3 校验、默认值与兼容
 
