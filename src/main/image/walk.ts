@@ -17,7 +17,7 @@ import type { DirNode, ScannedFile } from '@common/types';
 
 // 只读图片头几 KB 就能拿到宽高；扫描器需要它来估算解码内存，决定哪些图能并发。
 // 同样用 require：与其它图像库一致，不交给打包器内联。
-const { imageSize } = require('image-size') as typeof import('image-size');
+const { imageSizeFromFile } = require('image-size/fromFile') as typeof import('image-size/fromFile');
 
 /** 每处理这么多条目就让出一次事件循环，避免长时间霸占主进程 */
 const YIELD_EVERY = 200;
@@ -121,11 +121,12 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
     if (stat.isDirectory()) {
       files.push(...await collectImageFiles(fullPath));
     } else if (stat.isFile() && isImageExt(entry)) {
+      const dimensions = await readImageDimensions(fullPath);
       files.push({
         fileName: entry,
         filePath: fullPath,
         fileSize: stat.size,
-        ...readImageDimensions(fullPath),
+        ...dimensions,
         extension: extname(entry).toLowerCase().replace('.', ''),
         // 缩略图与感知哈希由工作线程解码时补齐
         thumbnail: null,
@@ -142,10 +143,13 @@ export async function collectImageFiles(dirPath: string): Promise<ScannedFile[]>
  *
  * 放在遍历阶段而不是解码线程里，是因为扫描器要根据「宽 × 高 × 4」估算解码
  * 需要多少内存，才能决定这张图能不能和别的图一起并发解码。
+ *
+ * image-size v2 的按路径读取只有异步版本；这也正好符合「主进程不做同步 IO」——
+ * 图库在网络盘上时，同步读一次图片头就是一次网络往返。
  */
-function readImageDimensions(filePath: string): { width: number; height: number } {
+async function readImageDimensions(filePath: string): Promise<{ width: number; height: number }> {
   try {
-    const dimensions = imageSize(filePath);
+    const dimensions = await imageSizeFromFile(filePath);
     return { width: dimensions.width ?? 0, height: dimensions.height ?? 0 };
   } catch {
     // 读不出来就是 0，不要 null：界面直接显示 0 × 0
