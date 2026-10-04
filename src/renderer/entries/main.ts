@@ -8,7 +8,6 @@ import App from '@/App.vue';
 import { installElementPlus } from '@/entries/shell/element-plus';
 import { initWindowChrome, setPopupOpen } from '@/entries/shell/window-chrome';
 import { initRendererLoading, registerRendererTask } from '@/loading';
-import '@/styles/theme.css';
 import LoadingPage from '@/views/startup/LoadingPage.vue';
 
 /**

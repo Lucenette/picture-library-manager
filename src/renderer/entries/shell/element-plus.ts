@@ -1,7 +1,7 @@
 import ElementPlus from 'element-plus';
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs';
 import type { App as VueApp } from 'vue';
-import 'element-plus/dist/index.css';
+import '@/styles/element-plus.css';
 
 /**
  * 唯一引 Element Plus 的地方。**入口不许自己 import 组件库，一律走这里。**

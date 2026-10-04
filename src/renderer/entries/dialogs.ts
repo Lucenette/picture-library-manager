@@ -1,7 +1,6 @@
 import { installElementPlus } from '@/entries/shell/element-plus';
 import { mountPage } from '@/entries/shell/page';
 import { initWindowChrome } from '@/entries/shell/window-chrome';
-import '@/styles/theme.css';
 
 initWindowChrome();
 
