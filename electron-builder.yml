@@ -39,3 +39,8 @@ linux:
   icon: src/static/icon.png
   category: Graphics
   maintainer: Lucenette
+  # package.json 的 desktopName 是 Electron 的 app_id，也就是窗口的 WM_CLASS；打开这个开关，
+  # .desktop 才会装成 ${desktopName}.desktop 并写同一个 StartupWMClass——两边一致，桌面环境
+  # 才能把运行中的窗口认到启动器上（否则 GNOME/KDE 当成来历不明的窗口）。v27 起是默认行为、
+  # 开关已移除；26 必须显式打开。它不改 Icon（那个仍取 executableName）。
+  syncDesktopName: true

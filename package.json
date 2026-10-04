@@ -3,6 +3,7 @@
   "version": "1.1.2",
   "private": true,
   "description": "角色图库管理器",
+  "desktopName": "com.lucenette.picture-library-manager",
   "main": "out/main/index.js",
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
