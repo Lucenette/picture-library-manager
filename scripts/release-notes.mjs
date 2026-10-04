@@ -1,8 +1,9 @@
 /**
  * 生成 Release 说明：提交信息、更新详情（取自 CHANGELOG）、各平台产物、安装与升级提示。
  *
- * 「更新详情」是**上次发布（最近一个 tag）以来的全部小节**，不是只有发布号那一节：中间那些没发布的
- * 版本（跳过的 z 补丁、只落到 master 而没打 tag 的版本）会一并带上；多节时按版本分块、节内标题降一级。
+ * 「更新详情」是**上次发布（最近一个 tag）以来的全部条目**：中间那些没发布的版本（跳过的 z 补丁、
+ * 只落到 master 而没打 tag 的版本）会一并带上，并按小节名（`### 新增` 这类）合并成一组——
+ * 内部版本号不出现在发布说明里。
  *
  * 运行：node scripts/release-notes.mjs > RELEASE_NOTES.md
  * **只在 master（tag 线）上跑**：tag 只打在 master 上，develop 看不到它们，`git describe` 会给出过期的 tag，
@@ -19,6 +20,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACTS = resolve(ROOT, process.env.ARTIFACTS_DIR ?? 'artifacts');
+/** 发布说明里永远排最前的小节名 */
+const FIRST_BLOCK = '升级必读';
 
 /** 取 git 输出；环境里没有 git 时返回空串，调用方自行降级 */
 function git(args) {
@@ -90,14 +93,82 @@ export function sectionsSinceLastRelease(sections, previousTag) {
   return usable.filter((section) => compareVersions(section.version, previous) > 0);
 }
 
-/** 拼成「更新详情」的正文：只有一节原样输出；多节按版本分块、节内标题降一级 */
+/**
+ * 把一节正文按 `### ` 标题切成小块；首个标题之前的散文 heading 为 null。
+ * @param {string} body 一节正文
+ * @returns {{ heading: string | null, lines: string[] }[]} 小块列表
+ */
+function splitBlocks(body) {
+  const blocks = [];
+  let current = { heading: null, lines: [] };
+  for (const line of body.split('\n')) {
+    const heading = /^### (.+?)\s*$/.exec(line);
+    if (heading === null) {
+      current.lines.push(line);
+      continue;
+    }
+    blocks.push(current);
+    current = { heading: heading[1], lines: [] };
+  }
+  blocks.push(current);
+  return blocks;
+}
+
+/**
+ * 去掉首尾空行。
+ * @param {string[]} lines 行
+ * @returns {string[]} 去掉首尾空行后的行
+ */
+function trimmedLines(lines) {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim() === '') {
+    start += 1;
+  }
+  while (end > start && lines[end - 1].trim() === '') {
+    end -= 1;
+  }
+  return lines.slice(start, end);
+}
+
+/**
+ * 拼成「更新详情」的正文：只有一节原样输出；多节按**小节名**合并条目，不出现内部版本号。
+ *
+ * 两次发布之间的内部版本共享同一个 x.y，合并后读者看到的才是「这条线带来了什么」；
+ * `### 升级必读` 始终排最前，其余按首次出现的顺序，节内条目保持新的在前。
+ * @param {{ version: string, body: string }[]} sections 上次发布以来的小节（新的在前）
+ * @returns {string} 正文
+ */
 export function formatSections(sections) {
   if (sections.length <= 1) {
     return sections[0]?.body ?? '';
   }
-  return sections
-    .map((section) => `### [${section.version}]\n\n${section.body.replace(/^### /gm, '#### ')}`)
-    .join('\n\n');
+  const order = [];
+  const groups = new Map();
+  for (const section of sections) {
+    for (const block of splitBlocks(section.body)) {
+      const key = block.heading ?? '';
+      const lines = trimmedLines(block.lines);
+      if (lines.length === 0) {
+        continue;
+      }
+      if (!groups.has(key)) {
+        groups.set(key, []);
+        order.push(key);
+      }
+      groups.get(key).push(...lines);
+    }
+  }
+  const keys = order.filter((key) => key !== FIRST_BLOCK);
+  if (order.includes(FIRST_BLOCK)) {
+    keys.unshift(FIRST_BLOCK);
+  }
+  const out = [];
+  for (const key of keys) {
+    const body = (groups.get(key) ?? []).join('\n');
+    out.push(key === '' ? body : `### ${key}\n\n${body}`);
+  }
+  return out.join('\n\n');
 }
 
 /**

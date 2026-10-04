@@ -67,12 +67,14 @@ test('只有一节时原样输出', () => {
   expect(formatSections([{ version: '1.0.0', body: '### 新增\n\n- x' }])).toBe('### 新增\n\n- x');
 });
 
-test('多节时按版本分块并降一级标题', () => {
+test('多节时按小节名合并条目，不出现内部版本号', () => {
   const text = formatSections([
-    { version: '1.2.0', body: '### 新增\n\n- a' },
-    { version: '1.0.0', body: '### 修复\n\n- b' },
+    { version: '1.2.0', body: '### 新增\n\n- a\n\n### 修复\n\n- c' },
+    { version: '1.1.0', body: '### 升级必读\n\n- 先备份\n\n### 新增\n\n- b' },
   ]);
-  expect(text).toContain('### [1.2.0]');
-  expect(text).toContain('#### 新增');
-  expect(text).toContain('### [1.0.0]');
+  expect(text).not.toContain('1.2.0');
+  expect(text).not.toContain('1.1.0');
+  expect(text).toContain('- a\n- b');
+  expect(text).toContain('### 修复\n\n- c');
+  expect(text.indexOf('### 升级必读')).toBeLessThan(text.indexOf('### 新增'));
 });
