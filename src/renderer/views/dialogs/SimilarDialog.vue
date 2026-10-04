@@ -73,8 +73,8 @@ onMounted(async () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #1e1f22;
-  color: #d8dadd;
+  background: var(--app-bg-page);
+  color: var(--app-text-regular);
 }
 
 .similar-bar {
@@ -93,7 +93,7 @@ onMounted(async () => {
 
 .similar-summary {
   font-size: 12px;
-  color: #8b8f95;
+  color: var(--app-text-muted);
 }
 
 .similar-tabs {
@@ -109,15 +109,15 @@ onMounted(async () => {
 
 .similar-group {
   margin-bottom: 16px;
-  border: 1px solid #2b2d30;
+  border: 1px solid var(--app-bg-surface);
   border-radius: 4px;
 }
 
 .similar-group-head {
   padding: 6px 10px;
   font-size: 12px;
-  color: #8b8f95;
-  border-bottom: 1px solid #2b2d30;
+  color: var(--app-text-muted);
+  border-bottom: 1px solid var(--app-bg-surface);
 }
 
 .similar-group-body {
@@ -136,7 +136,7 @@ onMounted(async () => {
   height: 100px;
   object-fit: cover;
   border-radius: 4px;
-  background: #2b2d30;
+  background: var(--app-bg-surface);
   display: block;
 }
 
@@ -145,7 +145,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: #6f7378;
+  color: var(--app-text-disabled);
 }
 
 .similar-name {
@@ -158,6 +158,6 @@ onMounted(async () => {
 
 .similar-meta {
   font-size: 11px;
-  color: #8b8f95;
+  color: var(--app-text-muted);
 }
 </style>

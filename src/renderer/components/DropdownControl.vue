@@ -65,23 +65,23 @@ function open(): void {
   justify-content: space-between;
   padding: 8px 12px;
   border-radius: 6px;
-  background: #2b2d30;
-  border: 1px solid #3e4044;
+  background: var(--app-bg-surface);
+  border: 1px solid var(--app-border-strong);
   cursor: pointer;
   font-size: 13px;
   transition: border-color 0.15s;
 }
 
 .select-btn:hover {
-  border-color: #4a4c50;
+  border-color: var(--app-border-hover);
 }
 
 .placeholder {
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 
 .arrow {
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 </style>

@@ -36,17 +36,33 @@ declare var __dirname: string;`;
   },
 };
 
-/** 与界面同一套暗色：底色取 .app-main 的 #1e1f22 */
+/**
+ * 取主题令牌的色值。
+ *
+ * Monaco 的主题只认字符串色值、读不了 CSS 变量，而颜色只有 `styles/theme.css` 一个来源，
+ * 所以在这里把变量取出来。取不到就直接抛：令牌改名而这里忘了改会当场发现，而不是静默用错色。
+ * @param name 令牌名，如 `--app-bg-page`
+ * @returns 该令牌当前的色值
+ */
+export function themeToken(name: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (value === '') {
+    throw new Error(`theme token not found: ${name}`);
+  }
+  return value;
+}
+
+/** 编辑器主题的颜色全部取自界面令牌，与界面同一套暗色（`base` 是 Monaco 自带的 vs-dark） */
 monacoEditor.defineTheme('plmanager-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
   colors: {
-    'editor.background': '#1e1f22',
-    'editorGutter.background': '#1e1f22',
-    'editor.lineHighlightBackground': '#26282c',
-    'editorLineNumber.foreground': '#5e6268',
-    'editorLineNumber.activeForeground': '#a0a3a9',
+    'editor.background': themeToken('--app-bg-page'),
+    'editorGutter.background': themeToken('--app-bg-page'),
+    'editor.lineHighlightBackground': themeToken('--app-bg-header'),
+    'editorLineNumber.foreground': themeToken('--app-text-faint'),
+    'editorLineNumber.activeForeground': themeToken('--app-text-soft'),
   },
 });
 

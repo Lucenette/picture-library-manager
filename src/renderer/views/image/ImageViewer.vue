@@ -417,8 +417,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #0d0d0d;
-  color: #c8cad0;
+  background: var(--app-viewer-bg);
+  color: var(--app-viewer-text);
   outline: none;
   user-select: none;
 }
@@ -428,7 +428,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  background: #1a1a1a;
+  background: var(--app-viewer-surface);
   flex-shrink: 0;
   font-size: 13px;
 }
@@ -441,7 +441,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 }
 
 .viewer-zoom {
-  color: #3871e1;
+  color: var(--app-primary);
   font-weight: 600;
   min-width: 48px;
   text-align: right;
@@ -461,7 +461,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   top: 50%;
   transform: translateY(-50%);
   font-size: 56px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--app-viewer-text-dim);
   cursor: pointer;
   user-select: none;
   z-index: 5;
@@ -479,7 +479,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 
 .viewer-nav-left:hover,
 .viewer-nav-right:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--app-viewer-text-bright);
 }
 
 .viewer-img {
@@ -491,7 +491,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   display: flex;
   gap: 6px;
   padding: 4px 100px 8px 100px;
-  background: #1a1a1a;
+  background: var(--app-viewer-surface);
   overflow: hidden;
   flex-shrink: 0;
   align-items: center;
@@ -512,12 +512,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 
 .viewer-thumbs::before {
   left: 0;
-  background: linear-gradient(to right, #1a1a1a, rgba(26, 26, 26, 0));
+  background: linear-gradient(to right, var(--app-viewer-surface), var(--app-viewer-fade));
 }
 
 .viewer-thumbs::after {
   right: 0;
-  background: linear-gradient(to left, #1a1a1a, rgba(26, 26, 26, 0));
+  background: linear-gradient(to left, var(--app-viewer-surface), var(--app-viewer-fade));
 }
 
 .thumb-item {
@@ -536,8 +536,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 }
 
 .thumb-item.active {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  border: 2px solid #3871e1;
+  box-shadow: 0 2px 12px var(--app-shadow-viewer-thumb);
+  border: 2px solid var(--app-primary);
   z-index: 4;
   position: relative;
 }
@@ -545,7 +545,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 .thumb-item:not(.active):hover {
   transform: scale(var(--hover-scale, 1.36));
   z-index: 3;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  box-shadow: var(--app-shadow-viewer);
 }
 
 .thumb-item img {

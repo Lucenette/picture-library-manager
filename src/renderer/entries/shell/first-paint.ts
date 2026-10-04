@@ -6,6 +6,10 @@
  * 各入口 HTML 的 `<!-- first-paint -->` 占位处，而不是在四个 HTML 里各抄一份。
  *
  * 这个文件**不许 import 任何东西**：构建配置（Node 侧）会直接读它，不能被浏览器入口引用。
+ *
+ * 下面两处色值是**有意写死**的：这段样式要早于外链 CSS 生效，那时 `styles/theme.css` 的令牌还不存在
+ * （`var(--win-bg, #1e1f22)` 的兜底同理，底色平时由主进程按窗口带进来）。改主色调时跟 theme.css 的
+ * `--app-bg-page` / `--app-text-regular` 一起改。
  */
 export const FIRST_PAINT = `
     <style>

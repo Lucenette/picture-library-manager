@@ -59,8 +59,8 @@ onMounted(loadInitData);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #1e1f22;
-  color: #d8dadd;
+  background: var(--app-bg-page);
+  color: var(--app-text-regular);
   font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
 }
 
@@ -70,7 +70,7 @@ onMounted(loadInitData);
   padding: 0 16px;
   font-size: 16px;
   font-weight: 400;
-  color: #eceef1;
+  color: var(--app-text-primary);
   -webkit-app-region: drag;
   flex-shrink: 0;
 }
@@ -87,6 +87,6 @@ onMounted(loadInitData);
 .info {
   margin-bottom: 16px;
   font-size: 13px;
-  color: #b4b6ba;
+  color: var(--app-text-secondary);
 }
 </style>

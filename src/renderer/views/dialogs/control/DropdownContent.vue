@@ -57,7 +57,7 @@ function hide(): void {
 .script-list {
   height: 100vh;
   overflow: hidden;
-  background: #2b2d30;
+  background: var(--app-bg-surface);
   outline: none;
 }
 
@@ -71,23 +71,23 @@ function hide(): void {
   padding: 8px 14px;
   cursor: pointer;
   font-size: 13px;
-  color: #d8dadd;
+  color: var(--app-text-regular);
   height: 34px;
   line-height: 18px;
   box-sizing: border-box;
 }
 
 .script-item:hover {
-  background: #323438;
+  background: var(--app-bg-active);
 }
 
 .script-item.selected {
-  color: #3871e1;
+  color: var(--app-primary);
 }
 
 .script-empty {
   padding: 12px 14px;
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 </style>

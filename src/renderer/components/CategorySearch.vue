@@ -46,7 +46,7 @@
           <template v-if="isFreeInput">
             <div class="free-hint">输入关键词后按回车确认</div>
             <div v-if="query" class="panel-item" @mousedown.prevent="pickFreeInput">
-              <span style="color: #3871e1">使用 "{{ query }}"</span>
+              <span style="color: var(--app-primary)">使用 "{{ query }}"</span>
             </div>
           </template>
 
@@ -299,14 +299,14 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   gap: 4px;
   padding: 4px 8px;
   border-radius: 8px;
-  background: #2b2d30;
-  border: 1px solid #3e4044;
+  background: var(--app-bg-surface);
+  border: 1px solid var(--app-border-strong);
   transition: border-color 0.15s;
   min-height: 32px;
 }
 
 .search-input-wrap.focused {
-  border-color: #3871e1;
+  border-color: var(--app-primary);
 }
 
 .search-tag {
@@ -315,9 +315,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   gap: 3px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #1e2e45;
-  border: 1px solid #2859b8;
-  color: #3871e1;
+  background: var(--app-bg-highlight);
+  border: 1px solid var(--app-border-highlight);
+  color: var(--app-primary);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -329,7 +329,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
 
 .tag-x:hover {
   opacity: 1;
-  color: #c75458;
+  color: var(--app-danger);
 }
 
 .search-input {
@@ -338,13 +338,13 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   border: none;
   outline: none;
   background: transparent;
-  color: #d8dadd;
+  color: var(--app-text-regular);
   font-size: 13px;
   padding: 2px 4px;
 }
 
 .search-input::placeholder {
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 
 .search-panel {
@@ -354,10 +354,10 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   right: 0;
   z-index: 20;
   margin-top: 4px;
-  background: #2b2d30;
-  border: 1px solid #323438;
+  background: var(--app-bg-surface);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px var(--app-shadow-popup);
 }
 
 .section-title {
@@ -366,12 +366,12 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   gap: 8px;
   padding: 8px 12px 4px;
   font-size: 11px;
-  color: #6e7177;
+  color: var(--app-text-disabled);
 }
 
 .back-btn {
   cursor: pointer;
-  color: #3871e1;
+  color: var(--app-primary);
 }
 
 .back-btn:hover {
@@ -385,33 +385,33 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   padding: 7px 12px;
   cursor: pointer;
   font-size: 13px;
-  color: #d8dadd;
+  color: var(--app-text-regular);
 }
 
 .panel-item:hover {
-  background: #2e3034;
+  background: var(--app-bg-hover);
 }
 
 .panel-item.highlighted {
-  background: #2e3034;
-  color: #3871e1;
+  background: var(--app-bg-hover);
+  color: var(--app-primary);
 }
 
 .item-arrow {
-  color: #5e6065;
+  color: var(--app-text-faint);
   font-size: 14px;
 }
 
 .panel-empty {
   padding: 16px;
   text-align: center;
-  color: #5e6065;
+  color: var(--app-text-faint);
   font-size: 13px;
 }
 
 .free-hint {
   padding: 10px 12px 4px;
   font-size: 12px;
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 </style>

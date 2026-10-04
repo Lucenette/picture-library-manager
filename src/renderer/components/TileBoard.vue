@@ -518,9 +518,9 @@ defineExpose({ scrollToTop });
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border: 1px solid #3e4044;
+  border: 1px solid var(--app-border-strong);
   border-radius: 6px;
-  background: #2b2d30;
+  background: var(--app-bg-surface);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -554,12 +554,12 @@ defineExpose({ scrollToTop });
 }
 
 .tile-cover:hover .tile-cover-img {
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 10px 26px var(--app-shadow-tile);
 }
 
 .tile-cover:hover .tile-cover-img.layer-0 {
   transform: scale(1.14);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 12px 30px var(--app-shadow-tile-hover);
 }
 
 .tile-cover:hover .tile-cover-img.layer-1 {
@@ -576,10 +576,10 @@ defineExpose({ scrollToTop });
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #3e4044;
+  border: 1px solid var(--app-border-strong);
   border-radius: 6px;
-  background: #2b2d30;
-  color: #5e6065;
+  background: var(--app-bg-surface);
+  color: var(--app-text-faint);
 }
 
 .tile-count {
@@ -590,8 +590,8 @@ defineExpose({ scrollToTop });
   min-width: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: rgba(0, 0, 0, 0.65);
-  color: #ffffff;
+  background: var(--app-overlay-scrim);
+  color: var(--app-on-primary);
   font-size: 11px;
   line-height: 18px;
   text-align: center;
@@ -615,19 +615,19 @@ defineExpose({ scrollToTop });
 
 /* 展开了的卡片给一圈主色描边：描边画在最上面那张封面上，跟着它一起缩放与旋转 */
 .tile-card.expanded .tile-cover-img.layer-0 {
-  outline: 2px solid #3871e1;
+  outline: 2px solid var(--app-primary);
   outline-offset: 0;
 }
 
 .tile-card.expanded .tile-title {
-  color: #7aa2f7;
+  color: var(--app-accent);
 }
 
 .tile-title {
   margin-top: 10px;
   max-width: 100%;
   font-size: 12px;
-  color: #d8dadd;
+  color: var(--app-text-regular);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -636,7 +636,7 @@ defineExpose({ scrollToTop });
 .tile-subtitle {
   max-width: 100%;
   font-size: 11px;
-  color: #82858b;
+  color: var(--app-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -645,9 +645,9 @@ defineExpose({ scrollToTop });
 .tile-panel {
   margin-top: 12px;
   padding: 14px 16px 16px 16px;
-  border: 1px solid #3871e1;
+  border: 1px solid var(--app-primary);
   border-radius: 8px;
-  background: #232427;
+  background: var(--app-bg-selected);
 }
 
 .tile-panel-head {
@@ -660,30 +660,30 @@ defineExpose({ scrollToTop });
 .tile-panel-title {
   font-size: 13px;
   font-weight: 600;
-  color: #d8dadd;
+  color: var(--app-text-regular);
 }
 
 .tile-panel-count {
   font-size: 12px;
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 
 .tile-panel-close {
   margin-left: auto;
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 
 .tile-empty {
   padding: 40px;
   text-align: center;
-  color: #5e6065;
+  color: var(--app-text-faint);
   font-size: 13px;
 }
 
 .tile-loading {
   padding: 12px;
   text-align: center;
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 </style>

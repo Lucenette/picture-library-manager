@@ -319,11 +319,11 @@ onUnmounted(() => {
   display: flex;
   gap: 20px;
   font-size: 13px;
-  color: #b4b6ba;
+  color: var(--app-text-secondary);
 }
 
 .summary b {
-  color: #eceef1;
+  color: var(--app-text-primary);
 }
 
 .table-wrap {
@@ -342,14 +342,14 @@ onUnmounted(() => {
 .progress-message {
   margin-top: 2px;
   font-size: 12px;
-  color: #82858b;
+  color: var(--app-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .progress-message--warn {
-  color: #f2c55c;
+  color: var(--app-warning);
 }
 
 .pager {

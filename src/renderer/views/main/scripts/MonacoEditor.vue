@@ -10,13 +10,13 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { ScriptCompileError } from '@common/types';
 
 import type { ScriptLineChange } from './diff';
-import './monaco-env';
+import { themeToken } from './monaco-env';
 
-/** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，与主题里那三个语义色一致 */
+/** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，直接取主题里那三个语义色 */
 const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
-  added: '#4ab86a',
-  modified: '#3871e1',
-  deleted: '#c75458',
+  added: themeToken('--app-tag-success-text'),
+  modified: themeToken('--app-primary'),
+  deleted: themeToken('--app-danger'),
 };
 
 const props = defineProps<{
@@ -327,20 +327,20 @@ onBeforeUnmount(() => {
 
 /* 编译失败那一行的底色；装饰画在 Monaco 自己的 DOM 里，所以要 :deep */
 .monaco-host :deep(.plm-error-line) {
-  background: rgba(199, 84, 88, 0.16);
+  background: var(--app-danger-tint);
 }
 
 /* 「自上次保存改了哪里」：行号右侧那条窄带上的色条（Git 那种 gutter 标记）。
    margin-left 让它离行号有一点距离，既不贴住数字，也不压到正文 */
 .monaco-host :deep(.plm-change-added) {
   margin-left: 4px;
-  border-left: 3px solid #4ab86a;
+  border-left: 3px solid var(--app-tag-success-text);
   box-sizing: border-box;
 }
 
 .monaco-host :deep(.plm-change-modified) {
   margin-left: 4px;
-  border-left: 3px solid #3871e1;
+  border-left: 3px solid var(--app-primary);
   box-sizing: border-box;
 }
 
@@ -352,7 +352,7 @@ onBeforeUnmount(() => {
   left: 4px;
   width: 0;
   height: 0;
-  border-top: 5px solid #c75458;
+  border-top: 5px solid var(--app-danger);
   border-right: 5px solid transparent;
 }
 </style>

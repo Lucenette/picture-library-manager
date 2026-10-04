@@ -107,8 +107,8 @@ onMounted(loadInitData);
 .file-viewer {
   height: 100vh;
   overflow: hidden;
-  background: #1e1f22;
-  color: #d8dadd;
+  background: var(--app-bg-page);
+  color: var(--app-text-regular);
   font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
 }
 
@@ -117,7 +117,7 @@ onMounted(loadInitData);
   line-height: 36px;
   padding: 0 16px;
   font-size: 14px;
-  color: #eceef1;
+  color: var(--app-text-primary);
   -webkit-app-region: drag;
 }
 

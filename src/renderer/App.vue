@@ -146,7 +146,7 @@ body {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: #a0a3a9;
+  color: var(--app-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -186,22 +186,22 @@ body {
   width: 40px;
   height: 40px;
   font-size: 18px;
-  color: #a0a3a9;
+  color: var(--app-text-soft);
   text-decoration: none;
   border-left: 2px solid transparent;
   transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
 .rail-link:hover {
-  color: #d8dadd;
-  background: #2b2d30;
+  color: var(--app-text-regular);
+  background: var(--app-bg-surface);
 }
 
 /* 激活态：左边一道竖条 + 提亮 */
 .rail-link.active {
-  color: #3871e1;
-  background: #2b2d30;
-  border-left-color: #3871e1;
+  color: var(--app-primary);
+  background: var(--app-bg-surface);
+  border-left-color: var(--app-primary);
 }
 
 /* 任务角标：贴在图标右上角 */
@@ -211,14 +211,14 @@ body {
   right: 3px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #3871e1;
-  color: #fff;
+  background: var(--app-primary);
+  color: var(--app-on-primary);
   font-size: 10px;
   line-height: 14px;
 }
 
 .app-main {
-  background: #1e1f22;
+  background: var(--app-bg-page);
   flex: 1;
   /* 横排里的 flex 项要显式允许收缩，否则宽表格会把整页撑出横向滚动 */
   min-width: 0;

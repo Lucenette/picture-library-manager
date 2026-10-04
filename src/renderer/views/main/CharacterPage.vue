@@ -290,7 +290,7 @@ onMounted(loadData);
 }
 
 .char-name:hover {
-  color: #3871e1;
+  color: var(--app-primary);
   text-decoration: underline;
 }
 

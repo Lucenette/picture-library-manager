@@ -37,8 +37,11 @@
   --app-text-regular: #d8dadd;
   --app-text-secondary: #b4b6ba;
   --app-text-muted: #82858b;
-  --app-text-faint: #3e4044;
   --app-text-disabled: #7a7e84;
+  /* 灰阶里更暗的三档：soft 用于次要标签、faint 用于说明性小字、ghost 只给分页禁用数字 */
+  --app-text-soft: #a0a3a9;
+  --app-text-faint: #5e6065;
+  --app-text-ghost: #3e4044;
 
   /* ---- 主色 ---- */
   --app-primary: #3871e1;
@@ -73,9 +76,30 @@
   --app-tag-similar-border: #1d5566;
   --app-tag-similar-text: #4cc8e8;
 
+  /* ---- 查看器：深底，自成一组，不跟主界面共用 ---- */
+  --app-viewer-bg: #0d0d0d;
+  --app-viewer-surface: #1a1a1a;
+  --app-viewer-text: #c8cad0;
+  --app-viewer-text-dim: rgba(255, 255, 255, 0.5);
+  --app-viewer-text-bright: rgba(255, 255, 255, 0.9);
+  --app-viewer-fade: rgba(26, 26, 26, 0);
+
+  /* ---- 强调与高亮（选中项、搜索命中、徽标）---- */
+  --app-accent: #7aa2f7;
+  --app-bg-selected: #232427;
+  --app-bg-highlight: #1e2e45;
+  --app-border-highlight: #2859b8;
+  --app-danger-tint: rgba(199, 84, 88, 0.16);
+
   /* ---- 遮罩与阴影 ---- */
+  --app-overlay-scrim: rgba(0, 0, 0, 0.65);
   --app-mask: rgb(30 31 34 / 0.7);
   --app-shadow-dialog: 0 16px 48px rgb(0 0 0 / 0.4);
+  --app-shadow-popup: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --app-shadow-tile: 0 10px 26px rgba(0, 0, 0, 0.8);
+  --app-shadow-tile-hover: 0 12px 30px rgba(0, 0, 0, 0.85);
+  --app-shadow-viewer: 0 4px 20px rgba(0, 0, 0, 0.7);
+  --app-shadow-viewer-thumb: 0 2px 12px rgba(0, 0, 0, 0.4);
 
   /* ---- Element Plus ---- */
   --el-color-primary: var(--app-primary);
@@ -361,7 +385,7 @@ body {
 .el-pagination .btn-next:disabled {
   background: var(--app-bg-disabled);
   border-color: var(--app-border-subtle);
-  color: var(--app-text-faint);
+  color: var(--app-text-ghost);
 }
 .el-pager li {
   background: var(--app-bg-surface);

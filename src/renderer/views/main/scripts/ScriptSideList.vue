@@ -425,15 +425,15 @@ function onItemDragEnd(): void {
   padding: 0 11px;
   border: none;
   border-radius: 4px;
-  background: #2b2d30;
-  box-shadow: 0 0 0 1px #323438 inset;
+  background: var(--app-bg-surface);
+  box-shadow: 0 0 0 1px var(--app-border) inset;
   color: var(--el-text-color-regular);
   font-size: var(--el-font-size-base);
   cursor: pointer;
 }
 
 .filter-btn:hover {
-  box-shadow: 0 0 0 1px #3e4044 inset;
+  box-shadow: 0 0 0 1px var(--app-border-strong) inset;
 }
 
 .filter-label {
@@ -445,7 +445,7 @@ function onItemDragEnd(): void {
 
 .filter-arrow {
   flex: none;
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 11px;
 }
 
@@ -473,8 +473,8 @@ function onItemDragEnd(): void {
 /* 拖脚本时悬停到的分组：整段亮一下（落下只改归属，所以没有"插到某两行之间"的落点线） */
 .group-section.is-drop-target {
   border-radius: var(--el-border-radius-base);
-  background: #26282b;
-  box-shadow: inset 0 0 0 1px #3e4044;
+  background: var(--app-bg-header);
+  box-shadow: inset 0 0 0 1px var(--app-border-strong);
 }
 
 .group-head {
@@ -490,7 +490,7 @@ function onItemDragEnd(): void {
 /* 组头也要有悬停底色（DSH 那边 projectRow 与 sessionRow 是同一条 hover 规则），
    底色与脚本项一致，形状也跟着项的圆角 */
 .group-head:hover {
-  background: #2b2d30;
+  background: var(--app-bg-surface);
 }
 
 /* 折叠开关：图标 + 组名 + 计数，占满剩下的宽度 */
@@ -539,7 +539,7 @@ function onItemDragEnd(): void {
 /* 组图标：折叠是合着的文件夹、展开是打开的文件夹（接替原来那个 ▾，色不变） */
 .group-icon {
   flex: none;
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 16px;
 }
 
@@ -553,7 +553,7 @@ function onItemDragEnd(): void {
 
 .group-count {
   flex: none;
-  color: #82858b;
+  color: var(--app-text-muted);
 }
 
 /* 缩进对齐组名：组名在 12（内边距）+ 16（文件夹图标）+ 6（间隙）= 34px */
@@ -573,13 +573,13 @@ function onItemDragEnd(): void {
 }
 
 .side-item:hover {
-  background: #2b2d30;
+  background: var(--app-bg-surface);
 }
 
 /* 选中态：一块圆角底色 + 提亮（与悬停同一块底色，只是文字更亮） */
 .side-item.active {
-  background: #2b2d30;
-  color: #d8dadd;
+  background: var(--app-bg-surface);
+  color: var(--app-text-regular);
 }
 
 /* 未保存：新建的绿、改动的蓝，同 IDEA 的 git 状态色 */
@@ -601,7 +601,7 @@ function onItemDragEnd(): void {
 
 .side-empty {
   padding: 8px 12px 8px 34px;
-  color: #82858b;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 </style>

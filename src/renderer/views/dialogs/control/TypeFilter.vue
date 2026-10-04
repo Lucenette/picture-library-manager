@@ -67,7 +67,7 @@ function hide(): void {
 .type-filter {
   height: 100vh;
   overflow-y: auto;
-  background: #2b2d30;
+  background: var(--app-bg-surface);
   outline: none;
 }
 
@@ -79,11 +79,11 @@ function hide(): void {
   padding: 0 12px;
   cursor: pointer;
   font-size: 13px;
-  color: #d8dadd;
+  color: var(--app-text-regular);
 }
 
 .filter-item:hover {
-  background: #323438;
+  background: var(--app-bg-active);
 }
 
 /* 复选框：这个窗口刻意不引 Element Plus，所以按它的样子手画一个 */
@@ -92,14 +92,14 @@ function hide(): void {
   flex: none;
   width: 14px;
   height: 14px;
-  border: 1px solid #4a4c50;
+  border: 1px solid var(--app-border-hover);
   border-radius: 2px;
-  background: #1e1f22;
+  background: var(--app-bg-page);
 }
 
 .filter-box.checked {
-  background: #3871e1;
-  border-color: #3871e1;
+  background: var(--app-primary);
+  border-color: var(--app-primary);
 }
 
 /* 勾：两个边框转 45°，与 Element Plus 的勾同一个画法 */
@@ -110,8 +110,8 @@ function hide(): void {
   top: 1px;
   width: 4px;
   height: 8px;
-  border-right: 1.5px solid #fff;
-  border-bottom: 1.5px solid #fff;
+  border-right: 1.5px solid var(--app-on-primary);
+  border-bottom: 1.5px solid var(--app-on-primary);
   transform: rotate(45deg);
 }
 

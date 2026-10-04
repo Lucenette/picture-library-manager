@@ -71,8 +71,8 @@ watch(
 .loading {
   height: 100%;
   overflow: hidden;
-  background: #1e1f22;
-  color: #d8dadd;
+  background: var(--app-bg-page);
+  color: var(--app-text-regular);
   font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
 }
 
@@ -81,7 +81,7 @@ watch(
   line-height: 60px;
   padding: 0 32px;
   font-size: 16px;
-  color: #eceef1;
+  color: var(--app-text-primary);
 }
 
 .loading-body {
@@ -93,13 +93,13 @@ watch(
 
 .loading-title {
   font-size: 13px;
-  color: #b4b6ba;
+  color: var(--app-text-secondary);
 }
 
 .loading-error {
   font-size: 13px;
   line-height: 1.7;
-  color: #f56c6c;
+  color: var(--app-danger);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -107,7 +107,7 @@ watch(
 .loading-note,
 .loading-hint {
   font-size: 12px;
-  color: #8b8e94;
+  color: var(--app-text-muted);
   word-break: break-all;
 }
 
