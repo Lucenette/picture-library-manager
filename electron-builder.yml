@@ -10,7 +10,17 @@ files:
   - package.json
 
 npmRebuild: false
-asar: false
+# 应用代码打成单个 app.asar：文件数少、启动少一堆 stat，用户也没法改安装目录里的代码。
+# 下面这些必须放在外面（app.asar.unpacked/），asar 内部加载不了：
+asar: true
+asarUnpack:
+  # sharp 的原生 .node 与它自带的 libvips 动态库（都在 @img/* 下）
+  - '**/node_modules/sharp/**'
+  - '**/node_modules/@img/**'
+  # 兜底：任何原生件都不能留在 asar 里
+  - '**/*.{node,dylib,dll,so,exe}'
+  # 缩略图工作线程：worker_threads 要真实文件路径（out/main/thumbnail-worker-*.js）
+  - '**/out/main/*worker*.js'
 
 # 图标由 electron-builder 自己从这张 1024×1024 的 PNG 现场生成（icns / ico / Linux 图标集），
 # 不再需要 electron-icon-builder：icns 要求源图 ≥512、ico 要求 ≥256。
