@@ -140,7 +140,7 @@ yarn build:mac
 yarn build:linux
 ```
 
-输出 `dist/PLManager_Setup_1.1.1.exe`（NSIS 安装程序，`productName` 为 `PLManager`）。
+输出 `dist/PLManager_Setup_<版本>.exe`（NSIS 安装程序，`productName` 为 `PLManager`）。
 
 ### 解码引擎
 
