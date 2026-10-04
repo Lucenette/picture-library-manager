@@ -25,6 +25,7 @@ description: 使用者说「发布」「发版」「release」（可能带版本
 - [受限环境下的等价手工步骤](#受限环境下的等价手工步骤)
 - [版本号与更新日志的两态](#版本号与更新日志的两态)
 - [更新日志怎么写](#更新日志怎么写)
+- [版本小节的链接](#版本小节的链接)
 - [与数据库版本目录的关系](#与数据库版本目录的关系)
 - [验证](#验证)
 - [失败与回滚](#失败与回滚)
@@ -63,19 +64,19 @@ description: 使用者说「发布」「发版」「release」（可能带版本
 1. **起 release 分支**：`git flow release start <版本>` → 得到 `release/<版本>`。
 2. **更新日志定稿**（在 release 分支上，一次提交 `文档：更新日志定稿 <版本>`）：
    - `package.json` 的 `version` 已经是本次发布版本，不用改；仅当使用者另行指定了版本才在这里改；
-   - 把 `CHANGELOG.md` 顶部的 `## [<版本>] - 未发布` 改成 `## [<版本>] - <今天>`，链接定义改成
-     `[<版本>]: https://github.com/Lucenette/picture-library-manager/releases/tag/v<版本>`；
+   - 把 `CHANGELOG.md` 顶部的 `## [<版本>] - 未发布` 改成 `## [<版本>] - <今天>`；**链接不动**，它要到发布时才改（见「版本小节的链接」）；
    - 确认顶部小节就是本次发布的内容，缺的条目补上。
 3. **发布收尾**：release 分支上只做与发布有关的改动。没有就跳过。
 4. **合并进 master**：`git switch master` → `git merge --no-ff release/<版本> -m "Merge branch 'release/<版本>'"`。
 5. **打 tag（可选这一步）**：要出产物就打，且必须打在 master 的那个合并提交上：
    `git tag -a v<版本> -m "Release <版本>"`。不打就停在这里——版本已经落在 master，产物等验证通过后再补。
+   打了 tag 之后按「版本小节的链接」把上一个已发布 tag 之后的小节链接一起改掉。
 6. **合并回 develop 并删分支**：`git merge --no-ff release/<版本> -m "Merge branch 'release/<版本>' into develop"`，
    然后 `git branch -d release/<版本>`。结束时停在 develop，不是的话先切回去。
 7. **把版本号提到下一次 release**（在 develop，一次提交 `版本：下一次 release 版本号提升到 <下一个版本>`）：
    - `package.json` 按是否发布改（见「发布策略」）：发布了提到 `x.(y+1).0`，只 release 没发布提到 `x.y.(z+1)`；
-   - 给 `CHANGELOG.md` 顶部补回 `## [<新版本>] - 未发布`，比较链接的基线用**最近一个打过 tag 的版本**——
-     **从 master 取**（`git describe --tags --abbrev=0 master`）：develop 上没有 tag，直接 `git describe` 会得到过期的版本。
+   - 给 `CHANGELOG.md` 顶部补回 `## [<新版本>] - 未发布`，链接写成 `compare/<最近一个已发布的 tag>...HEAD`——
+     基线**从 master 取**（`git describe --tags --abbrev=0 master`）：develop 上没有 tag，直接 `git describe` 会得到过期的版本。
      刚发布但没打 tag 时基线仍是上一个 tag，否则链接指向不存在的 tag。
 8. **不推送**。按「验证」核对后，把命令交给使用者：
 
@@ -128,6 +129,18 @@ git branch -d release/<版本>
 - **用正式书面语与标准术语**：陈述句、第三人称，不用第二人称与祈使句；用「备份 / 恢复 / 迁移 / 卸载」这类标准说法，不用「取出 / 搬到别处 / 装完就能用」这类口语。
 - **平台要写全**：涉及平台差异的说明必须覆盖 Windows / macOS / Linux，或写成与平台无关的说法；只提其中一个，会让其余平台的使用者以为与自己无关。
 - 语气与粒度照 `[1.0.0]`、`[0.0.1]` 两节；`## [<下一次版本>] - 未发布` 里的条目也按这个标准写，定稿前再过一遍。
+
+## 版本小节的链接
+
+链接指向**包含这个版本的 Release 页面**；没有就指向永远有效的 diff，别指向不存在的 tag（会 404）。
+
+| 情况 | 链接 |
+|---|---|
+| 有对应的 Release | `releases/tag/v<该版本>` |
+| tag 在但没建 Release | 包含它的最早 Release——`[0.0.1]` → `v1.0.0` |
+| 还没发布（只 release） | `compare/<最近一个已发布的 tag>...HEAD` |
+
+定稿不改链接（tag 还不存在）；**发布后**才把上一个已发布 tag 之后的全部小节改成该 release 链接，在开发分支上做、随下次 release 进 master。
 
 ## 与数据库版本目录的关系
 

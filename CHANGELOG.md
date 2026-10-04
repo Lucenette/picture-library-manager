@@ -110,7 +110,7 @@
 - 本地 SQLite（sql.js）存储，零原生依赖，绿色便携
 
 [1.1.2]: https://github.com/Lucenette/picture-library-manager/compare/v1.0.0...HEAD
-[1.1.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.1.1
-[1.1.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.1.0
+[1.1.1]: https://github.com/Lucenette/picture-library-manager/compare/v1.0.0...HEAD
+[1.1.0]: https://github.com/Lucenette/picture-library-manager/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.0.0
-[0.0.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v0.0.1
+[0.0.1]: https://github.com/Lucenette/picture-library-manager/releases/tag/v1.0.0
