@@ -70,7 +70,7 @@ jobs:
           cache: yarn
       - name: 安装依赖
         run: yarn install --frozen-lockfile --network-timeout 600000
-      - name: 打包（yarn icon 已串在 build:* 里）
+      - name: 打包
         env:
           # 没有签名证书：不去自动发现身份，省掉一轮等待与告警
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
