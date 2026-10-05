@@ -209,8 +209,12 @@ sequenceDiagram
 | `77f1b51` | Monaco 主题 id 收敛成常量（组件里还在传旧 id，导致编辑器回落成浅色默认主题） |
 | `d5f26b5` | 主题独立成 `src/common/theme/` 目录：一主题一文件（types / dark / light / system / index）、令牌缩进统一；补上浅色（Islands Light 实测 + `Light.icls`）；「跟随系统」按传入的明暗动态返回；`index.ts` 出统一入口 `resolveTheme(name, systemPrefersDark)` |
 | `2cd6950` | 暗色补 `comment.doc` 规则：`/** */` 用 `Dark.icls` 的绿 `#5f826b`（此前跟着 `//` 一起是灰的） |
+| `36da096` | 浅色令牌改用 WebStorm 导出的权威值（另一会话从源码导出的 `webstorm-themes/full`）：页面底 `#f7f8f9`、边框 `#d1d1d1` / `#c4c4c4` / `#b9bdc9`、文字取自 Gray2/6/7/8/10、悬停 `#00000012`、选中 `#d0dffe`；顺带确认品牌主色 `#3871e1` 就是 Islands Light 自己的 `Button.default.startBackground` |
+| `8f0fda0` | 默认主题改成「跟随系统」并**实时跟随**：渲染进程听 `matchMedia` 的 change、主进程听 `nativeTheme` 的 `updated`，系统切明暗**不需要重启**；主进程同时刷新已开窗口的兜底底色与系统按钮字形色 |
 
-**剩余**：切换与设置页。浅色已定义、`system` 已可用，但没有任何入口能切过去，所以实际看到的仍是暗色。
+**剩余**：设置页与切换入口。`DEFAULT_THEME` 已是 `system`，系统切明暗会实时跟随；但设置页还没做，所以**没有**"手动指定某一套"的入口——眼下验证浅色只能靠改系统主题。
+
+**已知未跟**：脚本页的改动色条（新增/修改/删除三色）是建编辑器时取的，系统切换后要重新打开脚本页才刷新。
 
 Monaco 的 `rules` 已接上两套 `*.icls`（暗色用 `Dark.icls`、浅色用 `Light.icls`）。一个限制写在这：JS/TS 的 `//` 与 `/* */` 在 Monaco 里同属 `comment` 词元，**没法像 IDEA 那样行内一色、行间另一色**；能单独着色的是 `/** */`（`comment.doc`）。
 
