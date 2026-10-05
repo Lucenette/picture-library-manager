@@ -41,7 +41,6 @@
   --el-fill-color-lighter: var(--app-bg-disabled);
   --el-fill-color-blank: var(--app-bg-surface);
   --el-font-size-base: 14px;
-  列表页统一填这一句；工具型页面（脚本管理、加载页）整页铺满，不填。 */
   --page-gap: 16px;
   --page-padding: var(--page-gap) var(--page-gap) 0;
 }
