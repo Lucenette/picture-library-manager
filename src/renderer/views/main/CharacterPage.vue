@@ -265,8 +265,8 @@ onMounted(loadData);
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--app-space-10);
+  margin-bottom: var(--app-space-12);
   flex-shrink: 0;
 }
 
@@ -297,7 +297,7 @@ onMounted(loadData);
 .pager {
   display: flex;
   justify-content: flex-end;
-  padding: 12px 0 16px 0;
+  padding: var(--app-space-12) 0 var(--app-space-16) 0;
   flex-shrink: 0;
 }
 </style>

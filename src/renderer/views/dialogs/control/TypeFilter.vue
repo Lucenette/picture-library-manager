@@ -74,11 +74,11 @@ function hide(): void {
 .filter-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--app-space-8);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--app-space-12);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   color: var(--app-text-regular);
 }
 
@@ -93,7 +93,7 @@ function hide(): void {
   width: 14px;
   height: 14px;
   border: 1px solid var(--app-border-hover);
-  border-radius: 2px;
+  border-radius: var(--app-radius-2);
   background: var(--app-bg-page);
 }
 

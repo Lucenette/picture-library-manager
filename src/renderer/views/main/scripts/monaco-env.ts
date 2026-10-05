@@ -13,6 +13,8 @@ import { editor as monacoEditor, languages, typescript } from 'monaco-editor';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker&inline';
 import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker&inline';
 
+import { onThemeChange } from '@/entries/shell/theme';
+
 /**
  * CommonJS 全局的声明。
  *
@@ -36,34 +38,25 @@ declare var __dirname: string;`;
   },
 };
 
-/**
- * 取主题令牌的色值。
- *
- * Monaco 的主题只认字符串色值、读不了 CSS 变量，而颜色只有 `styles/theme.css` 一个来源，
- * 所以在这里把变量取出来。取不到就直接抛：令牌改名而这里忘了改会当场发现，而不是静默用错色。
- * @param name 令牌名，如 `--app-bg-page`
- * @returns 该令牌当前的色值
- */
-export function themeToken(name: string): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  if (value === '') {
-    throw new Error(`theme token not found: ${name}`);
-  }
-  return value;
-}
+/** 编辑器主题的 id：定义与创建编辑器都引它，改名不会再漏 */
+export const MONACO_THEME = 'plmanager';
 
-/** 编辑器主题的颜色全部取自界面令牌，与界面同一套暗色（`base` 是 Monaco 自带的 vs-dark） */
-monacoEditor.defineTheme('plmanager-dark', {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [],
-  colors: {
-    'editor.background': themeToken('--app-bg-page'),
-    'editorGutter.background': themeToken('--app-bg-page'),
-    'editor.lineHighlightBackground': themeToken('--app-bg-header'),
-    'editorLineNumber.foreground': themeToken('--app-text-faint'),
-    'editorLineNumber.activeForeground': themeToken('--app-text-soft'),
-  },
+/**
+ * 编辑器主题：颜色直接取自 `src/common/theme.ts` 的主题对象。
+ *
+ * Monaco 只认字符串色值、读不了 CSS 变量，而主题对象两个进程都能 import——所以这里是直接取，
+ * 不再从 DOM 里刮（刮就只能拿"当前生效"的那套，切换时会留着旧色）。
+ *
+ * 注册给主题管理器：注册时立刻用当前主题调一次，现在只有一套主题；将来切换时同一段代码会重定义并重新应用。
+ */
+onThemeChange((theme) => {
+  monacoEditor.defineTheme(MONACO_THEME, {
+    base: theme.monaco.base,
+    inherit: true,
+    rules: [...theme.monaco.rules] as Parameters<typeof monacoEditor.defineTheme>[1]['rules'],
+    colors: { ...theme.monaco.colors },
+  });
+  monacoEditor.setTheme(MONACO_THEME);
 });
 
 // 只配 JS 一侧：脚本是 CommonJS 的 .js，typescriptDefaults 不碰。

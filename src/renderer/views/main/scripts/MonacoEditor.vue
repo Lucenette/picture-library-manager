@@ -7,16 +7,34 @@ import { editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity, Range } from '
 import type { IDisposable } from 'monaco-editor';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import { DEFAULT_THEME, resolveTheme } from '@common/theme';
 import type { ScriptCompileError } from '@common/types';
 
 import type { ScriptLineChange } from './diff';
-import { themeToken } from './monaco-env';
+import { MONACO_THEME } from './monaco-env';
+
+/** 当前主题的令牌；改动色条只在建编辑器时取值，系统切换后要等重新打开脚本页才刷新 */
+const { tokens } = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+/**
+ * 取主题令牌。
+ *
+ * 令牌表是偏的（其余主题可以少给键），所以取到 undefined 要当场抛——键名写错或主题漏了它，
+ * 会立刻暴露，而不是静默用错色；也因此不写兜底色值（写了就绕过「颜色只有一个来源」的用例）。
+ */
+function token(name: keyof typeof tokens): string {
+  const value = tokens[name];
+  if (value === undefined) {
+    throw new Error('theme token missing: ' + name);
+  }
+  return value;
+}
 
 /** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，直接取主题里那三个语义色 */
 const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
-  added: themeToken('--app-tag-success-text'),
-  modified: themeToken('--app-primary'),
-  deleted: themeToken('--app-danger'),
+  added: token('--app-tag-success-text'),
+  modified: token('--app-primary'),
+  deleted: token('--app-danger'),
 };
 
 const props = defineProps<{
@@ -251,7 +269,7 @@ onMounted(() => {
 
   editor = monacoEditor.create(hostEl.value, {
     model: modelFor(props.documentKey),
-    theme: 'plmanager-dark',
+    theme: MONACO_THEME,
     // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
     automaticLayout: true,
     minimap: { enabled: false },
@@ -333,13 +351,13 @@ onBeforeUnmount(() => {
 /* 「自上次保存改了哪里」：行号右侧那条窄带上的色条（Git 那种 gutter 标记）。
    margin-left 让它离行号有一点距离，既不贴住数字，也不压到正文 */
 .monaco-host :deep(.plm-change-added) {
-  margin-left: 4px;
+  margin-left: var(--app-space-4);
   border-left: 3px solid var(--app-tag-success-text);
   box-sizing: border-box;
 }
 
 .monaco-host :deep(.plm-change-modified) {
-  margin-left: 4px;
+  margin-left: var(--app-space-4);
   border-left: 3px solid var(--app-primary);
   box-sizing: border-box;
 }

@@ -311,14 +311,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: var(--app-space-12);
   flex-shrink: 0;
 }
 
 .summary {
   display: flex;
-  gap: 20px;
-  font-size: 13px;
+  gap: var(--app-space-20);
+  font-size: var(--app-font-base);
   color: var(--app-text-secondary);
 }
 
@@ -336,12 +336,12 @@ onUnmounted(() => {
 }
 
 .type-tag {
-  margin-right: 8px;
+  margin-right: var(--app-space-8);
 }
 
 .progress-message {
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: var(--app-space-2);
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -355,7 +355,7 @@ onUnmounted(() => {
 .pager {
   display: flex;
   justify-content: flex-end;
-  padding: 12px 0 16px 0;
+  padding: var(--app-space-12) 0 var(--app-space-16) 0;
   flex-shrink: 0;
 }
 </style>

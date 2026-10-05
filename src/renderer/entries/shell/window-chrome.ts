@@ -1,3 +1,5 @@
+import { initTheme } from './theme';
+
 /** macOS：左上角那一段归系统的红绿灯，标题栏不放图标 */
 export const isMac = navigator.platform.startsWith('Mac');
 
@@ -31,6 +33,8 @@ export function setPopupOpen(open: boolean): void {
  * 这个文件不依赖任何库，所以哪个入口都能安全地引它。
  */
 export function initWindowChrome(): void {
+  initTheme();
+
   if (isMac) {
     document.documentElement.classList.add('platform-mac');
   }

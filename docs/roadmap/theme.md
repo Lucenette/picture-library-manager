@@ -1,6 +1,6 @@
 # 颜色主题切换
 
-**状态**：待实施
+**状态**：待实施（令牌、两套主题、「跟随系统」与统一入口已落地，见 §4 末尾；切换与设置页未做）
 **关联**：[settings-page.md](./settings-page.md)（主题的偏好存在它的 `settings.yml`）
 
 ---
@@ -19,6 +19,7 @@
 | 日期 | 变更 | 原因 |
 |---|---|---|
 | 2026-09-29 | 首次记录（需求登记） | 使用者提出 |
+| 2026-10-05 | 收编落地：值搬进 `src/common/theme.ts`、主题管理器与注册处理器、删掉主进程的 `WINDOW_COLORS` 镜像、补尺寸阶梯、加样式表扫描用例 | 先把不依赖设置页与切换的部分做完 |
 | 2026-10-05 | 评审：定为**一份主题对象 + 一组注册的处理器**——值放 `src/common/theme.ts`（两个进程都 import），Element 侧的处理器把它写成 CSS 变量、Monaco 的处理器设自己的主题（含语法着色）；主进程只当"选择"的真源并管窗口那一层 | 对照 dsh 的 `ui-theme`、并纠正"值只放 CSS"会逼 JS 消费者去 DOM 里刮字符串 |
 
 ---
@@ -128,7 +129,7 @@ sequenceDiagram
 
 | 注册者 | 收到通知后做什么 |
 |---|---|
-| Element Plus 侧（应用本体，含尺寸） | 把 `theme.tokens` 逐项 `documentElement.style.setProperty` |
+| 应用本体（Element Plus 与页面，含尺寸） | **不是单独注册的**：管理器 `applyTheme()` 自己就把 `theme.tokens` 逐项写进 `:root`，再通知其余处理器——组件库的颜色全走 CSS 变量，变量一改它就跟着变 |
 | Monaco（`monaco-env.ts`） | `defineTheme('plmanager', theme.monaco)` + `setTheme('plmanager')`，**含语法着色**（`rules`）与编辑器配色 |
 
 **Element Plus 本身没有"主题 API"**：它的颜色全走 CSS 变量，所以"注册一个处理器"在这里的含义就是"把变量写对"——写完之后组件与页面一起变。不注册任何东西给组件库，注册的是**应用这一侧**的写变量动作。
@@ -197,6 +198,25 @@ sequenceDiagram
 | `src/renderer/views/main/scripts/monaco-env.ts` | 注册处理器：`defineTheme('plmanager', theme.monaco)` + `setTheme`；`CHANGE_COLORS` 同源 |
 | 各 `.vue` | 363 个尺寸字面量里重复的那些换成令牌 |
 | `docs/design/`（落地后） | 主题对象的口径、处理器清单、首帧例外 |
+
+**已落地**（在 `feature/color-theme` 上，尚未并入 develop）：
+
+| 提交 | 内容 |
+|---|---|
+| `a577344` | 颜色收编：122 条颜色声明搬进 `common/theme.ts`；管理器与四个入口的挂载；删掉主进程镜像；Monaco 改注册处理器；样式表扫描用例 |
+| `8f0039d` | 修掉清理 `theme.css` 时留下的悬空注释续行（构建失败的真凶） |
+| `9d9a8c0` | 尺寸收编：尺度阶梯 + 25 个文件里重复的间距 / 字号 / 圆角换成令牌 |
+| `77f1b51` | Monaco 主题 id 收敛成常量（组件里还在传旧 id，导致编辑器回落成浅色默认主题） |
+| `d5f26b5` | 主题独立成 `src/common/theme/` 目录：一主题一文件（types / dark / light / system / index）、令牌缩进统一；补上浅色（Islands Light 实测 + `Light.icls`）；「跟随系统」按传入的明暗动态返回；`index.ts` 出统一入口 `resolveTheme(name, systemPrefersDark)` |
+| `2cd6950` | 暗色补 `comment.doc` 规则：`/** */` 用 `Dark.icls` 的绿 `#5f826b`（此前跟着 `//` 一起是灰的） |
+| `36da096` | 浅色令牌改用 WebStorm 导出的权威值（另一会话从源码导出的 `webstorm-themes/full`）：页面底 `#f7f8f9`、边框 `#d1d1d1` / `#c4c4c4` / `#b9bdc9`、文字取自 Gray2/6/7/8/10、悬停 `#00000012`、选中 `#d0dffe`；顺带确认品牌主色 `#3871e1` 就是 Islands Light 自己的 `Button.default.startBackground` |
+| `8f0fda0` | 默认主题改成「跟随系统」并**实时跟随**：渲染进程听 `matchMedia` 的 change、主进程听 `nativeTheme` 的 `updated`，系统切明暗**不需要重启**；主进程同时刷新已开窗口的兜底底色与系统按钮字形色 |
+
+**剩余**：设置页与切换入口。`DEFAULT_THEME` 已是 `system`，系统切明暗会实时跟随；但设置页还没做，所以**没有**"手动指定某一套"的入口——眼下验证浅色只能靠改系统主题。
+
+**已知未跟**：脚本页的改动色条（新增/修改/删除三色）是建编辑器时取的，系统切换后要重新打开脚本页才刷新。
+
+Monaco 的 `rules` 已接上两套 `*.icls`（暗色用 `Dark.icls`、浅色用 `Light.icls`）。一个限制写在这：JS/TS 的 `//` 与 `/* */` 在 Monaco 里同属 `comment` 词元，**没法像 IDEA 那样行内一色、行间另一色**；能单独着色的是 `/** */`（`comment.doc`）。
 
 ## 5. 风险
 

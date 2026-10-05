@@ -481,7 +481,7 @@ defineExpose({ scrollToTop });
 }
 
 .tile-content {
-  padding: 2px 8px 8px 8px;
+  padding: var(--app-space-2) var(--app-space-8) var(--app-space-8) var(--app-space-8);
 }
 
 .tile-row-wrap {
@@ -519,7 +519,7 @@ defineExpose({ scrollToTop });
   height: 100%;
   object-fit: cover;
   border: 1px solid var(--app-border-strong);
-  border-radius: 6px;
+  border-radius: var(--app-radius-6);
   background: var(--app-bg-surface);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -577,7 +577,7 @@ defineExpose({ scrollToTop });
   align-items: center;
   justify-content: center;
   border: 1px solid var(--app-border-strong);
-  border-radius: 6px;
+  border-radius: var(--app-radius-6);
   background: var(--app-bg-surface);
   color: var(--app-text-faint);
 }
@@ -588,11 +588,11 @@ defineExpose({ scrollToTop });
   right: 4px;
   z-index: 5;
   min-width: 18px;
-  padding: 0 4px;
+  padding: 0 var(--app-space-4);
   border-radius: 9px;
   background: var(--app-overlay-scrim);
   color: var(--app-on-primary);
-  font-size: 11px;
+  font-size: var(--app-font-xs);
   line-height: 18px;
   text-align: center;
 }
@@ -624,9 +624,9 @@ defineExpose({ scrollToTop });
 }
 
 .tile-title {
-  margin-top: 10px;
+  margin-top: var(--app-space-10);
   max-width: 100%;
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   color: var(--app-text-regular);
   white-space: nowrap;
   overflow: hidden;
@@ -635,7 +635,7 @@ defineExpose({ scrollToTop });
 
 .tile-subtitle {
   max-width: 100%;
-  font-size: 11px;
+  font-size: var(--app-font-xs);
   color: var(--app-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -643,28 +643,28 @@ defineExpose({ scrollToTop });
 }
 
 .tile-panel {
-  margin-top: 12px;
-  padding: 14px 16px 16px 16px;
+  margin-top: var(--app-space-12);
+  padding: 14px var(--app-space-16) var(--app-space-16) var(--app-space-16);
   border: 1px solid var(--app-primary);
-  border-radius: 8px;
+  border-radius: var(--app-radius-8);
   background: var(--app-bg-selected);
 }
 
 .tile-panel-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--app-space-8);
+  margin-bottom: var(--app-space-8);
 }
 
 .tile-panel-title {
-  font-size: 13px;
+  font-size: var(--app-font-base);
   font-weight: 600;
   color: var(--app-text-regular);
 }
 
 .tile-panel-count {
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
 }
 
@@ -677,13 +677,13 @@ defineExpose({ scrollToTop });
   padding: 40px;
   text-align: center;
   color: var(--app-text-faint);
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 
 .tile-loading {
-  padding: 12px;
+  padding: var(--app-space-12);
   text-align: center;
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: var(--app-font-sm);
 }
 </style>

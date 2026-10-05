@@ -839,9 +839,9 @@ function toFilterItems(values: string[]): FilterItem[] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--app-space-12);
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--app-space-10);
   flex-shrink: 0;
 }
 
@@ -854,7 +854,7 @@ function toFilterItems(values: string[]): FilterItem[] {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--app-space-10);
 }
 
 .table-wrap {
@@ -871,7 +871,7 @@ function toFilterItems(values: string[]): FilterItem[] {
   width: 50px;
   height: 50px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
   cursor: pointer;
 }
 
@@ -879,8 +879,8 @@ function toFilterItems(values: string[]): FilterItem[] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0 16px 0;
+  gap: var(--app-space-12);
+  padding: var(--app-space-12) 0 var(--app-space-16) 0;
   flex-shrink: 0;
 }
 

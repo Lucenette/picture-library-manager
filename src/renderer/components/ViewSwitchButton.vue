@@ -24,6 +24,6 @@ const tooltip = computed(() => (props.mode === 'list' ? '切到平铺' : '切到
 
 <style scoped>
 .view-switch {
-  padding: 6px 8px;
+  padding: var(--app-space-6) var(--app-space-8);
 }
 </style>

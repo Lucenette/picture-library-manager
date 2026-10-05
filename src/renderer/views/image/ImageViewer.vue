@@ -154,9 +154,10 @@ function calcFit(): void {
     return;
   }
 
+  // 默认铺满容器：以前这里乘了 0.95，等于四周留 5% 边距，打开图片时看着像有边框
   fitScale.value = Math.min(
-    (container.clientWidth * 0.95) / image.naturalWidth,
-    (container.clientHeight * 0.95) / image.naturalHeight,
+    container.clientWidth / image.naturalWidth,
+    container.clientHeight / image.naturalHeight,
   );
   updateZoomLabel();
 }
@@ -426,11 +427,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 .viewer-toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
+  gap: var(--app-space-16);
+  padding: var(--app-space-8) var(--app-space-16);
   background: var(--app-viewer-surface);
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 
 .viewer-name {
@@ -465,7 +466,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   cursor: pointer;
   user-select: none;
   z-index: 5;
-  padding: 40px 12px;
+  padding: 40px var(--app-space-12);
   transition: color 0.15s;
 }
 
@@ -489,8 +490,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 
 .viewer-thumbs {
   display: flex;
-  gap: 6px;
-  padding: 4px 100px 8px 100px;
+  gap: var(--app-space-6);
+  padding: var(--app-space-4) 100px var(--app-space-8) 100px;
   background: var(--app-viewer-surface);
   overflow: hidden;
   flex-shrink: 0;
@@ -526,7 +527,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
   overflow: hidden;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
