@@ -15,11 +15,25 @@ import { MONACO_THEME } from './monaco-env';
 
 const { tokens } = THEMES[DEFAULT_THEME];
 
+/**
+ * 取主题令牌。
+ *
+ * 令牌表是偏的（其余主题可以少给键），所以取到 undefined 要当场抛——键名写错或主题漏了它，
+ * 会立刻暴露，而不是静默用错色；也因此不写兜底色值（写了就绕过「颜色只有一个来源」的用例）。
+ */
+function token(name: keyof typeof tokens): string {
+  const value = tokens[name];
+  if (value === undefined) {
+    throw new Error('theme token missing: ' + name);
+  }
+  return value;
+}
+
 /** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，直接取主题里那三个语义色 */
 const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
-  added: tokens['--app-tag-success-text'],
-  modified: tokens['--app-primary'],
-  deleted: tokens['--app-danger'],
+  added: token('--app-tag-success-text'),
+  modified: token('--app-primary'),
+  deleted: token('--app-danger'),
 };
 
 const props = defineProps<{

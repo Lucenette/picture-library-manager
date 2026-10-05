@@ -12,7 +12,9 @@ import { describe, expect, test } from 'vitest';
  *
  * 注释里的色值不算——说明文字里引用具体颜色是正常的。
  */
-const ALLOWED = ['src/common/theme.ts', 'src/renderer/entries/shell/first-paint.ts'];
+const ALLOWED = ['src/renderer/entries/shell/first-paint.ts'];
+/** 主题目录本身就是那份来源：一套主题一个文件，色值只允许出现在这里 */
+const THEME_DIR = 'src/common/theme/';
 const COLOR = /#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/;
 
 /** 去掉块注释与行注释，避免说明文字里的色值被当成用法 */
@@ -42,7 +44,7 @@ describe('颜色的唯一来源', () => {
     const offenders: string[] = [];
     for (const full of files) {
       const file = relative(process.cwd(), full).split('\\').join('/');
-      if (ALLOWED.includes(file)) {
+      if (ALLOWED.includes(file) || file.startsWith(THEME_DIR)) {
         continue;
       }
       for (const line of stripComments(readFileSync(full, 'utf8')).split('\n')) {

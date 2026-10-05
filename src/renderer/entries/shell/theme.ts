@@ -20,7 +20,10 @@ let current: Theme = THEMES[DEFAULT_THEME];
 export function applyTheme(theme: Theme): void {
   current = theme;
   for (const [name, value] of Object.entries(theme.tokens)) {
-    document.documentElement.style.setProperty(name, value);
+    // 某套主题可以少给键（例如浅色不覆盖 --el-* 色阶，交给 Element Plus 自带的浅色默认），跳过即可
+    if (value !== undefined) {
+      document.documentElement.style.setProperty(name, value);
+    }
   }
   for (const handler of handlers) {
     try {
