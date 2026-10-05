@@ -7,16 +7,19 @@ import { editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity, Range } from '
 import type { IDisposable } from 'monaco-editor';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import { DEFAULT_THEME, THEMES } from '@common/theme';
 import type { ScriptCompileError } from '@common/types';
 
 import type { ScriptLineChange } from './diff';
-import { themeToken } from './monaco-env';
+import './monaco-env';
+
+const { tokens } = THEMES[DEFAULT_THEME];
 
 /** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，直接取主题里那三个语义色 */
 const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
-  added: themeToken('--app-tag-success-text'),
-  modified: themeToken('--app-primary'),
-  deleted: themeToken('--app-danger'),
+  added: tokens['--app-tag-success-text'],
+  modified: tokens['--app-primary'],
+  deleted: tokens['--app-danger'],
 };
 
 const props = defineProps<{

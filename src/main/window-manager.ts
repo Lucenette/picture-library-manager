@@ -4,6 +4,7 @@ import { pathToFileURL } from 'url';
 import { app, BrowserWindow, type WebPreferences } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
+import { DEFAULT_THEME, THEMES } from '@common/theme';
 
 import { createLogger } from '@/log';
 
@@ -14,26 +15,7 @@ const log = createLogger('window');
 // 常量
 // ------------------------------------------------------------
 
-/**
- * 主进程侧的窗口配色。
- *
- * 主进程没有 DOM、拿不到 CSS 变量，而窗口底色与 Windows / Linux 的系统按钮字形色只能在建窗口时给，
- * 所以这里是**一份显式镜像**：每一项都与 `src/renderer/styles/theme.css` 的同名令牌同值，改主题时两处一起改。
- * （路线图 docs/roadmap/theme.md 里它会变成按主题取的映射。）
- */
-const WINDOW_COLORS = {
-  /** 主窗口、对话框、加载页的底色——对应 `--app-bg-page` */
-  page: '#1e1f22',
-  /** 面板底色——对应 `--app-bg-surface` */
-  surface: '#2b2d30',
-  /** 标题栏底色（与 `.title-bar` 相等）——对应 `--app-bg-header` */
-  titleBar: '#26282c',
-  /** 图片查看器底色——对应 `--app-viewer-bg` */
-  viewer: '#0d0d0d',
-  /** 系统窗口按钮的字形色，失焦时跟标题栏一起压暗——对应 `--app-text-regular` / `--app-text-muted` */
-  symbolActive: '#d8dadd',
-  symbolInactive: '#82858b',
-} as const;
+const PALETTE = THEMES[DEFAULT_THEME].tokens;
 
 /** 渲染进程入口名 → 构建产物里的 HTML 文件；每个窗口类一份，见 docs/design/window-management.md 第 4 节 */
 const ENTRY_HTML: Record<RendererEntry, string> = {
@@ -127,7 +109,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   const hideTitleBar = !frame || titleBar !== undefined;
   // 窗口按钮由 Windows / Linux 的 Window Controls Overlay 提供；macOS 的红绿灯是原生控件，不需要它
   const hasOverlay = hideTitleBar && !isControl && process.platform !== 'darwin';
-  const overlayColor = titleBar?.color ?? config.backgroundColor ?? WINDOW_COLORS.page;
+  const overlayColor = titleBar?.color ?? config.backgroundColor ?? PALETTE['--app-bg-page'];
   const overlayHeight = titleBar?.height ?? 36;
 
   const window = new BrowserWindow({
@@ -135,7 +117,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     width: config.width,
     height: config.height,
     // 兜底给深色：Electron 默认是白的，漏传就会在文档绘制前闪一下白
-    backgroundColor: config.backgroundColor ?? WINDOW_COLORS.page,
+    backgroundColor: config.backgroundColor ?? PALETTE['--app-bg-page'],
     icon: devWindowIcon(),
     title: config.title,
     parent,
@@ -143,7 +125,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     frame,
     titleBarStyle: hideTitleBar ? 'hidden' : 'default',
     titleBarOverlay: hasOverlay
-      ? { color: overlayColor, symbolColor: WINDOW_COLORS.symbolActive, height: overlayHeight }
+      ? { color: overlayColor, symbolColor: PALETTE['--app-text-regular'], height: overlayHeight }
       : undefined,
     minWidth: config.minWidth,
     minHeight: config.minHeight,
@@ -159,7 +141,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     const syncSymbolColor = (focused: boolean): void => {
       window.setTitleBarOverlay({
         color: overlayColor,
-        symbolColor: focused ? WINDOW_COLORS.symbolActive : WINDOW_COLORS.symbolInactive,
+        symbolColor: focused ? PALETTE['--app-text-regular'] : PALETTE['--app-text-muted'],
         height: overlayHeight,
       });
     };
@@ -239,10 +221,10 @@ export function createMain(route = '/'): BrowserWindow {
   const window = create('main', {
     width: 1400,
     height: 900,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route,
     // 高度与 App.vue 的 --title-bar-height 相等，底色与 .title-bar 的 #26282c 相等
-    titleBar: { height: 40, color: WINDOW_COLORS.titleBar },
+    titleBar: { height: 40, color: PALETTE['--app-bg-header'] },
   });
   // 主窗口是应用的生命周期锚点：它一关，其余窗口（查看器、各类弹窗、常驻的浮窗宿主）都不该再存在。
   // 由注册表统一关掉（此时 main 已被 create() 的 closed 回调移出注册表）——只关查看器是不够的：
@@ -256,7 +238,7 @@ export function createViewer(): BrowserWindow {
   return create('viewer', {
     width: 1200,
     height: 800,
-    backgroundColor: WINDOW_COLORS.viewer,
+    backgroundColor: PALETTE['--app-viewer-bg'],
     title: '图片查看器',
     route: '/viewer',
     entry: 'viewer',
@@ -283,7 +265,7 @@ export function ensurePopup(): BrowserWindow {
   const window = create('popup', {
     width: 200,
     height: 120,
-    backgroundColor: WINDOW_COLORS.surface,
+    backgroundColor: PALETTE['--app-bg-surface'],
     route: '/popup',
     entry: 'popup',
     frame: false,
@@ -316,7 +298,7 @@ export function createScanConfig(): BrowserWindow {
     height: 210,
     minWidth: 420,
     minHeight: 210,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route: '/scan-config',
     entry: 'dialogs',
     parentId: 'main',
@@ -334,7 +316,7 @@ export function createBatchProcess(): BrowserWindow {
     height: 210,
     minWidth: 420,
     minHeight: 210,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route: '/batch-process',
     entry: 'dialogs',
     parentId: 'main',
@@ -352,7 +334,7 @@ export function createConfirm(): BrowserWindow {
     height: 208,
     minWidth: 380,
     minHeight: 190,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route: '/confirm',
     entry: 'dialogs',
     parentId: 'main',
@@ -370,7 +352,7 @@ export function createPrompt(): BrowserWindow {
     height: 170,
     minWidth: 400,
     minHeight: 170,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route: '/prompt',
     entry: 'dialogs',
     parentId: 'main',
@@ -388,7 +370,7 @@ export function createFileViewer(): BrowserWindow {
     height: 560,
     minWidth: 600,
     minHeight: 400,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     route: '/file-viewer',
     entry: 'dialogs',
     parentId: 'main',
@@ -406,7 +388,7 @@ export function createSimilar(): BrowserWindow {
     height: 760,
     minWidth: 720,
     minHeight: 520,
-    backgroundColor: WINDOW_COLORS.page,
+    backgroundColor: PALETTE['--app-bg-page'],
     title: '相似图片',
     route: '/similar',
     entry: 'dialogs',
