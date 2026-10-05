@@ -22,7 +22,7 @@ const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'README.en.md', 'CONTRIBUTING
 /** 只校验编码、不参与链接与索引检查的目录：changelog 里有中文表名注释，存错编码会静默变成乱码写进账本。 */
 const ENCODING_DIRS = ["src/main/ups/changesets"];
 /** 这两个目录的 README 是索引表，必须与目录内的文件双向一致。 */
-const INDEX_DIRS = ['docs/roadmap', 'docs/design'];
+const INDEX_DIRS = ['docs/roadmap', 'docs/design', 'docs/todo'];
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PLACEHOLDERS = ['«', '»'];
 /**

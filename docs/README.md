@@ -11,6 +11,7 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 跨子系统的结构：进程模型、目录归属、数据流 | 单个子系统的细节（→ `design/`）、代码规范（→ `AGENTS.md`） |
 | [roadmap/](./roadmap/) | **尚未实施**的方案 | 已落地的事实（按 `design/README.md` 的约定迁走）、跨子系统结构（→ `ARCHITECTURE.md`） |
 | [design/](./design/) | **已落地**子系统的设计说明：为什么是这样、有哪些不变量、改动时注意什么 | 还在讨论的方案（→ `roadmap/`）、代码已经表达清楚的实现细节 |
+| [todo/](./todo/) | **工程性待办**：被上游卡住的升级、临时屏蔽与待清理项 | 功能方案（→ `roadmap/`）、已落地子系统的设计（→ `design/`） |
 | [postmortem/](./postmortem/) | 事故复盘：坏在哪、机制是什么、为什么没被拦住、补了哪些守卫 | 设计取舍（→ `design/`）、按现象排障（→ `TROUBLESHOOTING.md`） |
 | [cookbook/](./cookbook/) | 面向人的分步操作：按顺序做、每步可验证 | 判据与可复用工作流（→ `.agents/skills/`）、设计理由（→ `design/`） |
 | [requirements.md](./requirements.md) | 最初的需求规格（顶部注记了哪些已被实现取代） | 当前行为（→ `README.md`、`ARCHITECTURE.md`、`SCRIPTING.md`） |
