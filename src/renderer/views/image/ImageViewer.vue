@@ -154,9 +154,10 @@ function calcFit(): void {
     return;
   }
 
+  // 默认铺满容器：以前这里乘了 0.95，等于四周留 5% 边距，打开图片时看着像有边框
   fitScale.value = Math.min(
-    (container.clientWidth * 0.95) / image.naturalWidth,
-    (container.clientHeight * 0.95) / image.naturalHeight,
+    container.clientWidth / image.naturalWidth,
+    container.clientHeight / image.naturalHeight,
   );
   updateZoomLabel();
 }
