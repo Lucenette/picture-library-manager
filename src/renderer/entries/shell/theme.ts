@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, THEMES, type Theme } from '@common/theme';
+import { DEFAULT_THEME, resolveTheme, type Theme } from '@common/theme';
 
 import { createLogger } from '@/services/log-service';
 
@@ -9,7 +9,7 @@ const log = createLogger('theme');
 export type ThemeHandler = (theme: Theme) => void;
 
 const handlers = new Set<ThemeHandler>();
-let current: Theme = THEMES[DEFAULT_THEME];
+let current: Theme = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
 
 /**
  * 应用一套主题：先把令牌写进 `:root`，再依次通知订阅者。
@@ -48,7 +48,17 @@ export function onThemeChange(handler: ThemeHandler): () => void {
   };
 }
 
-/** 入口初始化：把默认主题挂上（四个入口都经 `initWindowChrome()` 调到） */
+/**
+ * 入口初始化：按偏好挂上主题，并在系统切换明暗时**立刻**跟着换。
+ *
+ * 「跟随系统」在这里落成一条 matchMedia 监听：系统一切换就重新解析并应用，已注册的处理器
+ * （编辑器等）跟着重定义——不需要重启，也不需要主进程广播，两端各自听同一个系统事件。
+ */
 export function initTheme(): void {
-  applyTheme(THEMES[DEFAULT_THEME]);
+  const query = window.matchMedia('(prefers-color-scheme: dark)');
+  applyTheme(resolveTheme(DEFAULT_THEME, query.matches));
+  query.addEventListener('change', (event) => {
+    log.info('system appearance changed, reapplying theme: ' + (event.matches ? 'dark' : 'light'));
+    applyTheme(resolveTheme(DEFAULT_THEME, event.matches));
+  });
 }

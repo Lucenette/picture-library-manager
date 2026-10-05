@@ -12,8 +12,8 @@ export const THEMES = { dark, light } as const;
 /** 全部主题名，含动态的 system */
 export const THEME_NAMES: readonly ThemeName[] = ['dark', 'light', 'system'];
 
-/** 默认主题：设置页落地前固定暗色，避免改变现有外观 */
-export const DEFAULT_THEME = 'dark';
+/** 默认主题：跟随系统（设置页落地前没有切换入口，靠系统明暗来验证亮/暗两套） */
+export const DEFAULT_THEME = 'system';
 
 /**
  * 把主题名解析成一套具体主题——主体系统只需要调这一个函数。

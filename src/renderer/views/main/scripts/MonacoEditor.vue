@@ -7,13 +7,14 @@ import { editor as monacoEditor, KeyCode, KeyMod, MarkerSeverity, Range } from '
 import type { IDisposable } from 'monaco-editor';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { DEFAULT_THEME, THEMES } from '@common/theme';
+import { DEFAULT_THEME, resolveTheme } from '@common/theme';
 import type { ScriptCompileError } from '@common/types';
 
 import type { ScriptLineChange } from './diff';
 import { MONACO_THEME } from './monaco-env';
 
-const { tokens } = THEMES[DEFAULT_THEME];
+/** 当前主题的令牌；改动色条只在建编辑器时取值，系统切换后要等重新打开脚本页才刷新 */
+const { tokens } = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
 
 /**
  * 取主题令牌。
