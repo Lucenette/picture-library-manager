@@ -45,14 +45,14 @@
 | 函数 | 打包态 | 开发态 | 放什么 |
 |---|---|---|---|
 | `getUserDir()` | `~/.plmanager` | `dist` | 应用全部持久化内容的根 |
-| `getDataDir()` | `~/.plmanager/data` | `dist/data` | 库文件与库备份（应用内部数据） |
-| `getScriptsDir()` | `~/.plmanager/scripts` | `dist/scripts` | 脚本正文（用户资产） |
-| `getTempDir()` | `~/.plmanager/temp` | `dist/temp` | 草稿这类随时可以丢掉的临时状态 |
+| `getDataDir()` | `~/.plmanager/data` | `dist/.plmanager/data` | 库文件与库备份（应用内部数据） |
+| `getScriptsDir()` | `~/.plmanager/scripts` | `dist/.plmanager/scripts` | 脚本正文（用户资产） |
+| `getTempDir()` | `~/.plmanager/temp` | `dist/.plmanager/temp` | 草稿这类随时可以丢掉的临时状态 |
 
-于是开发态与打包态一一对应：`dist/data` ≙ `~/.plmanager/data`、`dist/scripts` ≙ `~/.plmanager/scripts`。`database/` 与 `ups/` 都从这里取路径。
+于是开发态与打包态一一对应：`dist/.plmanager/data` ≙ `~/.plmanager/data`、`dist/.plmanager/scripts` ≙ `~/.plmanager/scripts`。`database/` 与 `ups/` 都从这里取路径。
 
 ```
-~/.plmanager/                （开发态 dist/）
+~/.plmanager/                （开发态 dist/.plmanager/）
 ├── data/
 │   ├── picture-lib.db
 │   └── backups/             升级前的库备份

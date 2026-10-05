@@ -10,7 +10,7 @@
 
 1. 现有识别只有**一个维度**：64 位感知哈希（pHash，8 字节）。它算在缩略图的灰度 DCT 低频上（`src/main/image/thumbnail-sharp.ts` 的 `perceptualHash`），比对是 `src/main/image/similar.ts` 的汉明距离，分组阈值是 `SAME_DISTANCE = 3` 与 `SIMILAR_DISTANCE = 10`。
 2. pHash 抗重压缩、抗分辨率变化，但**对裁切、换画风、换背景不敏感**——同一角色的不同构图会被判为不相似；它看的是「像素低频布局」，不是「画面内容」。
-3. 规模的实测出处：开发库 `dist/data/picture-lib.db`（3.5 MB）当前 `processed_image` 135 条、`image_file` 806 条且全部有 phash（实测，2026-10-02）。相似识别只吃 `processed_image`，所以此刻两两比对（135 选 2 = 9075 次）是毫秒级的；真正的复杂度压力来自将来图库到数千张、且比对维度从 8 字节变成数百字节。
+3. 规模的实测出处：开发库 `dist/.plmanager/data/picture-lib.db`（3.5 MB）当前 `processed_image` 135 条、`image_file` 806 条且全部有 phash（实测，2026-10-02）。相似识别只吃 `processed_image`，所以此刻两两比对（135 选 2 = 9075 次）是毫秒级的；真正的复杂度压力来自将来图库到数千张、且比对维度从 8 字节变成数百字节。
 4. CLIP 推理需要 ONNX Runtime（`onnxruntime-node`，N-API 插件）。它与现有 `sharp` 同属「不需要 electron-rebuild、但必须按平台与架构提供预编译二进制」的一类，因此 `asarUnpack` 与 [build-targets.md](./build-targets.md) 的架构矩阵要跟着更新。
 5. sqlite-vec 是 SQLite **可加载扩展**（纯 C，不是 Node 插件），不涉及 rebuild；但它要求宿主 SQLite 允许动态加载。本项目用的是 Electron 内置的 `node:sqlite`，其是否被编译成 `SQLITE_OMIT_LOAD_EXTENSION` **必须先实测**——这是本条目里唯一可能推翻检索层做法的未知量。
 

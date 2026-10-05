@@ -123,7 +123,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 | 运行方式 | 路径 |
 |---|---|
-| 开发（`yarn dev`） | `dist/data/picture-lib.db` |
+| 开发（`yarn dev`） | `dist/.plmanager/data/picture-lib.db` |
 | 打包后 | `~/.plmanager/data/picture-lib.db`（Windows 为 `C:\Users\<用户名>\.plmanager\data\picture-lib.db`） |
 
 打包后固定落在用户主目录，**不放安装目录**：Windows 的「覆盖安装」会先静默调用旧版卸载器、清空整个安装目录，
@@ -156,7 +156,7 @@ webSecurity: app.isPackaged,   // 开发态 false（放宽），打包后 true�
 
 | 运行方式 | 目录 |
 |---|---|
-| 开发（`yarn dev`） | `dist/logs/` |
+| 开发（`yarn dev`） | `dist/.plmanager/logs/` |
 | 打包后 | `~/.plmanager/logs/`（Windows 为 `C:\Users\<用户名>\.plmanager\logs`） |
 
 三个文件各管一类来源，文件由主进程独占写入：

@@ -9,7 +9,7 @@
 - **是什么**：Electron 桌面应用，扫描来源各异的图库目录、批量选图、导出到统一目录。
 - **技术栈**：Electron 44 + Vue 3 + TypeScript 5 + Vite 7 + Element Plus 2 + node:sqlite（Electron 内置 SQLite）+ sharp（图片解码）。
 - **分支**：`develop`。提交信息用中文，形如 `范围：做了什么`（如 `对话框原生化：PromptDialog + FileViewerDialog`）。
-- **数据目录**：开发态是项目的 `dist/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<用户名>\.plmanager`），里面分四份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿、`logs/` 放三个日志文件（`root.log` / `external.log` / `script.log`，位置与读法见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
+- **数据目录**：开发态是项目的 `dist/.plmanager/`，打包后是用户主目录的 `~/.plmanager/`（Windows 为 `C:\Users\<用户名>\.plmanager`），里面分四份：`data/` 放数据库与库备份（`data/picture-lib.db`）、`scripts/` 放脚本正文（一份脚本一个 `.js` 文件）、`temp/` 放编辑草稿、`logs/` 放三个日志文件（`root.log` / `external.log` / `script.log`，位置与读法见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) 的「日志」一节）。**用户数据不放安装目录**：Windows 的覆盖安装会先跑旧版卸载器清空整个安装目录，Linux 的 deb 装在 root 所有的 `/opt/PLManager`，macOS 的 exe 在 `.app` 内部。
 
 ## 常用命令
 
@@ -247,7 +247,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
   让 `yarn install` 之后直接就能开发。GitHub 拉不动时用环境变量 `ELECTRON_MIRROR` 指镜像——
   别再往 `.npmrc` 写 `electron_mirror`，npm 已警告这类未知配置下个大版本会失效。
 - **Windows 终端中文乱码**：默认 GBK 代码页，Node 按 UTF-8 输出，中文在终端显示为乱码；`chcp 65001` 后正常，文件内容不受影响。应用自己写出的日志消息已改成英文（见运行时约定第 10 节），仍会乱码的是第三方库自己打的中文。
-- **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/data/picture-lib.db`，是你自己的图库
+- **不要清空 `dist/`（例如 `rimraf dist`）**：开发态数据库就在 `dist/.plmanager/data/picture-lib.db`，是你自己的图库
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
   要清理只点具体产物：`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。
 - **依赖可复现**：`yarn.lock` 已入库，CI 用 `yarn install --frozen-lockfile` 安装；Node 版本由 `.nvmrc`（`22`）与 `package.json` 的 `engines.node`（`>=22.12`）固定。
