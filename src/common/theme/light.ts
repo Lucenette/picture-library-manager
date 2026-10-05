@@ -1,6 +1,5 @@
-import type { Theme } from './types';
-
 import { darkTokens } from './dark';
+import type { Theme } from './types';
 
 /**
  * 浅色的令牌。
