@@ -11,6 +11,26 @@
 
 /** 暗色（IDEA Darcula）的令牌；键是 CSS 变量名，值是它当前的字面值 */
 const darkTokens = {
+  /* ---- 尺寸：与主题正交，但和颜色一样只有这一处来源 ---- */
+  "--app-space-2": "2px",
+  "--app-space-4": "4px",
+  "--app-space-6": "6px",
+  "--app-space-8": "8px",
+  "--app-space-10": "10px",
+  "--app-space-12": "12px",
+  "--app-space-16": "16px",
+  "--app-space-20": "20px",
+  "--app-space-24": "24px",
+  "--app-space-32": "32px",
+  "--app-radius-2": "2px",
+  "--app-radius-4": "4px",
+  "--app-radius-6": "6px",
+  "--app-radius-8": "8px",
+  "--app-font-xs": "11px",
+  "--app-font-sm": "12px",
+  "--app-font-base": "13px",
+  "--app-font-md": "14px",
+  "--app-font-lg": "16px",
     "--app-bg-page": "#1e1f22",
     "--app-bg-surface": "#2b2d30",
     "--app-bg-header": "#26282c",

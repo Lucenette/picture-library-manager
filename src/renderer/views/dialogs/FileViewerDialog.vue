@@ -115,8 +115,8 @@ onMounted(loadInitData);
 .fv-header {
   height: 36px;
   line-height: 36px;
-  padding: 0 16px;
-  font-size: 14px;
+  padding: 0 var(--app-space-16);
+  font-size: var(--app-font-md);
   color: var(--app-text-primary);
   -webkit-app-region: drag;
 }
@@ -135,7 +135,7 @@ onMounted(loadInitData);
   width: 50px;
   height: 50px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
   cursor: pointer;
 }
 </style>

@@ -76,8 +76,8 @@ onMounted(loadInitData);
 .confirm-header {
   height: 36px;
   line-height: 36px;
-  padding: 0 16px;
-  font-size: 16px;
+  padding: 0 var(--app-space-16);
+  font-size: var(--app-font-lg);
   font-weight: 400;
   color: var(--app-text-primary);
   -webkit-app-region: drag;
@@ -89,12 +89,12 @@ onMounted(loadInitData);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 0 24px 20px;
+  padding: 0 var(--app-space-24) var(--app-space-20);
   -webkit-app-region: no-drag;
 }
 
 .confirm-message {
-  font-size: 13px;
+  font-size: var(--app-font-base);
   line-height: 1.7;
   color: var(--app-text-secondary);
   white-space: pre-wrap;
@@ -104,6 +104,6 @@ onMounted(loadInitData);
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--app-space-10);
 }
 </style>

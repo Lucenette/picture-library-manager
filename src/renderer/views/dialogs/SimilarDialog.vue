@@ -81,41 +81,41 @@ onMounted(async () => {
   height: 36px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 12px;
+  gap: var(--app-space-12);
+  padding: 0 var(--app-space-12);
   -webkit-app-region: drag;
   flex-shrink: 0;
 }
 
 .similar-title {
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 
 .similar-summary {
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
 }
 
 .similar-tabs {
-  padding: 0 12px;
+  padding: 0 var(--app-space-12);
   flex-shrink: 0;
 }
 
 .similar-body {
   flex: 1;
   overflow: auto;
-  padding: 0 12px 12px;
+  padding: 0 var(--app-space-12) var(--app-space-12);
 }
 
 .similar-group {
-  margin-bottom: 16px;
+  margin-bottom: var(--app-space-16);
   border: 1px solid var(--app-bg-surface);
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
 }
 
 .similar-group-head {
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: var(--app-space-6) var(--app-space-10);
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
   border-bottom: 1px solid var(--app-bg-surface);
 }
@@ -123,8 +123,8 @@ onMounted(async () => {
 .similar-group-body {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px;
+  gap: var(--app-space-12);
+  padding: var(--app-space-10);
 }
 
 .similar-item {
@@ -135,7 +135,7 @@ onMounted(async () => {
   width: 100px;
   height: 100px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
   background: var(--app-bg-surface);
   display: block;
 }
@@ -144,20 +144,20 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   color: var(--app-text-disabled);
 }
 
 .similar-name {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: var(--app-space-4);
+  font-size: var(--app-font-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .similar-meta {
-  font-size: 11px;
+  font-size: var(--app-font-xs);
   color: var(--app-text-muted);
 }
 </style>

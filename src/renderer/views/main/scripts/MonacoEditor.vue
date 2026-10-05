@@ -336,13 +336,13 @@ onBeforeUnmount(() => {
 /* 「自上次保存改了哪里」：行号右侧那条窄带上的色条（Git 那种 gutter 标记）。
    margin-left 让它离行号有一点距离，既不贴住数字，也不压到正文 */
 .monaco-host :deep(.plm-change-added) {
-  margin-left: 4px;
+  margin-left: var(--app-space-4);
   border-left: 3px solid var(--app-tag-success-text);
   box-sizing: border-box;
 }
 
 .monaco-host :deep(.plm-change-modified) {
-  margin-left: 4px;
+  margin-left: var(--app-space-4);
   border-left: 3px solid var(--app-primary);
   box-sizing: border-box;
 }

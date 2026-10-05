@@ -63,12 +63,12 @@ function open(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 6px;
+  padding: var(--app-space-8) var(--app-space-12);
+  border-radius: var(--app-radius-6);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   transition: border-color 0.15s;
 }
 
@@ -82,6 +82,6 @@ function open(): void {
 
 .arrow {
   color: var(--app-text-muted);
-  font-size: 12px;
+  font-size: var(--app-font-sm);
 }
 </style>

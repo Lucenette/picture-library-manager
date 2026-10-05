@@ -873,6 +873,6 @@ async function moveScript(key: string, groupId: number | null): Promise<void> {
   justify-content: center;
   flex: 1;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 </style>

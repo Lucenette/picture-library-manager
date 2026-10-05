@@ -115,12 +115,12 @@ const problemTitle = computed(() => {
 .status-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--app-space-12);
   flex: none;
-  padding: 4px 12px;
+  padding: var(--app-space-4) var(--app-space-12);
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--app-font-sm);
 }
 
 .status-types {

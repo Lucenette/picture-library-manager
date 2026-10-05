@@ -68,9 +68,9 @@ function hide(): void {
 }
 
 .script-item {
-  padding: 8px 14px;
+  padding: var(--app-space-8) 14px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   color: var(--app-text-regular);
   height: 34px;
   line-height: 18px;
@@ -86,8 +86,8 @@ function hide(): void {
 }
 
 .script-empty {
-  padding: 12px 14px;
+  padding: var(--app-space-12) 14px;
   color: var(--app-text-muted);
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 </style>

@@ -361,7 +361,7 @@ function onItemDragEnd(): void {
   display: flex;
   align-items: center;
   padding: var(--page-padding);
-  padding-bottom: 16px;
+  padding-bottom: var(--app-space-16);
 }
 
 /* 表头那一排控件：展开搜索框时整条收紧到 0。
@@ -369,7 +369,7 @@ function onItemDragEnd(): void {
 .head-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--app-space-10);
   flex: 1;
   min-width: 0;
   max-width: 100%;
@@ -404,7 +404,7 @@ function onItemDragEnd(): void {
 .icon-btn {
   padding: 0;
   border-radius: var(--el-border-radius-base);
-  font-size: 16px;
+  font-size: var(--app-font-lg);
   color: var(--el-text-color-secondary);
 
   &:hover {
@@ -418,13 +418,13 @@ function onItemDragEnd(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--app-space-6);
   flex: 1;
   min-width: 0;
   height: 32px;
   padding: 0 11px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
   background: var(--app-bg-surface);
   box-shadow: 0 0 0 1px var(--app-border) inset;
   color: var(--el-text-color-regular);
@@ -446,7 +446,7 @@ function onItemDragEnd(): void {
 .filter-arrow {
   flex: none;
   color: var(--app-text-muted);
-  font-size: 11px;
+  font-size: var(--app-font-xs);
 }
 
 .side-list {
@@ -463,11 +463,11 @@ function onItemDragEnd(): void {
 /* 段间距 4px、段内行距 2px：与 DSH 的 `.groupSection + .groupSection` / `.groupSection > * + *`
    同一条规则。高亮背景因此是 32px/34px 一个独立的圆角块，不会和邻行连成一片 */
 .side-list :deep(.el-scrollbar__view) > * + * {
-  margin-top: 4px;
+  margin-top: var(--app-space-4);
 }
 
 .group-section > * + * {
-  margin-top: 2px;
+  margin-top: var(--app-space-2);
 }
 
 /* 拖脚本时悬停到的分组：整段亮一下（落下只改归属，所以没有"插到某两行之间"的落点线） */
@@ -480,10 +480,10 @@ function onItemDragEnd(): void {
 .group-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--app-space-6);
   width: 100%;
   height: 34px;
-  padding: 0 8px 0 12px;
+  padding: 0 var(--app-space-8) 0 var(--app-space-12);
   border-radius: var(--el-border-radius-base);
 }
 
@@ -497,7 +497,7 @@ function onItemDragEnd(): void {
 .group-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--app-space-6);
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -505,7 +505,7 @@ function onItemDragEnd(): void {
   border: none;
   background: none;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--app-font-base);
   text-align: left;
   cursor: pointer;
 }
@@ -519,7 +519,7 @@ function onItemDragEnd(): void {
 .group-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--app-space-8);
   flex: none;
   opacity: 0;
   visibility: hidden;
@@ -540,7 +540,7 @@ function onItemDragEnd(): void {
 .group-icon {
   flex: none;
   color: var(--app-text-muted);
-  font-size: 16px;
+  font-size: var(--app-font-lg);
 }
 
 /* 名称按内容宽：后面的计数直接跟在它后面（不再被顶到最右）。名字太长时才由它自己省略 */
@@ -562,7 +562,7 @@ function onItemDragEnd(): void {
   align-items: center;
   width: 100%;
   height: 32px;
-  padding: 8px 12px 8px 34px;
+  padding: var(--app-space-8) var(--app-space-12) var(--app-space-8) 34px;
   border: none;
   border-radius: var(--el-border-radius-base);
   background: none;
@@ -600,8 +600,8 @@ function onItemDragEnd(): void {
 }
 
 .side-empty {
-  padding: 8px 12px 8px 34px;
+  padding: var(--app-space-8) var(--app-space-12) var(--app-space-8) 34px;
   color: var(--app-text-muted);
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 </style>

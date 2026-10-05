@@ -145,7 +145,7 @@ body {
   /* 标题只占一行：空间不够时省略，而不是折成一列字 */
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   color: var(--app-text-soft);
   white-space: nowrap;
   overflow: hidden;
@@ -209,8 +209,8 @@ body {
   position: absolute;
   top: 3px;
   right: 3px;
-  padding: 0 4px;
-  border-radius: 8px;
+  padding: 0 var(--app-space-4);
+  border-radius: var(--app-radius-8);
   background: var(--app-primary);
   color: var(--app-on-primary);
   font-size: 10px;

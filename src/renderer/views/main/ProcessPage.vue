@@ -776,9 +776,9 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--app-space-12);
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--app-space-10);
   flex-shrink: 0;
 }
 
@@ -791,7 +791,7 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--app-space-10);
 }
 
 .table-wrap {
@@ -808,8 +808,8 @@ function findLoadedGroup(id: number): ImageGroupView | undefined {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0 16px 0;
+  gap: var(--app-space-12);
+  padding: var(--app-space-12) 0 var(--app-space-16) 0;
   flex-shrink: 0;
 }
 

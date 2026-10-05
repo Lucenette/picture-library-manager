@@ -296,9 +296,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 8px;
+  gap: var(--app-space-4);
+  padding: var(--app-space-4) var(--app-space-8);
+  border-radius: var(--app-radius-8);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
   transition: border-color 0.15s;
@@ -313,12 +313,12 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: var(--app-space-2) var(--app-space-8);
+  border-radius: var(--app-radius-4);
   background: var(--app-bg-highlight);
   border: 1px solid var(--app-border-highlight);
   color: var(--app-primary);
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   white-space: nowrap;
 }
 
@@ -339,8 +339,8 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   outline: none;
   background: transparent;
   color: var(--app-text-regular);
-  font-size: 13px;
-  padding: 2px 4px;
+  font-size: var(--app-font-base);
+  padding: var(--app-space-2) var(--app-space-4);
 }
 
 .search-input::placeholder {
@@ -353,19 +353,19 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   left: 0;
   right: 0;
   z-index: 20;
-  margin-top: 4px;
+  margin-top: var(--app-space-4);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border);
-  border-radius: 8px;
+  border-radius: var(--app-radius-8);
   box-shadow: 0 8px 24px var(--app-shadow-popup);
 }
 
 .section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px 4px;
-  font-size: 11px;
+  gap: var(--app-space-8);
+  padding: var(--app-space-8) var(--app-space-12) var(--app-space-4);
+  font-size: var(--app-font-xs);
   color: var(--app-text-disabled);
 }
 
@@ -382,9 +382,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px;
+  padding: 7px var(--app-space-12);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   color: var(--app-text-regular);
 }
 
@@ -399,19 +399,19 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
 
 .item-arrow {
   color: var(--app-text-faint);
-  font-size: 14px;
+  font-size: var(--app-font-md);
 }
 
 .panel-empty {
-  padding: 16px;
+  padding: var(--app-space-16);
   text-align: center;
   color: var(--app-text-faint);
-  font-size: 13px;
+  font-size: var(--app-font-base);
 }
 
 .free-hint {
-  padding: 10px 12px 4px;
-  font-size: 12px;
+  padding: var(--app-space-10) var(--app-space-12) var(--app-space-4);
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
 }
 </style>

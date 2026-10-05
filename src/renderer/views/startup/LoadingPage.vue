@@ -79,8 +79,8 @@ watch(
 .loading-header {
   height: 60px;
   line-height: 60px;
-  padding: 0 32px;
-  font-size: 16px;
+  padding: 0 var(--app-space-32);
+  font-size: var(--app-font-lg);
   color: var(--app-text-primary);
 }
 
@@ -88,16 +88,16 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 32px;
+  padding: 0 var(--app-space-32);
 }
 
 .loading-title {
-  font-size: 13px;
+  font-size: var(--app-font-base);
   color: var(--app-text-secondary);
 }
 
 .loading-error {
-  font-size: 13px;
+  font-size: var(--app-font-base);
   line-height: 1.7;
   color: var(--app-danger);
   white-space: pre-wrap;
@@ -106,7 +106,7 @@ watch(
 
 .loading-note,
 .loading-hint {
-  font-size: 12px;
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
   word-break: break-all;
 }

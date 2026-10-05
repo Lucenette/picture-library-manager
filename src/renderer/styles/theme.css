@@ -69,7 +69,7 @@ body {
   background: var(--app-bg-header) !important;
   color: var(--app-text-secondary) !important;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--app-font-base);
   border-bottom: 1px solid var(--app-border) !important;
 }
 .el-table td.el-table__cell {
@@ -154,7 +154,7 @@ body {
 /* ======== 标签 ======== */
 .el-tag {
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
 }
 .el-tag--success {
   background: var(--app-tag-success-bg);
@@ -200,7 +200,7 @@ body {
 .el-input__wrapper {
   background: var(--app-bg-surface);
   box-shadow: 0 0 0 1px var(--app-border) inset;
-  border-radius: 4px;
+  border-radius: var(--app-radius-4);
 }
 .el-input__wrapper:hover {
   box-shadow: 0 0 0 1px var(--app-border-strong) inset;
@@ -272,24 +272,24 @@ body {
 /* ======== 对话框 ======== */
 .el-dialog {
   background: var(--app-bg-surface);
-  border-radius: 8px;
+  border-radius: var(--app-radius-8);
   box-shadow: var(--app-shadow-dialog);
 }
 .el-dialog__header {
-  padding: 24px 24px 0;
+  padding: var(--app-space-24) var(--app-space-24) 0;
 }
 .el-dialog__title {
   color: var(--app-text-primary);
 }
 .el-dialog__body {
-  padding: 20px 24px;
+  padding: var(--app-space-20) var(--app-space-24);
   color: var(--app-text-regular);
 }
 .el-dialog__footer {
-  padding: 0 24px 20px;
+  padding: 0 var(--app-space-24) var(--app-space-20);
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--app-space-10);
 }
 
 /* ======== 复选框 ======== */
