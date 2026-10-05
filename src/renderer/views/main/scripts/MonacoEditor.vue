@@ -11,7 +11,7 @@ import { DEFAULT_THEME, THEMES } from '@common/theme';
 import type { ScriptCompileError } from '@common/types';
 
 import type { ScriptLineChange } from './diff';
-import './monaco-env';
+import { MONACO_THEME } from './monaco-env';
 
 const { tokens } = THEMES[DEFAULT_THEME];
 
@@ -254,7 +254,7 @@ onMounted(() => {
 
   editor = monacoEditor.create(hostEl.value, {
     model: modelFor(props.documentKey),
-    theme: 'plmanager-dark',
+    theme: MONACO_THEME,
     // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
     automaticLayout: true,
     minimap: { enabled: false },

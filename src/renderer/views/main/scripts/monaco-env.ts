@@ -38,6 +38,9 @@ declare var __dirname: string;`;
   },
 };
 
+/** 编辑器主题的 id：定义与创建编辑器都引它，改名不会再漏 */
+export const MONACO_THEME = 'plmanager';
+
 /**
  * 编辑器主题：颜色直接取自 `src/common/theme.ts` 的主题对象。
  *
@@ -47,13 +50,13 @@ declare var __dirname: string;`;
  * 注册给主题管理器：注册时立刻用当前主题调一次，现在只有一套主题；将来切换时同一段代码会重定义并重新应用。
  */
 onThemeChange((theme) => {
-  monacoEditor.defineTheme('plmanager', {
+  monacoEditor.defineTheme(MONACO_THEME, {
     base: theme.monaco.base,
     inherit: true,
     rules: [...theme.monaco.rules] as Parameters<typeof monacoEditor.defineTheme>[1]['rules'],
     colors: { ...theme.monaco.colors },
   });
-  monacoEditor.setTheme('plmanager');
+  monacoEditor.setTheme(MONACO_THEME);
 });
 
 // 只配 JS 一侧：脚本是 CommonJS 的 .js，typescriptDefaults 不碰。
