@@ -1,6 +1,6 @@
 # 颜色主题切换
 
-**状态**：待实施（**收编部分已落地**，见 §4 末尾；切换与设置页未做）
+**状态**：待实施（令牌、两套主题、「跟随系统」与统一入口已落地，见 §4 末尾；切换与设置页未做）
 **关联**：[settings-page.md](./settings-page.md)（主题的偏好存在它的 `settings.yml`）
 
 ---
@@ -207,8 +207,12 @@ sequenceDiagram
 | `8f0039d` | 修掉清理 `theme.css` 时留下的悬空注释续行（构建失败的真凶） |
 | `9d9a8c0` | 尺寸收编：尺度阶梯 + 25 个文件里重复的间距 / 字号 / 圆角换成令牌 |
 | `77f1b51` | Monaco 主题 id 收敛成常量（组件里还在传旧 id，导致编辑器回落成浅色默认主题） |
+| `d5f26b5` | 主题独立成 `src/common/theme/` 目录：一主题一文件（types / dark / light / system / index）、令牌缩进统一；补上浅色（Islands Light 实测 + `Light.icls`）；「跟随系统」按传入的明暗动态返回；`index.ts` 出统一入口 `resolveTheme(name, systemPrefersDark)` |
+| `2cd6950` | 暗色补 `comment.doc` 规则：`/** */` 用 `Dark.icls` 的绿 `#5f826b`（此前跟着 `//` 一起是灰的） |
 
-**剩余**：Monaco 的 `rules`（语法着色）按需填、浅色那套、切换与设置页——都不做则本项不算完成，文件继续留在 `docs/roadmap/`。
+**剩余**：切换与设置页。浅色已定义、`system` 已可用，但没有任何入口能切过去，所以实际看到的仍是暗色。
+
+Monaco 的 `rules` 已接上两套 `*.icls`（暗色用 `Dark.icls`、浅色用 `Light.icls`）。一个限制写在这：JS/TS 的 `//` 与 `/* */` 在 Monaco 里同属 `comment` 词元，**没法像 IDEA 那样行内一色、行间另一色**；能单独着色的是 `/** */`（`comment.doc`）。
 
 ## 5. 风险
 
