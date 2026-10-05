@@ -11,6 +11,24 @@ updates:
       - dependencies
     commit-message:
       prefix: "依赖"
+    # 被上游卡住的升级：dependabot 只看版本号、不看 peer 上限，不显式屏蔽就会每次推一个
+    # "升了必然坏"的 PR。等上游放开后删掉对应条目——每条都写了判断依据。
+    ignore:
+      # typescript-eslint 的 peer 是 >=4.8.4 <6.1.0，TS 7（Go 重写的原生编译器）装上去
+      # 会让类型感知规则失效/报错，而本仓库的 lint 就靠它。判断依据：
+      #   npm view typescript-eslint peerDependencies.typescript
+      - dependency-name: typescript
+        versions:
+          - ">=6.1.0"
+      # electron-vite@5 的 peer 上限是 vite ^7，Vite 8 会直接构建失败。判断依据：
+      #   npm view electron-vite peerDependencies.vite
+      - dependency-name: vite
+        versions:
+          - ">=8.0.0"
+      # 1.0.0 起的破坏性变更是 Drop Vite < 8 support，与上一条同源（它要 Vite 8）
+      - dependency-name: vite-plugin-electron-renderer
+        versions:
+          - ">=1.0.0"
     groups:
       electron:
         patterns:
