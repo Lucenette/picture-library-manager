@@ -1,6 +1,6 @@
 # 颜色主题切换
 
-**状态**：待实施
+**状态**：待实施（**收编部分已落地**，见 §4 末尾；切换与设置页未做）
 **关联**：[settings-page.md](./settings-page.md)（主题的偏好存在它的 `settings.yml`）
 
 ---
@@ -19,6 +19,7 @@
 | 日期 | 变更 | 原因 |
 |---|---|---|
 | 2026-09-29 | 首次记录（需求登记） | 使用者提出 |
+| 2026-10-05 | 收编落地：值搬进 `src/common/theme.ts`、主题管理器与注册处理器、删掉主进程的 `WINDOW_COLORS` 镜像、补尺寸阶梯、加样式表扫描用例 | 先把不依赖设置页与切换的部分做完 |
 | 2026-10-05 | 评审：定为**一份主题对象 + 一组注册的处理器**——值放 `src/common/theme.ts`（两个进程都 import），Element 侧的处理器把它写成 CSS 变量、Monaco 的处理器设自己的主题（含语法着色）；主进程只当"选择"的真源并管窗口那一层 | 对照 dsh 的 `ui-theme`、并纠正"值只放 CSS"会逼 JS 消费者去 DOM 里刮字符串 |
 
 ---
@@ -128,7 +129,7 @@ sequenceDiagram
 
 | 注册者 | 收到通知后做什么 |
 |---|---|
-| Element Plus 侧（应用本体，含尺寸） | 把 `theme.tokens` 逐项 `documentElement.style.setProperty` |
+| 应用本体（Element Plus 与页面，含尺寸） | **不是单独注册的**：管理器 `applyTheme()` 自己就把 `theme.tokens` 逐项写进 `:root`，再通知其余处理器——组件库的颜色全走 CSS 变量，变量一改它就跟着变 |
 | Monaco（`monaco-env.ts`） | `defineTheme('plmanager', theme.monaco)` + `setTheme('plmanager')`，**含语法着色**（`rules`）与编辑器配色 |
 
 **Element Plus 本身没有"主题 API"**：它的颜色全走 CSS 变量，所以"注册一个处理器"在这里的含义就是"把变量写对"——写完之后组件与页面一起变。不注册任何东西给组件库，注册的是**应用这一侧**的写变量动作。
@@ -197,6 +198,17 @@ sequenceDiagram
 | `src/renderer/views/main/scripts/monaco-env.ts` | 注册处理器：`defineTheme('plmanager', theme.monaco)` + `setTheme`；`CHANGE_COLORS` 同源 |
 | 各 `.vue` | 363 个尺寸字面量里重复的那些换成令牌 |
 | `docs/design/`（落地后） | 主题对象的口径、处理器清单、首帧例外 |
+
+**已落地**（在 `feature/color-theme` 上，尚未并入 develop）：
+
+| 提交 | 内容 |
+|---|---|
+| `a577344` | 颜色收编：122 条颜色声明搬进 `common/theme.ts`；管理器与四个入口的挂载；删掉主进程镜像；Monaco 改注册处理器；样式表扫描用例 |
+| `8f0039d` | 修掉清理 `theme.css` 时留下的悬空注释续行（构建失败的真凶） |
+| `9d9a8c0` | 尺寸收编：尺度阶梯 + 25 个文件里重复的间距 / 字号 / 圆角换成令牌 |
+| `77f1b51` | Monaco 主题 id 收敛成常量（组件里还在传旧 id，导致编辑器回落成浅色默认主题） |
+
+**剩余**：Monaco 的 `rules`（语法着色）按需填、浅色那套、切换与设置页——都不做则本项不算完成，文件继续留在 `docs/roadmap/`。
 
 ## 5. 风险
 
