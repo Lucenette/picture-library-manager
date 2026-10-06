@@ -20,9 +20,34 @@ function row(name: string, phash: Uint8Array | null): SimilarInputRow {
   return { filePath: '/lib/' + name, fileName: name, thumbnail: null, width: 10, height: 10, phash };
 }
 
-test('阈值常量与设计一致', () => {
-  expect(SAME_DISTANCE).toBe(3);
-  expect(SIMILAR_DISTANCE).toBe(10);
+test('相同判定边界：距离正好 SAME_DISTANCE 算相同，+1 不算', async () => {
+  const bits = (count: number): number[] => Array.from({ length: count }, (_, index) => index);
+  const atLimit = await buildSimilarGroups([row('a', hash([])), row('b', hash(bits(SAME_DISTANCE)))]);
+  expect(atLimit.same).toHaveLength(1);
+  const overLimit = await buildSimilarGroups([row('a', hash([])), row('b', hash(bits(SAME_DISTANCE + 1)))]);
+  expect(overLimit.same).toHaveLength(0);
+});
+
+test('相似判定边界：两个相同组距离 = SIMILAR_DISTANCE 连成相似，+1 不连', async () => {
+  const bits = (count: number): number[] => Array.from({ length: count }, (_, index) => index);
+  const atLimit = await buildSimilarGroups([
+    row('a1', hash([])),
+    row('a2', hash([])),
+    row('b1', hash(bits(SIMILAR_DISTANCE))),
+    row('b2', hash(bits(SIMILAR_DISTANCE))),
+  ]);
+  expect(atLimit.same).toHaveLength(2);
+  expect(atLimit.similar).toHaveLength(1);
+  expect(atLimit.similar[0].members).toHaveLength(4);
+
+  const overLimit = await buildSimilarGroups([
+    row('a1', hash([])),
+    row('a2', hash([])),
+    row('b1', hash(bits(SIMILAR_DISTANCE + 1))),
+    row('b2', hash(bits(SIMILAR_DISTANCE + 1))),
+  ]);
+  expect(overLimit.same).toHaveLength(2);
+  expect(overLimit.similar).toHaveLength(0);
 });
 
 test('完全相同的两张进 same 组', async () => {

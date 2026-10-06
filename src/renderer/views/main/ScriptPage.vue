@@ -41,7 +41,6 @@ import type {
   ScriptType,
 } from '@common/types';
 
-
 import { useIpcListener } from '@/composables/useIpcListener';
 import { alertDialog, confirmDialog } from '@/services/dialog-service';
 import { createLogger } from '@/services/log-service';
@@ -304,7 +303,6 @@ async function syncDraftAndCheck(): Promise<void> {
   await checkCurrent();
 }
 
-
 async function loadDrafts(): Promise<void> {
   const list = await listScriptDrafts();
   const next: Record<string, ScriptDraft> = {};
@@ -428,8 +426,6 @@ async function importFiles(groupId: number | null): Promise<void> {
     await openKey(keyOfScript(result.imported[0].id));
   }
 }
-
-
 
 async function save(): Promise<void> {
   if (saving.value || activeKey.value === '') {

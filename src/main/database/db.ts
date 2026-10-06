@@ -826,7 +826,6 @@ export function countRowsMissingSortKeys(table: SortKeyTable): number {
   return queryOne<{ missing: number }>(`SELECT COUNT(*) AS missing FROM ${table.table} WHERE ${missing}`)?.missing ?? 0;
 }
 
-
 // ------------------------------------------------------------
 // ScriptGroup
 // ------------------------------------------------------------
@@ -888,7 +887,6 @@ export function deleteScriptGroup(id: number): void {
 export function setScriptGroup(scriptId: number, groupId: number | null): void {
   run(SQL.SET_SCRIPT_GROUP, [groupId, scriptId]);
 }
-
 
 // ------------------------------------------------------------
 // ProcessedImage

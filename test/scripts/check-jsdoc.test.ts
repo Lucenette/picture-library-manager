@@ -39,3 +39,33 @@ test('每种顶层声明都认', () => {
   const text = ['export class A {}', 'export interface B {}', 'export type C = string;', 'export enum D {}'].join('\n');
   expect(findMissingJsdoc(sources(text)).map((item: { name: string }) => item.name)).toEqual(['A', 'B', 'C', 'D']);
 });
+
+test('普通块注释不能隔空顶替更早的 JSDoc', () => {
+  const text = ['/** 说明 A */', 'export const a = 1;', '/* 只是普通注释 */', 'export const b = 2;'].join('\n');
+  expect(findMissingJsdoc(sources(text))).toEqual([{ file: 'src/a.ts', line: 4, name: 'b' }]);
+});
+
+test('块注释里的 export 不算导出', () => {
+  const text = ['/*', 'export const y = 2;', '*/'].join('\n');
+  expect(findMissingJsdoc(sources(text))).toEqual([]);
+});
+
+test('带 BOM 的文件首个导出仍能被识别', () => {
+  const text = '\uFEFFexport const y = 2;\n';
+  expect(findMissingJsdoc(sources(text))).toEqual([{ file: 'src/a.ts', line: 1, name: 'y' }]);
+});
+
+test('函数重载只要求第一处带 JSDoc', () => {
+  const text = ['/** 说明 */', 'export function foo(a: string): void;', 'export function foo(a: number): void;', 'export function foo(a: any) {}'].join('\n');
+  expect(findMissingJsdoc(sources(text))).toEqual([]);
+});
+
+test('const enum 报真正的符号名', () => {
+  const text = 'export declare const enum E { A }\n';
+  expect(findMissingJsdoc(sources(text)).map((item: { name: string }) => item.name)).toEqual(['E']);
+});
+
+test('行尾的块注释不清掉同一行的声明', () => {
+  const text = 'export const t = 1; /* trailing */\n';
+  expect(findMissingJsdoc(sources(text))).toEqual([{ file: 'src/a.ts', line: 1, name: 't' }]);
+});

@@ -78,3 +78,32 @@ test('多节时按小节名合并条目，不出现内部版本号', () => {
   expect(text).toContain('### 修复\n\n- c');
   expect(text.indexOf('### 升级必读')).toBeLessThan(text.indexOf('### 新增'));
 });
+
+test('零节返回空串', () => {
+  expect(formatSections([])).toBe('');
+});
+
+test('首个 ### 之前的散文块原样保留', () => {
+  const text = formatSections([
+    { version: '1.2.0', body: '一句散文\n\n### 新增\n\n- a' },
+    { version: '1.1.0', body: '### 新增\n\n- b' },
+  ]);
+  expect(text.startsWith('一句散文')).toBe(true);
+  expect(text).toContain('- a\n- b');
+});
+
+test('没有条目的空块被跳过', () => {
+  const text = formatSections([
+    { version: '1.2.0', body: '### 新增\n\n- a\n\n### 修复\n' },
+    { version: '1.1.0', body: '### 新增\n\n- b' },
+  ]);
+  expect(text).not.toContain('### 修复');
+});
+
+test('多节且无「升级必读」时按首次出现顺序排列', () => {
+  const text = formatSections([
+    { version: '1.2.0', body: '### 修复\n\n- a' },
+    { version: '1.1.0', body: '### 新增\n\n- b' },
+  ]);
+  expect(text.indexOf('### 修复')).toBeLessThan(text.indexOf('### 新增'));
+});

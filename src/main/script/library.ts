@@ -202,7 +202,6 @@ export async function importScripts(sourcePaths: string[], groupId: number | nul
   return { imported, failed };
 }
 
-
 // ------------------------------------------------------------
 // 删除与恢复默认
 // ------------------------------------------------------------

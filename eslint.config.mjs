@@ -15,17 +15,25 @@ const BUILTINS = [...new Set(builtinModules.flatMap((name) => [name, 'node:' + n
 
 export default tseslint.config(
   { ignores: ['dist/**', 'out/**', 'node_modules/**', 'src/static/default-script.js'] },
-  { files: ['**/*.{js,mjs,cjs,ts,vue}'], ...js.configs.recommended },
-  ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['**/*.{ts,vue}'] })),
+  { files: ['**/*.{js,mjs,cjs,mts,ts,vue}'], ...js.configs.recommended },
+  ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['**/*.{mts,ts,vue}'] })),
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({ ...config, files: TYPED_FILES })),
   ...pluginVue.configs['flat/essential'],
   {
-    files: ['**/*.{js,mjs,cjs,ts,vue}'],
+    files: ['**/*.{js,mjs,cjs,mts,ts,vue}'],
     languageOptions: { globals: { ...globals.node } },
     rules: {
       'comma-dangle': ['error', 'always-multiline'],
       'object-curly-spacing': ['error', 'always'],
       'block-spacing': ['error', 'always'],
+      // 硬性规范 1、2 是全仓约定，不止 src/ 与 test/：脚本、基准与根配置也要守
+      curly: ['error', 'all'],
+      'no-multiple-empty-lines': ['error', { max: 1 }],
+      'no-restricted-syntax': ['error',
+        { selector: 'ImportNamespaceSpecifier', message: '禁止 import * as，改用具名导入' },
+        { selector: 'ExportNamespaceSpecifier', message: '禁止 export * as，改用具名导出' },
+        { selector: 'ExportAllDeclaration', message: '禁止 export *，改用具名导出' },
+      ],
     },
   },
   {
@@ -34,13 +42,7 @@ export default tseslint.config(
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
-      curly: ['error', 'all'],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-      'no-restricted-syntax': ['error',
-        { selector: 'ImportNamespaceSpecifier', message: '禁止 import * as，改用具名导入' },
-        { selector: 'ExportNamespaceSpecifier', message: '禁止 export * as，改用具名导出' },
-        { selector: 'ExportAllDeclaration', message: '禁止 export *，改用具名导出' },
-      ],
     },
   },
   {
@@ -55,7 +57,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{ts,vue}'],
+    files: ['**/*.{mts,ts,vue}'],
     plugins: { 'import-x': importX },
     rules: {
       'import-x/order': ['error', {

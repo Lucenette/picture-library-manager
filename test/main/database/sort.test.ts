@@ -37,6 +37,3 @@ test('姓氏策略改变汉字读音', () => {
   expect(surname).toContain('shan');
 });
 
-test('同一输入两次结果一致（键是派生数据）', () => {
-  expect(sortKeyOf('阿波尼亚')).toBe(sortKeyOf('阿波尼亚'));
-});

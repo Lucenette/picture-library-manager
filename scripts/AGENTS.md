@@ -14,5 +14,5 @@
 ## 用例与接线
 
 - 每个脚本在 `test/scripts/<脚本名>.test.ts` 有对应用例，至少覆盖合规输入、每一种违规、豁免边界；用例调纯函数，不进 CLI 入口。
-- 新脚本同时接进两处：根 [AGENTS.md](../../AGENTS.md) 的「改完必须自检」与 [.github/workflows/verify.yml](../../.github/workflows/verify.yml) 的 `check` 作业。只写脚本不接线，它不会被跑到。
-- 完整步骤见 [docs/cookbook/adding-a-repo-check.md](../../docs/cookbook/adding-a-repo-check.md)。
+- 新脚本同时接进两处：根 [AGENTS.md](../AGENTS.md) 的「改完必须自检」与 [.github/workflows/verify.yml](../.github/workflows/verify.yml) 的 `check` 作业。只写脚本不接线，它不会被跑到。
+- 完整步骤见 [docs/cookbook/adding-a-repo-check.md](../docs/cookbook/adding-a-repo-check.md)。

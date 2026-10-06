@@ -4,7 +4,7 @@
  * 检查五件事：
  *   1. 参与的文本文件都是不带 BOM 的合法 UTF-8（Markdown 与 changelog XML）；
  *   2. Markdown 里的相对链接目标存在，锚点能命中标题或显式 `<a id>`；
- *   3. docs/roadmap 与 docs/design 的 README 索引与实际文件双向一致；
+ *   3. docs/roadmap、docs/design 与 docs/todo 的 README 索引与实际文件双向一致；
  *   4. .agents/skills/<name>/SKILL.md 的 frontmatter 合法；
  *   5. 没有占位符残留（`«` / `»`，以及尖括号里的邮箱占位、TODO 一类词根）。
  *
@@ -14,14 +14,26 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const ROOT = resolve(import.meta.dirname, '..');
-/** 参与检查的目录与根文件：只覆盖仓库自己写的文档，不含依赖与构建产物。 */
+/** 仓库根；checkDocuments 可临时指向一个临时目录，测试才不必往仓库里写探针。 */
+let ROOT = resolve(import.meta.dirname, '..');
+/** 参与检查的目录：只覆盖仓库自己写的文档，不含依赖与构建产物。 */
 const SCAN_DIRS = ['docs', '.agents/skills'];
-const SCAN_ROOT_FILES = ['AGENTS.md', 'README.md', 'README.en.md', 'CONTRIBUTING.md'];
+/** 散落在目录之外的文档：子树 AGENTS、基准与测试的 README 也在检查范围内 */
+const SCAN_FILES = [
+  'AGENTS.md',
+  'README.md',
+  'README.en.md',
+  'CONTRIBUTING.md',
+  'scripts/AGENTS.md',
+  'src/main/ups/AGENTS.md',
+  'benchmarks/README.md',
+  'test/README.md',
+];
 /** 只校验编码、不参与链接与索引检查的目录：changelog 里有中文表名注释，存错编码会静默变成乱码写进账本。 */
 const ENCODING_DIRS = ["src/main/ups/changesets"];
-/** 这两个目录的 README 是索引表，必须与目录内的文件双向一致。 */
+/** 这几个目录的 README 是索引表，必须与目录内的文件双向一致。 */
 const INDEX_DIRS = ['docs/roadmap', 'docs/design', 'docs/todo'];
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PLACEHOLDERS = ['«', '»'];
@@ -57,7 +69,7 @@ function walkMarkdown(absDir, relDir, out) {
 
 /** 收集全部待检查的 Markdown 文件名。 */
 function collectMarkdown() {
-  const files = SCAN_ROOT_FILES.filter((name) => existsSync(resolve(ROOT, name)));
+  const files = SCAN_FILES.filter((name) => existsSync(resolve(ROOT, name)));
   for (const dir of SCAN_DIRS) {
     walkMarkdown(resolve(ROOT, dir), dir, files);
   }
@@ -347,18 +359,38 @@ function checkPlaceholders(sources) {
   }
 }
 
-const sources = loadSources();
-checkEncodings();
-const linkCount = checkLinks(sources);
-checkIndexes(sources);
-checkSkills(sources);
-checkPlaceholders(sources);
-
-if (violations.length > 0) {
-  for (const violation of violations) {
-    console.log(`${violation.file}:${violation.line} ${violation.message}`);
-  }
-  console.log(`文档检查失败：${violations.length} 个问题。`);
-  process.exit(1);
+/**
+ * 跑完整检查，返回违规列表与统计。判定逻辑集中在这里，CLI 与测试都调它——
+ * 测试可以传一个临时目录当仓库根，不必往真实仓库里写探针文件。
+ * @param {string} [baseDir] 仓库根；省略为脚本所在仓库
+ * @returns {{ violations: { file: string, line: number, message: string }[], fileCount: number, linkCount: number }} 结果
+ */
+export function checkDocuments(baseDir = ROOT) {
+  ROOT = baseDir;
+  violations.length = 0;
+  const sources = loadSources();
+  checkEncodings();
+  const linkCount = checkLinks(sources);
+  checkIndexes(sources);
+  checkSkills(sources);
+  checkPlaceholders(sources);
+  return { violations: violations.map((item) => ({ ...item })), fileCount: sources.size, linkCount };
 }
-console.log(`文档检查通过：${sources.size} 个文件，${linkCount} 条链接。`);
+
+/** 命令行入口：逐条报出问题，有则退出码 1。 */
+function main() {
+  const result = checkDocuments();
+  if (result.violations.length > 0) {
+    for (const violation of result.violations) {
+      console.log(`${violation.file}:${violation.line} ${violation.message}`);
+    }
+    console.log(`文档检查失败：${result.violations.length} 个问题。`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`文档检查通过：${result.fileCount} 个文件，${result.linkCount} 条链接。`);
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

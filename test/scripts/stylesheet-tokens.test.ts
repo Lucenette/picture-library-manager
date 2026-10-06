@@ -3,11 +3,13 @@ import { join, relative } from 'path';
 
 import { describe, expect, test } from 'vitest';
 
+import { dark, light } from '@common/theme';
+
 /**
- * 颜色只有一个来源：`src/common/theme.ts` 的主题对象。
+ * 颜色只有一个来源：`src/common/theme/` 的主题对象。
  *
  * 允许写死字面色值的只有两处，都有理由：
- * - `src/common/theme.ts` 本身就是那份来源；
+ * - `src/common/theme/` 本身就是那份来源；
  * - `src/renderer/entries/shell/first-paint.ts` 的内联片段要早于外链 CSS 生效，那时变量还不存在。
  *
  * 注释里的色值不算——说明文字里引用具体颜色是正常的。
@@ -54,5 +56,11 @@ describe('颜色的唯一来源', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  test('两套主题的 --app-* 令牌键完全一致', () => {
+    const appKeys = (tokens: Record<string, string | undefined>): string[] =>
+      Object.keys(tokens).filter((key) => key.startsWith('--app-')).sort();
+    expect(appKeys(light.tokens)).toEqual(appKeys(dark.tokens));
   });
 });
