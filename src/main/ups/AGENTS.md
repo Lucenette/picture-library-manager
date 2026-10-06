@@ -1,6 +1,6 @@
 # AGENTS.md — src/main/ups/
 
-升级模块的本地规则。启动阶段的登记与调度（谁阻塞、谁预热、跑在哪个进程）是加载服务的事，见 [docs/design/loading.md](../../docs/design/loading.md)。
+升级模块的本地规则。启动阶段的登记与调度（谁阻塞、谁预热、跑在哪个进程）是加载服务的事，见 [docs/design/loading.md](../../../docs/design/loading.md)。
 
 - 升级独立成 `src/main/ups/`，`src/main/database/` 是它的下层：升级模块调用数据库模块跑 SQL、读写账本，
   **`database/` 里不出现 `@/ups`**。

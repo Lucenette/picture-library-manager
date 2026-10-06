@@ -17,7 +17,7 @@ import { DOMParser } from '@xmldom/xmldom';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const DIR = join(ROOT, 'src/main/ups/changesets');
-const DEV_DB = join(ROOT, 'dist/data/picture-lib.db');
+const DEV_DB = join(ROOT, 'dist/.plmanager/data/picture-lib.db');
 const LEDGER = 'schema_migration';
 /** 约定文件里除了 dbups.xml 之外的两段脚本，只用来提示「没被预演」 */
 const SCRIPT_FILES = ['preups.ts', 'postups.ts'];
@@ -140,7 +140,7 @@ if (skipped.length > 0) {
 }
 
 // 路径一：全新库，按顺序跑完
-const fresh = join(ROOT, 'dist/data/_verify-fresh.db');
+const fresh = join(ROOT, 'dist/.plmanager/data/_verify-fresh.db');
 if (existsSync(fresh)) {
   rmSync(fresh);
 }
@@ -159,7 +159,7 @@ if (!existsSync(DEV_DB)) {
   console.log('');
   console.log('【现有库】跳过：没有 ' + DEV_DB);
 } else {
-  const copy = join(ROOT, 'dist/data/_verify-existing.db');
+  const copy = join(ROOT, 'dist/.plmanager/data/_verify-existing.db');
   copyFileSync(DEV_DB, copy);
   if (existsSync(DEV_DB + '-wal')) {
     copyFileSync(DEV_DB + '-wal', copy + '-wal');

@@ -89,7 +89,7 @@
 ### 界面
 - 自绘标题栏 + 左侧导航栏，失焦时整条 chrome 同步压暗
 - 确认、输入、文件查看、批量处理、扫描配置等一律原生弹窗，不用页面内弹窗
-- JetBrains 风格暗色主题，Element Plus 组件全覆盖
+- JetBrains 风格主题（明 / 暗两套），默认跟随系统；Element Plus 组件全覆盖
 
 ## 工作流程
 
@@ -153,8 +153,8 @@ shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图。sharp 是
 | 层 | 技术 | 说明 |
 |---|---|---|
 | 桌面壳 | Electron 44 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
-| 前端 | Vue 3 + Vite 6 + TypeScript 5 | Composition API + `<script setup>` |
-| UI 组件 | Element Plus 2 | 暗色主题全覆盖 |
+| 前端 | Vue 3 + Vite 7 + TypeScript 5 | Composition API + `<script setup>` |
+| UI 组件 | Element Plus 2 | 主题令牌全覆盖，明暗两套、可跟随系统 |
 | 数据库 | SQLite（`node:sqlite`） | Electron 内置，真实文件 + WAL，单条写入毫秒级落盘 |
 | 图片解码 | sharp（libvips） | 按需缩放解码 + 裁剪；原生依赖，各平台各自安装预编译包 |
 | 并发 | Node `worker_threads` | 解码跑在工作线程，不阻塞主进程 |
@@ -180,7 +180,7 @@ picture-library-manager/
 
 ## 脚本系统
 
-脚本是一份 CommonJS 的 `.js` 文件，正文放在**用户目录的 `scripts/` 下**（打包态 `~/.plmanager/scripts/`，开发态 `dist/scripts/`），库里只留索引：名称、文件路径、内置标记、类型关联与所属分组。「加载文件」只是把选中的文件**复制**一份进 `scripts/`，原文件此后不再被读写——所以复制出来的那一份就是脚本唯一的副本，删掉就没了。
+脚本是一份 CommonJS 的 `.js` 文件，正文放在**用户目录的 `scripts/` 下**（打包态 `~/.plmanager/scripts/`，开发态 `dist/.plmanager/scripts/`），库里只留索引：名称、文件路径、内置标记、类型关联与所属分组。「加载文件」只是把选中的文件**复制**一份进 `scripts/`，原文件此后不再被读写——所以复制出来的那一份就是脚本唯一的副本，删掉就没了。
 
 脚本**在主进程执行**：打开或保存时检测导出了哪些方法，每次调用前重新读盘并编译。因此用外部编辑器改完文件，下一次扫描 / 选图就会用新内容，不需要在应用里点任何按钮。
 

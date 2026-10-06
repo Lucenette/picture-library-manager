@@ -44,7 +44,7 @@
 
 | 函数 | 打包态 | 开发态 | 放什么 |
 |---|---|---|---|
-| `getUserDir()` | `~/.plmanager` | `dist` | 应用全部持久化内容的根 |
+| `getUserDir()` | `~/.plmanager` | `dist/.plmanager` | 应用全部持久化内容的根 |
 | `getDataDir()` | `~/.plmanager/data` | `dist/.plmanager/data` | 库文件与库备份（应用内部数据） |
 | `getScriptsDir()` | `~/.plmanager/scripts` | `dist/.plmanager/scripts` | 脚本正文（用户资产） |
 | `getTempDir()` | `~/.plmanager/temp` | `dist/.plmanager/temp` | 草稿这类随时可以丢掉的临时状态 |
@@ -248,7 +248,7 @@ monaco.typescript.javascriptDefaults.setCompilerOptions({
 monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.ts');
 ```
 
-`CJS_GLOBALS` 声明 `require` / `module` / `exports` / `__filename` / `__dirname`——补全与悬停因此可用（**IntelliSense 是现状**，关掉语义校验只是不报假错）。主题 `plmanager-dark` 取 `#1e1f22` 底；编辑器选项：`automaticLayout`、关 minimap、`fontSize: 14`、`tabSize: 4`、`scrollBeyondLastLine`、`smoothScrolling`、`fixedOverflowWidgets`、`contextmenu: false`（右键一律走原生菜单）、`lineDecorationsWidth: 14`、`rulers: [120]`、`stickyScroll: { enabled: true, maxLineCount: 3 }`。
+`CJS_GLOBALS` 声明 `require` / `module` / `exports` / `__filename` / `__dirname`——补全与悬停因此可用（**IntelliSense 是现状**，关掉语义校验只是不报假错）。主题 `plmanager` 的暗色底取 `#1e1f22`；编辑器选项：`automaticLayout`、关 minimap、`fontSize: 14`、`tabSize: 4`、`scrollBeyondLastLine`、`smoothScrolling`、`fixedOverflowWidgets`、`contextmenu: false`（右键一律走原生菜单）、`lineDecorationsWidth: 14`、`rulers: [120]`、`stickyScroll: { enabled: true, maxLineCount: 3 }`。
 
 `monaco-env.ts` 里还有 `warmUpTypeScript()`：加载服务「脚本编辑器」预热任务的第二步，用一个一次性离屏编辑器把语言服务点着（为什么必须是一个挂进编辑器的模型、以及它常驻堆内存的代价，见 [loading.md](./loading.md)）。编辑器只被 `ScriptPage` 引用，路由按需加载，所以 Monaco 只在进入脚本管理时才进依赖图。
 

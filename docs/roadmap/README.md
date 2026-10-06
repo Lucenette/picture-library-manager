@@ -21,10 +21,11 @@
 
 | 计划版本 | 主题 | 状态 | 难度 | 涉及 | 文件 |
 |---|---|---|---|---|---|
+| `1.1.2` | 图标库：用独立 SVG 图标库替换 Element Plus 图标 | 待实施 | 低 | 渲染进程 + 依赖 | [icon-library.md](./icon-library.md) |
 | `1.1.2` | 编辑器语法分析器换成 TextMate | 待实施 | 中 | 渲染进程 + 依赖 + 构建 | [monaco-textmate.md](./monaco-textmate.md) |
 | `1.2.0` | 任务剩余耗时估算 | 待实施 | 低 | 主进程 + IPC | [task-eta.md](./task-eta.md) |
 | `1.2.0` | 诊断：打开日志目录与收集日志 | 待评审 | 低 | 主进程 + 渲染进程 | [diagnostics.md](./diagnostics.md) |
-| `1.2.0` | 颜色主题切换 | 待实施 | 低 | 渲染进程 + 主进程（窗口底色与系统按钮字形色） | [theme.md](./theme.md) |
+| `1.2.0` | 颜色主题切换 | 进行中 | 低 | 渲染进程 + 主进程（窗口底色与系统按钮字形色） | [theme.md](./theme.md) |
 | `1.3.0` | 构建目标：32 位与 arm 架构 | 待评审 | 低 | 构建配置（需先核实 Electron 与 sharp 的架构支持） | [build-targets.md](./build-targets.md) |
 | `1.3.0` | 用本机编辑器打开脚本 | 待评审 | 中 | 主进程 + 渲染进程 | [open-script-in-editor.md](./open-script-in-editor.md) |
 | `1.3.0` | 设置页面 | 待评审 | 中 | 主进程 + 渲染进程（需先评审：要加 YAML 依赖） | [settings-page.md](./settings-page.md) |

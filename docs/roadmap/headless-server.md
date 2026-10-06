@@ -9,7 +9,7 @@
 
 1. **Electron 是硬依赖，装不上就跑不起来。** 主进程有 21 个文件 `import electron`，渲染进程有 26 个文件 `import ipcRenderer`；而业务核心（`main/database` 的 CRUD 与排序键、`main/task/runners`、`main/image`、`main/ups`、`script/compile.ts`）本身并不依赖 Electron——耦合集中在「窗口」「原生对话框」「IPC 注册」三处。
 2. **训练机不该背 Chromium。** 打包态的 Electron 带来 150~250 MB 运行时，并且必须起图形会话来跑；而 [visual-training-pipeline.md](./visual-training-pipeline.md) 规划的图库与训练更适合长期驻留在 GPU 机上，由另一台机器开网页操作。
-3. **通道名已经集中。** `src/common/ipcChannels.ts`（131 行）把全部通道集中在一处，`src/common/types.ts` 定义了载荷，等于一份现成的 RPC 契约；缺的只是「谁来承载这些通道」。
+3. **通道名已经集中。** `src/common/ipcChannels.ts`（130 行）把全部通道集中在一处，`src/common/types.ts` 定义了载荷，等于一份现成的 RPC 契约；缺的只是「谁来承载这些通道」。
 4. **辅助窗口有 7 类**（图片查看器、扫描配置、批量处理、输入、确认、文件查看、相似管理），各自一个 `BrowserWindow` 与独立渲染进程。其中「文件查看」只是浏览一组文件并挑一张，从发起到落库的六跳里有四跳纯粹因为它跨了进程。
 5. **无头服务需要一个标准的对外接入面。** 桌面模式的能力只能靠人点界面；server 模式才能对外暴露 `/metrics` 与能力清单，供外部监控或编排器定时拉取。
 
@@ -145,7 +145,6 @@ dirs:
 
 | 风险 | 应对 |
 |---|---|
-| 无测试框架，重构没有回归网 | 与 [测试系统](../design/test-system.md) 一起做，先钉住 task 状态机、DB CRUD、bus 路由 |
 | 对话框 / 子窗口收编牵动 UI 语义 | 先只做「文件查看」一个样板，验证后再推其它 |
 | `?nodeWorker` 在非 electron-vite 构建下失效 | 先验证 server 构建能产出 worker chunk |
 | `node:sqlite` 在纯 Node 上未验证 | 在目标 Node 版本上实测开库与读写 |

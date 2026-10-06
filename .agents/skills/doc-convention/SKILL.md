@@ -7,7 +7,7 @@ description: 在本仓库新增、修订、迁移或审阅 docs/ 下的 Markdown
 
 ## Summary
 
-`docs/` 下的每一份 Markdown 只有两种身份：**还没做的方案**与**已经落地的事实**。这份规范说明一份文档属于
+`docs/` 下的 Markdown 分几层，本规范管**还没做的方案**与**已经落地的事实**两种。这份规范说明一份文档属于
 哪一态、用哪个模板、写完要动哪些索引，以及落地后怎么 `git mv`。它要达到的效果是：改某个子系统之前，
 能先读到它为什么是现在这样、有哪些不变量，而不必翻代码或提交历史。仓库的硬性代码与目录约定见
 [AGENTS.md](../../../AGENTS.md)，进程模型与分层见 [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md)。
@@ -41,6 +41,8 @@ description: 在本仓库新增、修订、迁移或审阅 docs/ 下的 Markdown
 | 已落地的子系统：为什么这样、有哪些不变量、改动注意什么 | `docs/design/<子系统>.md` | [templates/design.md](templates/design.md) |
 | 跨子系统的结构：进程模型、目录归属、数据流 | `docs/ARCHITECTURE.md` | 无模板；结构真的变了才动它 |
 | 编码代理的硬性约定与自检步骤 | `AGENTS.md` | 无模板；文档格式规则归本 skill，不要往 AGENTS.md 里加 |
+
+其余各层（`todo/`、`postmortem/`、`cookbook/`、`glossary.md`）的归属见 [docs/README.md](../../../docs/README.md)。
 
 一个功能一个文件，文件名 kebab-case 且与功能同名。`docs/design/` 只接收从路线图迁来的文件，不在那里新写方案。
 

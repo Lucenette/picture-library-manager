@@ -105,7 +105,7 @@ export async function run(ctx: ChangeScriptContext): Promise<void> {
 
 ## 数据目录在用户主目录
 
-唯一指定的用户数据目录是打包后的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`，开发态是 `dist/data/`）：
+唯一指定的用户数据目录是打包后的 `~/.plmanager/data/`（Windows 为 `C:\Users\<你>\.plmanager\data`，开发态是 `dist/.plmanager/data/`）：
 库、备份、脚本以及将来的日志都在里面。**不要把它挪回安装目录**——Windows 的覆盖安装会先静默调用旧版卸载器、
 清空整个安装目录，库放那儿等于每次更新都可能丢；Linux 的 deb 装在 root 所有的 `/opt/PLManager`、
 macOS 的 exe 在 `.app` 内部，也都不是能写库的地方。
@@ -149,7 +149,7 @@ node .agents/skills/db-maintenance/scripts/verify-migration.mjs
 它跑两条路径，都不碰真实库：
 
 1. **全新库**：把各版本 `dbups.xml` 里的 `<sql>` 按顺序跑在临时库上，打印最终的表 / 列 / 索引——这是"新装一台机器"的结果。
-2. **现有库**：在工作区内复制 `dist/data/picture-lib.db`，只跑账本里没记过的 changeset，打印前后的行数——这是"老库升上来"的结果。
+2. **现有库**：在工作区内复制 `dist/.plmanager/data/picture-lib.db`，只跑账本里没记过的 changeset，打印前后的行数——这是"老库升上来"的结果。
 
 它还会打印每个版本目录里有哪些文件，并单独列出**没有被预演的 `preups.ts` / `postups.ts`**：脚本是编译进主进程包的 TS，
 纯 Node 跑不了，带脚本的版本必须额外在库副本上手工冒烟。
@@ -162,12 +162,12 @@ node .agents/skills/db-maintenance/scripts/verify-migration.mjs
 
 ## 迁移失败或启动报错
 
-- 只要有待执行的步骤，升级会先把整个库复制到 `dist/data/backups/pre-migration-<yyyyMMdd-HHmmss>.db`，**每次启动清理旧备份、保留最近 3 份**。恢复就是把它拷回 `dist/data/picture-lib.db`（先关掉应用）。
+- 只要有待执行的步骤，升级会先把整个库复制到 `dist/.plmanager/data/backups/pre-migration-<yyyyMMdd-HHmmss>.db`，**每次启动清理旧备份、保留最近 3 份**。恢复就是把它拷回 `dist/.plmanager/data/picture-lib.db`（先关掉应用）。
 - 账本里 `exectype = 'failed'` 的那一行记着上次失败的原因；启动加载页也会显示错误与备份路径。**失败不算执行过，下次启动会重跑那一步。**
 - 脚本报错时数据库里只留下那一行 `failed`：它写进库的其它内容随事务回滚了；已经写出去的文件不会回滚。
 - `no such table: xxx` 通常是"代码预期新结构、库还是旧结构"：升级没跑（身份已在账本里）或跑失败了。
 - `Provided value cannot be bound to SQLite parameter N` 是**绑定到了 `undefined`**：顺着那条语句的参数往上找哪个字段取空了，多半是持久化数据的键名问题。
-- 不要清空 `dist/`：开发库就在 `dist/data/picture-lib.db`，删掉没有报错、也找不回来。
+- 不要清空 `dist/`：开发库就在 `dist/.plmanager/data/picture-lib.db`，删掉没有报错、也找不回来。
 
 ## 交稿前的自检
 

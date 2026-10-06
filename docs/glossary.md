@@ -33,7 +33,7 @@
 | 版本目录 | `src/main/ups/changesets/<版本>/`，最多含 preups / dbups / postups 三件 | [design/ups.md](./design/ups.md) |
 | 账本 | `schema_migration` 表，记录已执行的 changeSet 与脚本；执行过的不再执行 | [design/ups.md](./design/ups.md) |
 | 排序键 | 把中文（拼音）、数字（自然序）与标点算成可直接比较的字符串 | [design/sort-keys.md](./design/sort-keys.md) |
-| 数据目录 / 缓存目录 | `~/.plmanager/data` 与 `cache`；前者是库与备份，后者可随时删 | [AGENTS.md](../AGENTS.md) |
+| 数据目录 | `~/.plmanager/data`：库文件与库备份（应用内部数据） | [design/script-management.md](./design/script-management.md) |
 
 ## 界面
 

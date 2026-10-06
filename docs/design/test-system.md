@@ -1,7 +1,7 @@
 # 测试与静态检查
 
 **状态**：现行架构
-**最后更新**：2026-10-03
+**最后更新**：2026-10-04
 
 **关联**：[ARCHITECTURE.md](../ARCHITECTURE.md)（进程模型与分层）、[AGENTS.md](../../AGENTS.md)（改完必须自检的五条）
 
@@ -104,7 +104,7 @@ test/
 
 - `test/` 的对应目录已并入两份 tsconfig 的 `include`，`@` 按各自的映射解析，`yarn typecheck` 连测试一起查；`tsconfig.node.json` 开 `allowJs`，测试才能 import `scripts/release-notes.mjs`（同目录的 `release-notes.d.mts` 提供类型）。
 - `node scripts/check-jsdoc.mjs` 管硬性规范 4：`src/**/*.ts` 的顶层导出符号必须有 JSDoc（零依赖，只看顶层声明）。
-- `node scripts/check-docs.mjs` 管文档：编码、相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill frontmatter、占位符。
+- `node scripts/check-docs.mjs` 管文档：编码、相对链接与锚点、`docs/roadmap`、`docs/design` 与 `docs/todo` 的 README 索引、skill frontmatter、占位符；扫描范围含子树 `AGENTS.md`、`benchmarks/README.md` 与 `test/README.md`。
 - `node scripts/check-doc-budgets.mjs` 管常驻文档的字数预算（`scripts/doc-budgets.json`，单位是非空白字符数）。
 - `scripts/check-code.mjs` 已删除：四条规则迁进 ESLint，模板编译与导入解析分别由 `vue/no-parsing-error` 与 `typecheck` 覆盖。
 - AGENTS.md 的「改完必须自检」收敛到 7 条：`tsc` / `vue-tsc` / `yarn lint` / `check-jsdoc` / `check-docs` / `check-doc-budgets` / `yarn test`。

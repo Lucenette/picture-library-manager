@@ -1,6 +1,6 @@
 # 颜色主题切换
 
-**状态**：待实施（令牌、两套主题、「跟随系统」与统一入口已落地，见 §4 末尾；切换与设置页未做）
+**状态**：进行中（令牌、两套主题、「跟随系统」与统一入口已落地，见 §4 末尾；切换与设置页未做）
 **关联**：[settings-page.md](./settings-page.md)（主题的偏好存在它的 `settings.yml`）
 
 ---
@@ -19,8 +19,8 @@
 | 日期 | 变更 | 原因 |
 |---|---|---|
 | 2026-09-29 | 首次记录（需求登记） | 使用者提出 |
-| 2026-10-05 | 收编落地：值搬进 `src/common/theme.ts`、主题管理器与注册处理器、删掉主进程的 `WINDOW_COLORS` 镜像、补尺寸阶梯、加样式表扫描用例 | 先把不依赖设置页与切换的部分做完 |
-| 2026-10-05 | 评审：定为**一份主题对象 + 一组注册的处理器**——值放 `src/common/theme.ts`（两个进程都 import），Element 侧的处理器把它写成 CSS 变量、Monaco 的处理器设自己的主题（含语法着色）；主进程只当"选择"的真源并管窗口那一层 | 对照 dsh 的 `ui-theme`、并纠正"值只放 CSS"会逼 JS 消费者去 DOM 里刮字符串 |
+| 2026-10-05 | 评审：定为**一份主题对象 + 一组注册的处理器**——值放 `src/common/theme/`（两个进程都 import），Element 侧的处理器把它写成 CSS 变量、Monaco 的处理器设自己的主题（含语法着色）；主进程只当"选择"的真源并管窗口那一层 | 对照 dsh 的 `ui-theme`、并纠正"值只放 CSS"会逼 JS 消费者去 DOM 里刮字符串 |
+| 2026-10-05 | 收编落地：值搬进 `src/common/theme/`、主题管理器与注册处理器、删掉主进程的 `WINDOW_COLORS` 镜像、补尺寸阶梯、加样式表扫描用例 | 先把不依赖设置页与切换的部分做完 |
 
 ---
 
@@ -43,23 +43,23 @@
 
 ### 3.1 数据形状
 
-**(a) 主题定义**：`src/common/theme.ts`，一套主题一个条目，**键完全一致**——加主题就是照抄一份改值。
+**(a) 主题定义**：`src/common/theme/`（`index.ts` 出统一入口，一套主题一个文件），一套主题一个条目，**键完全一致**——加主题就是照抄一份改值。
 
     THEMES.dark = {
       tokens: {                       // 既含颜色也含尺寸，键就是 CSS 变量名
-        '--app-bg-page': '#1e1f22', '--app-text-regular': '#d8dadd', …
+        '--app-bg-page': '#191a1c', '--app-text-regular': '#dfe1e5', …
         '--app-space-2': '8px', '--app-radius-md': '4px', '--app-title-bar-height': '40px', …
       },
       monaco: {
-        base: 'vs-dark',              // token 着色的底：第一版继承 base
-        rules: [],                    // 语法规则（关键字/字符串/注释…），浅色落地时按需填
+        base: 'vs-dark',              // token 着色的底
+        rules: [{ … }],               // 语法规则：按词元名着色，取自 Dark.icls / Light.icls
         colors: { 'editor.background': …, 行号、选中、当前行、差异色 },
       },
     }
 
 **(b) 偏好**（`settings.yml` 的键，settings-page 负责读写；本项只消费）
 
-    theme: dark          # dark | light | system，缺省 dark
+    theme: system        # dark | light | system，缺省 system
 
 **(c) 传递的是什么**：两个进程都 import 同一份对象，所以跨进程只传**选择**，不传值——
 
@@ -159,7 +159,7 @@ sequenceDiagram
 ### 3.9 强制：样式表扫描用例
 
 - 扫 `src/renderer/**/*.{vue,css}` 的样式块：颜色只准以 `var(--app-*)` / `var(--el-*)` 出现（`#hex`、`rgb()` 一律失败），例外只有 `first-paint` 的内联片段那两处。
-- **色值的唯一合法落点是 `src/common/theme.ts`**——这条也由用例守：全仓搜 `#hex` / `rgb(`，命中只允许出现在 `theme.ts`、`first-paint.ts`（都有注释说明）。
+- **色值的唯一合法落点是 `src/common/theme/`**——这条也由用例守：全仓搜 `#hex` / `rgb(`，命中只允许出现在 `theme/`、`first-paint.ts`（都有注释说明）。
 - dsh 用的是同一套机制（样式表扫描 + 例外清单）。
 
 ### 3.10 与 settings-page 的边界
@@ -174,7 +174,7 @@ sequenceDiagram
 | 层 | 唯一真源 | 各窗口怎么一致 |
 |---|---|---|
 | **选择**（dark / light / system） | 主进程（`settings.yml` → 内存 → `resolved`） | 在一个窗口里改 → 回主进程 → 写文件 + **广播给所有窗口**；新窗口由 URL 带上当前值 |
-| **值**（颜色与尺寸） | `src/common/theme.ts`（一份对象） | 两个进程 import 同一份；各窗口的同名处理器拿到同一个对象 |
+| **值**（颜色与尺寸） | `src/common/theme/`（一份对象） | 两个进程 import 同一份；各窗口的同名处理器拿到同一个对象 |
 
 **不在渲染进程放缓存（localStorage 之类）**：
 
@@ -188,22 +188,22 @@ sequenceDiagram
 
 | 位置 | 改动 |
 |---|---|
-| **新增** `src/common/theme.ts` | 主题对象：`tokens`（颜色 + 尺寸）与 `monaco`；其余主题按第一套的键约束 |
+| **新增** `src/common/theme/`（`index.ts` 出统一入口） | 主题对象：`tokens`（颜色 + 尺寸）与 `monaco`；其余主题按第一套的键约束 |
 | `src/renderer/styles/theme.css` | 去掉全部值，只留 `var(--app-*)` 用法与 `--el-*` 映射 |
 | **新增** `src/renderer/entries/shell/theme.ts` | 主题管理器：`applyTheme` 通知处理器、`onThemeChange` 注册与注销 |
-| **新增** 写 CSS 变量的处理器 | 把 `theme.tokens` 逐项 setProperty；四个入口共用 |
+| **新增** 写 CSS 变量的处理器 | 把 `theme.tokens` 逐项 setProperty，并删掉新主题没有的旧键；四个入口共用 |
 | `src/renderer/entries/shell/first-paint.ts` | 按 `?bg=` 给画布底色（保留写死的兜底与注释） |
-| `src/main/window-manager.ts` | 删 `WINDOW_COLORS`，改读 `THEMES[resolved].tokens`；`getWindowUrl()` 带 `theme`；设 `nativeTheme.themeSource`；`nativeTheme.on('updated')` |
+| `src/main/window-manager.ts` | 删 `WINDOW_COLORS`，改读 `resolveTheme(...).tokens`；`getWindowUrl()` 带上当前解析出的窗口底色（`?bg=`）；`nativeTheme.on('updated')` 刷新已开窗口 |
 | `src/main/settings/*`（settings-page） | `theme` 键、校验、原子写、广播载荷带 `resolved` |
-| `src/renderer/views/main/scripts/monaco-env.ts` | 注册处理器：`defineTheme('plmanager', theme.monaco)` + `setTheme`；`CHANGE_COLORS` 同源 |
+| `src/renderer/views/main/scripts/monaco-env.ts` | 注册处理器：`defineTheme('plmanager', theme.monaco)` + `setTheme`；概览标尺的改动色条同源，随 `onThemeChange` 重画 |
 | 各 `.vue` | 363 个尺寸字面量里重复的那些换成令牌 |
 | `docs/design/`（落地后） | 主题对象的口径、处理器清单、首帧例外 |
 
-**已落地**（在 `feature/color-theme` 上，尚未并入 develop）：
+**已落地**（`259d229` 已并入 develop）：
 
 | 提交 | 内容 |
 |---|---|
-| `a577344` | 颜色收编：122 条颜色声明搬进 `common/theme.ts`；管理器与四个入口的挂载；删掉主进程镜像；Monaco 改注册处理器；样式表扫描用例 |
+| `a577344` | 颜色收编：122 条颜色声明搬进 `src/common/theme/`；管理器与四个入口的挂载；删掉主进程镜像；Monaco 改注册处理器；样式表扫描用例 |
 | `8f0039d` | 修掉清理 `theme.css` 时留下的悬空注释续行（构建失败的真凶） |
 | `9d9a8c0` | 尺寸收编：尺度阶梯 + 25 个文件里重复的间距 / 字号 / 圆角换成令牌 |
 | `77f1b51` | Monaco 主题 id 收敛成常量（组件里还在传旧 id，导致编辑器回落成浅色默认主题） |
@@ -225,22 +225,13 @@ Monaco 的 `rules` 已接上两套 `*.icls`（暗色用 `Dark.icls`、浅色用 
 | 首帧闪错色 | 画布底色由主进程经 URL 提前给（§3.2） |
 | `resolved` 两处各算一次，窗口与界面不一致 | 只由主进程算，载荷带过去（§3.1） |
 | 某个处理器忘了注册或忘了注销 | 处理器清单固定（§3.5）；管理器逐个 try/catch；注销在 `onBeforeUnmount` |
-| 一套主题少键、两份主题键不一致 | `as const` + 按第一套的键做类型约束，编译期就报 |
+| 一套主题少键、两份主题键不一致 | 两套 `--app-*` 的键集合由 `test/scripts/stylesheet-tokens.test.ts` 的用例断言相等 |
 | 一次性的对齐值被塞进令牌，令牌表膨胀 | §3.7 的口径 |
 | 浅色下对比度不足 | 另给一套（含系统按钮字形色与 Monaco 语法规则），逐窗口人眼走一遍 |
 
 ## 6. 验证方法
 
-1. 静态：样式表扫描用例（颜色只走 token）；全仓搜 `#hex` / `rgb(` 只允许 `theme.ts` 与 `first-paint.ts`。
+1. 静态：样式表扫描用例（颜色只走 token）；全仓搜 `#hex` / `rgb(` 只允许 `theme/` 与 `first-paint.ts`。
 2. 纯逻辑：`resolveTheme`（三种偏好 × 两种系统态）、管理器的注册／注销与"一个处理器抛异常不影响其余"——都不需要 Electron。
 3. 人工：深色下四个窗口各看一遍；浅色落地后同样；Windows / Linux 看系统按钮字形色；开两个窗口切一次，确认都跟上、没有闪。
 4. 切换与持久化随 settings-page 落地时一并验（含"手改文件后重启"）。
-
-## 7. 待决事项
-
-| # | 事项 | 倾向 |
-|---|---|---|
-| 1 | 浅色那套的内容 | Element Plus 默认 + 我们的品牌主色，不自己维护整套变量 |
-| 2 | Monaco 的语法 `rules` 何时填 | 第一版留空、由 `base` 继承；浅色落地时只填与界面冲突的几条 |
-| 3 | 尺寸阶梯先收几档 | 只收重复 ≥ 3 次的值 |
-| 4 | 样式表扫描放哪一层 | 渲染进程用例（`test/renderer/`），与只跑静态检查的那几项分开 |

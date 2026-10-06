@@ -21,7 +21,7 @@
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
 | `node scripts/check-docs.mjs` | 文档检查：编码、相对链接与锚点、README 索引、skill frontmatter、占位符 | 零依赖；CI 与「改完必须自检」都会跑 |
 | `node scripts/make-fixture.mjs` | 生成样例图库到 `dist/fixture/` | 零依赖、可重复执行；见 `CONTRIBUTING.md` 的「样例图库」 |
-| `yarn lint` | ESLint：命名空间导入、控制语句大括号、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板编译与导入解析、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs` |
+| `yarn lint` | ESLint：命名空间导入、控制语句大括号、空行、渲染进程 Node 边界、`database` 反向依赖、`.vue` 模板语法、类型感知的 Promise / `any` 规则 | 需先 `yarn install`；配置见 `eslint.config.mjs`；导入解析由 `tsc` / `vue-tsc` 负责 |
 | `yarn test` | 单元测试：主进程与渲染进程两份 vitest 配置 | 只跑一侧用 `yarn test:main` / `yarn test:renderer` |
 | `yarn bench` | 基准测试：排序键、相似分组 | 不进 CI，只用于同机前后对比；见 [benchmarks/README.md](benchmarks/README.md) |
 
@@ -240,7 +240,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 ## 已知环境限制
 
 - **`yarn build` 可能无法在受限沙箱里跑完**：esbuild 需要 `spawn` 子进程并用命名管道通信，沙箱会以 `spawn EPERM` 拒绝。遇到时如实说明"构建未验证"，不要假装通过，也不要绕过沙箱。
-- **`vue-tsc` 已随依赖安装**（当前 5.9.3）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
+- **`vue-tsc` 已随依赖安装**（当前 3.3.12）：`tsc` 只覆盖主进程与 `common`，**`.vue` 的类型错误必须靠 `vue-tsc`**。
   只跑 `tsc` 就宣称"类型已检查"是错的——曾经因此漏掉一个缺失的 import，对应按钮一点就报 `ReferenceError`。
 - **Electron ≥ 42 不再在 install 时下载二进制**：官方的 `postinstall` 没了，改成首次运行 `electron .` 时按需拉取。
   本仓库在 `package.json` 的 `postinstall` 里显式跑 `node node_modules/electron/install.js`（幂等，装过就跳过），
@@ -275,9 +275,9 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
 1. `node_modules/.bin/tsc -p tsconfig.node.json` —— 覆盖主进程与 `common`。
 2. `node_modules/.bin/vue-tsc -p tsconfig.web.json` —— 覆盖渲染进程，**含 `.vue`**。
    这一步不能省：`tsc` 看不到 `.vue`，缺 import、模板变量不存在这类错误只有它会报。
-3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板编译与导入解析，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。
+3. `yarn lint` —— 覆盖禁止命名空间导入（硬性规范 1）、控制语句大括号（硬性规范 2）、渲染进程引用 Node 内置模块（运行时约定 1）、`src/main/database/` 依赖 `@/ups`（运行时约定 8）、`.vue` 模板语法，以及类型感知的 Promise / `any` 规则；配置见 `eslint.config.mjs`。**导入解析不在这里**：静态 import 的 `TS2307` 由上面两条 `tsc` / `vue-tsc` 报。
 4. `node scripts/check-jsdoc.mjs` —— 覆盖硬性规范 4：`src/**/*.ts` 的顶层导出符号必须有 JSDoc。
-5. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap` 与 `docs/design` 的 README 索引、skill 的 frontmatter。
+5. `node scripts/check-docs.mjs` —— 覆盖编码（Markdown 与 changelog XML）、文档的相对链接与锚点、`docs/roadmap`、`docs/design` 与 `docs/todo` 的 README 索引、skill 的 frontmatter、占位符。
 6. `node scripts/check-doc-budgets.mjs` —— 常驻文档的字数预算（`scripts/doc-budgets.json`）。超了先搬走内容、再压缩，最后才提额并在提交信息里写明理由。
 7. `yarn test` —— 规则内的代码改了就跑；判据见上面的「测试覆盖规则」。
 

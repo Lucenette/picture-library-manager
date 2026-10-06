@@ -58,6 +58,7 @@ description: 使用者说「发布」「发版」「release」（可能带版本
 5. **本次发布的版本号**：取 develop 的 `package.json` 版本号（见「发布策略」）；使用者另行指定了版本，才在 release 分支上改 `package.json` 与 CHANGELOG 顶部的 `[<版本>]`。
 6. 发布门禁，全过才往下走：`yarn typecheck`、`node scripts/check-docs.mjs`；有数据库改动时再跑
    `node .agents/skills/db-maintenance/scripts/verify-migration.mjs`。
+7. **`docs/todo/` 已清空**（除 `README.md` 外没有别的 `.md`）：还有未结的工程欠账时禁止发版，除非使用者明确要求。
 
 ## 标准流程
 
@@ -109,7 +110,7 @@ git branch -d release/<版本>
 
 ## 版本号与更新日志的两态
 
-- **master 是发布线，tag 只打在它上面；develop 是开发线，不带 tag。** develop 看不到那些 tag 指向的合并提交，所以 `git describe --tags --abbrev=0` 在 develop 上会给出一个**过期的** tag（本仓库现在是 `v0.0.1`）。**任何需要「最近一个发布过的版本」的地方都从 master 取**：`git describe --tags --abbrev=0 master`，或 `git tag --sort=-v:refname | head -1`。
+- **master 是发布线，tag 只打在它上面；develop 是开发线，不带 tag。** develop 看不到那些 tag 指向的合并提交，所以 `git describe --tags --abbrev=0` 在 develop 上给出的不保证是最新发布——它只反映 develop 合过哪些 tag。**任何需要「最近一个发布过的版本」的地方都从 master 取**：`git describe --tags --abbrev=0 master`，或 `git tag --sort=-v:refname | head -1`。
 - **`package.json` 的版本号**：develop 上是下一次 release 的版本号；master 上是刚落地的发布版本。发布过的 release 之后 develop 比 master 高一档（master `1.1.1`、develop `1.2.0`），只 release 没发布时可能只高一个补丁位。
 - `CHANGELOG.md` 已发布段在两条线上相同；develop 顶部多一个空的 `## [<下一次版本>] - 未发布`，master 没有。
 - 发布说明由 `scripts/release-notes.mjs` 生成：它以**最近一个 tag**（`git describe --tags --abbrev=0`）为界，把之后的所有
@@ -168,6 +169,7 @@ git branch -d release/<版本>
 ## 不能做的事
 
 - **不要推送**：本仓库的推送由使用者自己执行。
+- **todo 未清空时不要发版**（除非使用者明确要求）：`docs/todo/` 还有文件就说明欠账没结清。
 - 不要 force push、不要移动已推送的 tag、不要在 `master` 上直接提交代码。
 - 不要改已经记过账的版本目录里的 `VERSION`。
 - 发布门禁没过就不算发布完成——不要把类型检查、文档检查、迁移预演跳过。
