@@ -9,7 +9,7 @@
  * 只改 `*_sort` 列，不动任何原文；跑之前请先关掉应用（同一个库文件不要两个进程一起写）。
  *
  * 用法：node scripts/rebuild-sort-keys.mjs [库文件]
- * 默认库文件是开发态的 `dist/data/picture-lib.db`；装好的应用在 `~/.plmanager/data/picture-lib.db`。
+ * 默认库文件是开发态的 `dist/.plmanager/data/picture-lib.db`；装好的应用在 `~/.plmanager/data/picture-lib.db`。
  */
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SORT_DIR = join(ROOT, 'src/main/database/sort');
-const DEFAULT_DB = join(ROOT, 'dist/data/picture-lib.db');
+const DEFAULT_DB = join(ROOT, 'dist/.plmanager/data/picture-lib.db');
 
 /** 编译 `sort/` 并把它加载进来；临时产物用完即删 */
 function loadSortModule() {

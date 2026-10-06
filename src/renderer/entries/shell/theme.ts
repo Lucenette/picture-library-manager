@@ -10,21 +10,33 @@ export type ThemeHandler = (theme: Theme) => void;
 
 const handlers = new Set<ThemeHandler>();
 let current: Theme = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
+/** 上一套写进 `<html>` 的键：换主题时要把新主题没有的删掉，否则内联变量会压住新主题应有的默认值 */
+let applied: string[] = [];
 
 /**
  * 应用一套主题：先把令牌写进 `:root`，再依次通知订阅者。
  *
  * 处理器之间**互不依赖**——它们从 theme 对象取值、不从 DOM 里读，所以不需要约定先后。
- * 设置页落地前只有一套主题，入口初始化时由 `initTheme()` 跑一次。
+ * 明暗两套由 `initTheme()` 在入口初始化时挂上，系统切明暗时重跑；设置页落地前没有手动切换入口。
  */
 export function applyTheme(theme: Theme): void {
   current = theme;
+  const next: string[] = [];
   for (const [name, value] of Object.entries(theme.tokens)) {
     // 某套主题可以少给键（例如浅色不覆盖 --el-* 色阶，交给 Element Plus 自带的浅色默认），跳过即可
     if (value !== undefined) {
       document.documentElement.style.setProperty(name, value);
+      next.push(name);
     }
   }
+  // 内联变量优先级最高：新主题没给的键必须删掉，否则暗→亮会留着上一套的 --el-*
+  const nextSet = new Set(next);
+  for (const name of applied) {
+    if (!nextSet.has(name)) {
+      document.documentElement.style.removeProperty(name);
+    }
+  }
+  applied = next;
   for (const handler of handlers) {
     try {
       handler(theme);

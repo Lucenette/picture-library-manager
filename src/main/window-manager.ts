@@ -4,7 +4,7 @@ import { pathToFileURL } from 'url';
 import { app, BrowserWindow, nativeTheme, type WebPreferences } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
-import { DEFAULT_THEME, resolveTheme } from '@common/theme';
+import { DEFAULT_THEME, resolveTheme, type TokenName } from '@common/theme';
 
 import { createLogger } from '@/log';
 
@@ -50,9 +50,9 @@ interface WindowConfig {
   minHeight?: number;
   backgroundColor?: string;
   /** 换主题时要跟着变的那一项令牌（与 backgroundColor 二选一，后者优先） */
-  backgroundToken?: string;
+  backgroundToken?: TokenName;
   /** 标题栏与系统按钮那一段要跟的令牌；省略则跟 backgroundToken */
-  titleBarToken?: string;
+  titleBarToken?: TokenName;
   title?: string;
   /** 渲染进程路由 */
   route: string;
@@ -99,7 +99,7 @@ interface WindowConfig {
 const windows = new Map<string, BrowserWindow>();
 
 /** 每个窗口的配色来源：换主题时按各自的来源重新取值，不能一律按主窗口的来 */
-const chromeSources = new WeakMap<BrowserWindow, { backgroundToken?: string; overlayToken?: string; height: number }>();
+const chromeSources = new WeakMap<BrowserWindow, { backgroundToken?: TokenName; overlayToken?: TokenName; height: number }>();
 
 /**
  * 系统明暗切换时把已开的窗口也改过来。
@@ -116,7 +116,7 @@ function syncSystemAppearance(): void {
       continue;
     }
     const source = chromeSources.get(window);
-    const pick = (key: string | undefined, fallback: string): string | undefined => (key === undefined ? tokens[fallback] : (tokens[key] ?? tokens[fallback]));
+    const pick = (key: TokenName | undefined, fallback: TokenName): string | undefined => (key === undefined ? tokens[fallback] : (tokens[key] ?? tokens[fallback]));
     const background = pick(source?.backgroundToken, '--app-bg-page');
     if (background !== undefined) {
       window.setBackgroundColor(background);
@@ -160,7 +160,18 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   const hasOverlay = hideTitleBar && !isControl && process.platform !== 'darwin';
   const paletteNow = palette();
   const background = config.backgroundColor ?? (config.backgroundToken === undefined ? paletteNow['--app-bg-page'] : paletteNow[config.backgroundToken]);
-  const overlayColor = titleBar?.color ?? (config.titleBarToken === undefined ? background : paletteNow[config.titleBarToken]);
+  const overlayToken = config.titleBarToken ?? config.backgroundToken;
+  /**
+   * 现取 overlay 底色：系统切明暗后再 focus/blur 也要跟当前主题，不能用手上建窗口时的快照。
+   */
+  const resolveOverlayColor = (): string | undefined => {
+    if (titleBar?.color !== undefined) {
+      return titleBar.color;
+    }
+    const tokens = palette();
+    return overlayToken === undefined ? tokens['--app-bg-page'] : (tokens[overlayToken] ?? tokens['--app-bg-page']);
+  };
+  const overlayColor = resolveOverlayColor();
   const overlayHeight = titleBar?.height ?? 36;
 
   const window = new BrowserWindow({
@@ -191,7 +202,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
     // 由它自己监听 focus/blur（见 App.vue）。macOS 的红绿灯由系统自己变灰，这里不用管。
     const syncSymbolColor = (focused: boolean): void => {
       window.setTitleBarOverlay({
-        color: overlayColor,
+        color: resolveOverlayColor() ?? '',
         symbolColor: focused ? palette()['--app-text-regular'] : palette()['--app-text-muted'],
         height: overlayHeight,
       });
@@ -213,7 +224,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   }
 
   window.setMenu(null);
-  void window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, config.backgroundColor));
+  void window.loadURL(getWindowUrl(config.entry ?? 'index', config.route, background));
   window.on('closed', () => {
     log.info(`window closed: ${id}`);
     if (windows.get(id) === window) {
@@ -224,7 +235,7 @@ export function create(id: string, config: WindowConfig): BrowserWindow {
   logWindowTiming(window, id, startedAt);
 
   windows.set(id, window);
-  chromeSources.set(window, { backgroundToken: config.backgroundToken, overlayToken: config.titleBarToken ?? config.backgroundToken, height: overlayHeight });
+  chromeSources.set(window, { backgroundToken: config.backgroundToken, overlayToken, height: overlayHeight });
   log.info(`window opened: ${id} (entry=${config.entry ?? 'index'}, route=${config.route})`);
   return window;
 }

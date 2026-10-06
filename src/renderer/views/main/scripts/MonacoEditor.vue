@@ -10,11 +10,15 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { DEFAULT_THEME, resolveTheme } from '@common/theme';
 import type { ScriptCompileError } from '@common/types';
 
+import { onThemeChange } from '@/entries/shell/theme';
+
 import type { ScriptLineChange } from './diff';
 import { MONACO_THEME } from './monaco-env';
 
-/** 当前主题的令牌；改动色条只在建编辑器时取值，系统切换后要等重新打开脚本页才刷新 */
-const { tokens } = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
+/** 当前主题的令牌：系统切明暗后现取，概览标尺能跟着变（gutter 色条走 CSS 变量，两边一起跟） */
+function currentTokens(): ReturnType<typeof resolveTheme>['tokens'] {
+  return resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches).tokens;
+}
 
 /**
  * 取主题令牌。
@@ -22,20 +26,25 @@ const { tokens } = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color
  * 令牌表是偏的（其余主题可以少给键），所以取到 undefined 要当场抛——键名写错或主题漏了它，
  * 会立刻暴露，而不是静默用错色；也因此不写兜底色值（写了就绕过「颜色只有一个来源」的用例）。
  */
-function token(name: keyof typeof tokens): string {
-  const value = tokens[name];
+function token(name: string): string {
+  const value = currentTokens()[name];
   if (value === undefined) {
     throw new Error('theme token missing: ' + name);
   }
   return value;
 }
 
-/** 改动色条与概览标尺的颜色：新增绿、修改蓝、删除红，直接取主题里那三个语义色 */
-const CHANGE_COLORS: Record<ScriptLineChange['kind'], string> = {
-  added: token('--app-tag-success-text'),
-  modified: token('--app-primary'),
-  deleted: token('--app-danger'),
+/** 改动色条与概览标尺各用哪个语义色：新增绿、修改蓝、删除红 */
+const CHANGE_COLOR_TOKENS: Record<ScriptLineChange['kind'], string> = {
+  added: '--app-tag-success-text',
+  modified: '--app-primary',
+  deleted: '--app-danger',
 };
+
+/** 概览标尺的颜色按当前主题现取，注册在 onThemeChange 上随系统切换重画 */
+function changeColor(kind: ScriptLineChange['kind']): string {
+  return token(CHANGE_COLOR_TOKENS[kind]);
+}
 
 const props = defineProps<{
   modelValue: string;
@@ -72,6 +81,8 @@ let errorLine: monacoEditor.IEditorDecorationsCollection | null = null;
 let changeDecorations: monacoEditor.IEditorDecorationsCollection | null = null;
 /** marker 变化的订阅：Monaco 的语法诊断是异步算出来的，得靠它上报 */
 let markerSubscription: IDisposable | null = null;
+/** 主题切换的订阅：换明暗时重画概览标尺的颜色 */
+let themeSubscription: (() => void) | null = null;
 /** 正在把外部内容灌进编辑器：这一轮的变化不要再抛回去，否则会绕成环 */
 let applying = false;
 
@@ -254,7 +265,7 @@ function applyChanges(): void {
         isWholeLine: true,
         linesDecorationsClassName: `plm-change-${change.kind}`,
         overviewRuler: {
-          color: CHANGE_COLORS[change.kind],
+          color: changeColor(change.kind),
           position: monacoEditor.OverviewRulerLane.Left,
         },
       },
@@ -308,6 +319,7 @@ onMounted(() => {
   applyMarkers();
   changeDecorations = editor.createDecorationsCollection([]);
   applyChanges();
+  themeSubscription = onThemeChange(() => applyChanges());
   // 我们设的编译标记与 Monaco 的语法诊断都会触发它，状态图标因此能实时反映问题
   markerSubscription = monacoEditor.onDidChangeMarkers(() => reportProblems());
   reportProblems();
@@ -325,6 +337,8 @@ watch(() => props.error, applyMarkers, { deep: true });
 watch(() => props.changes, applyChanges, { deep: true });
 
 onBeforeUnmount(() => {
+  themeSubscription?.();
+  themeSubscription = null;
   markerSubscription?.dispose();
   markerSubscription = null;
   editor?.dispose();

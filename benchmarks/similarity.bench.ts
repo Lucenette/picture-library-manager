@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { test } from 'vitest';
 
 import { buildSimilarGroups, type SimilarInputRow } from '@/image/similar';
 
@@ -6,7 +6,7 @@ import { measureAsync, report } from './harness';
 
 /** 样本规模：1000 张图。识别会把一次图库两两比对，1000 张约 50 万次比对。 */
 const ROW_COUNT = 1000;
-/** 哈希种子上界：500 种模式，制造大量小簇而不是一个巨簇。 */
+/** 哈希种子上界：seed 取模 500；生成时只用到 seed 的低 8 位，因此最多 256 种不同哈希，制造大量小簇而不是一个巨簇。 */
 const SEED_MODULUS = 500;
 /** 每个哈希置 1 的位数：8 字节里取 24 位，让汉明距离落在相同/相似阈值附近。 */
 const HASH_BITS = 24;
@@ -44,6 +44,6 @@ test(`相似分组：${ROW_COUNT} 张图`, async () => {
   const result = await measureAsync(`相似分组 ${ROW_COUNT} 张图`, async () => {
     await buildSimilarGroups(ROWS);
   }, { samples: 7, runsPerSample: 3 });
+  // 基准的产物是上面这行数字，不是断言——阈值见 README 的「没有预算」一节
   report(result);
-  expect(result.medianMs).toBeGreaterThan(0);
 });

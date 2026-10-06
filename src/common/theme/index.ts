@@ -1,16 +1,16 @@
-import { dark } from './dark';
+import { dark, darkTokens } from './dark';
 import { light } from './light';
 import { resolveSystemTheme } from './system';
 import type { Theme, ThemeName } from './types';
 
-export type { MonacoTheme, Theme, ThemeName } from './types';
+export type { Theme, ThemeName } from './types';
 export { dark, light };
 
 /** 静态主题：一套一个文件；加主题就是再加一个文件并登记到这里 */
 export const THEMES = { dark, light } as const;
 
-/** 全部主题名，含动态的 system */
-export const THEME_NAMES: readonly ThemeName[] = ['dark', 'light', 'system'];
+/** 主题令牌名：窗口配置里指令牌的地方用它，写错在编译期就报 */
+export type TokenName = keyof typeof darkTokens;
 
 /** 默认主题：跟随系统（设置页落地前没有切换入口，靠系统明暗来验证亮/暗两套） */
 export const DEFAULT_THEME = 'system';

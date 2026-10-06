@@ -42,7 +42,7 @@ declare var __dirname: string;`;
 export const MONACO_THEME = 'plmanager';
 
 /**
- * 编辑器主题：颜色直接取自 `src/common/theme.ts` 的主题对象。
+ * 编辑器主题：颜色直接取自 `src/common/theme/` 的主题对象。
  *
  * Monaco 只认字符串色值、读不了 CSS 变量，而主题对象两个进程都能 import——所以这里是直接取，
  * 不再从 DOM 里刮（刮就只能拿"当前生效"的那套，切换时会留着旧色）。

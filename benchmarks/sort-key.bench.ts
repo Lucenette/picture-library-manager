@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { test } from 'vitest';
 
 import { CHARACTER_NAME_PROFILE, sortKeyOf } from '@/database/sort';
 
@@ -6,9 +6,9 @@ import { measure, report } from './harness';
 
 /** 样本规模：5000 个名字。开发库实测 2.5 万条记录，取同数量级的一次全量排序。 */
 const SAMPLE_COUNT = 5000;
-/** 汉字池：16 个常用字，覆盖不同拼音分组，默认与姓名两种 profile 都要过一遍。 */
+/** 汉字池：18 个字（「景」「物」各重复，互异的 15 个），覆盖不同拼音分组，默认与姓名两种 profile 都要过一遍。 */
 const HAN_POOL = '测试图片角色场景人物风景动物植物建筑';
-/** 文件名数字的上界：997 是质数，与汉字池长度 16 互质，样本不会退化成简单周期。 */
+/** 文件名数字的上界：997 是质数，与汉字池长度 18 互质，样本不会退化成简单周期。 */
 const FILE_INDEX_MODULUS = 997;
 
 /**
@@ -33,8 +33,8 @@ test(`排序键：${SAMPLE_COUNT} 个混合名（默认 profile）`, () => {
       sortKeyOf(sample);
     }
   });
+  // 基准的产物是上面这行数字，不是断言——阈值见 README 的「没有预算」一节
   report(result);
-  expect(result.medianMs).toBeGreaterThan(0);
 });
 
 test(`排序键：${SAMPLE_COUNT} 个混合名（姓名 profile）`, () => {
@@ -44,5 +44,4 @@ test(`排序键：${SAMPLE_COUNT} 个混合名（姓名 profile）`, () => {
     }
   });
   report(result);
-  expect(result.medianMs).toBeGreaterThan(0);
 });
