@@ -109,7 +109,7 @@ closeAllWatchers(): void                                               // before
 - 首读与热加载都走 `readTextIfChanged`；`watchPaths([getSettingsPath()], reload)`。
 - reload 的三档：**读不到/解析不了** → 保持当前内存 + warn；**解析成功但某项非法** → 应用好的键、坏的退回默认并标记；**与内存深比较相等** → 什么都不做（顺带吃掉自己的写回回声）。
 - 应用 = `nativeTheme.themeSource` + 通知订阅者（窗口配色 + `settings:changed` 广播）。**渲染进程零改动**：设置页与四个入口早就订阅了这条通道。
-- 为「启动时固化」的项（日志级别那类）预留 `pendingRestart: string[]`：界面显示「文件里的值与当前生效值不同，需重启」，而不是悄悄不生效。
+- 为「启动时固化」的项（日志级别那类）预留 `pendingRestart: string[]`：界面显示「文件里的值与当前生效值不同，需重启」，而不是悄悄不生效。日志级别那条设置项本身仍在 [settings-page.md](./settings-page.md) 的剩余项里，这里只留位置。
 
 ### 4.2 脚本：类型索引走 watcher，编辑器缓冲走焦点
 
@@ -147,7 +147,7 @@ closeAllWatchers(): void                                               // before
 5. **脚本外部改动**：类型索引 + `script:changed` + 焦点校验与原生确认框。
 6. **`image/walk.ts` 同步遍历改异步**（独立一笔：修既有缺陷，与本方案可分别回滚）。
 
-前三笔不含界面行为，可以先合；后三笔与设置页、脚本外部编辑同批。
+六笔都在本版（1.1.2）落地。①②③⑥ 不含界面行为，可以先合、逐笔验；④⑤ 要动渲染进程与界面，排在 [renderer-preload.md](./renderer-preload.md) 之前，届时新增的渲染进程侧调用会在那一项里一起迁到 preload。
 
 ## 8. 改动清单
 

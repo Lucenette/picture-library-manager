@@ -22,10 +22,11 @@
 | 计划版本 | 主题 | 状态 | 难度 | 涉及 | 文件 |
 |---|---|---|---|---|---|
 | `1.1.2` | 编辑器语法分析器换成 TextMate | 待实施 | 中 | 渲染进程 + 依赖 + 构建 | [monaco-textmate.md](./monaco-textmate.md) |
+| `1.1.2` | 文件读写与变更监听（fs 层） | 待实施 | 中 | 主进程 + 渲染进程 + 依赖 | [file-watch.md](./file-watch.md) |
+| `1.1.2` | 渲染进程权限收口：IPC 收进 preload | 待实施 | 中 | 渲染进程 + preload + 构建配置 | [renderer-preload.md](./renderer-preload.md) |
 | `1.2.0` | 任务剩余耗时估算 | 待实施 | 低 | 主进程 + IPC | [task-eta.md](./task-eta.md) |
 | `1.2.0` | 诊断：打开日志目录与收集日志 | 待评审 | 低 | 主进程 + 渲染进程 | [diagnostics.md](./diagnostics.md) |
 | `1.3.0` | 构建目标：32 位与 arm 架构 | 待评审 | 低 | 构建配置（需先核实 Electron 与 sharp 的架构支持） | [build-targets.md](./build-targets.md) |
-| `1.3.0` | 文件读写与变更监听（fs 层；前三笔不含界面行为，可先随 `1.2.0` 出） | 待实施 | 中 | 主进程 + 渲染进程 + 依赖 | [file-watch.md](./file-watch.md) |
 | `1.3.0` | 用本机编辑器打开脚本 | 待评审 | 中 | 主进程 + 渲染进程 | [open-script-in-editor.md](./open-script-in-editor.md) |
 | `1.3.0` | 设置页面（骨架、主题与日志只读展示已随 `1.1.2` 落地，剩余见文件） | 进行中 | 中 | 主进程 + 渲染进程 | [settings-page.md](./settings-page.md) |
 | `1.3.0` | 相似图片管理 | 待评审 | 中 | 主进程 + 渲染进程 + 数据库（需先评审） | [similar-manage.md](./similar-manage.md) |
