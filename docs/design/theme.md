@@ -1,7 +1,7 @@
 # 颜色主题
 
 **状态**：现行架构
-**最后更新**：2026-10-07
+**最后更新**：2026-10-08
 
 **关联**：[settings-page.md](../roadmap/settings-page.md)（偏好的落点）、[icon-library.md](./icon-library.md)（图标跟令牌变色）
 
@@ -29,6 +29,7 @@
 | 2026-10-05 | 评审：定为**一份主题对象 + 一组注册的处理器**——值放 `src/common/theme/`（两个进程都 import），Element 侧的处理器把它写成 CSS 变量、Monaco 的处理器设自己的主题；主进程只当「选择」的真源并管窗口那一层 | 对照 dsh 的 `ui-theme`，并纠正「值只放 CSS」会逼 JS 消费者去 DOM 里刮字符串 |
 | 2026-10-05 | 收编落地：值搬进 `src/common/theme/`、主题管理器与注册处理器、删掉主进程的镜像、补尺寸阶梯、加样式表扫描用例（`a577344`、`9d9a8c0` 等） | 先把不依赖设置页与切换的部分做完 |
 | 2026-10-07 | 切换入口与持久化落地：偏好进 `settings.yml`、建窗口时经 URL 的 `?theme=` 首帧送达、改完广播 `settings:changed`；文档迁入 `docs/design/` | 方案最后一块完成 |
+| 2026-10-08 | 脚本编辑器的 `monaco.rules` 由词元名改成 TextMate 作用域 | 词法器换成 TextMate（见 [monaco-textmate.md](./monaco-textmate.md)），注释能分行内 / 行间两级 |
 
 ---
 
@@ -43,7 +44,7 @@
       },
       monaco: {
         base: 'vs-dark',              // token 着色的底
-        rules: [{ … }],               // 语法规则：按词元名着色，取自 Dark.icls / Light.icls
+        rules: [{ … }],               // 语法规则：按 TextMate 作用域着色，色值取自 Dark.icls / Light.icls
         colors: { 'editor.background': …, 行号、选中、当前行、差异色 },
       },
     }
@@ -126,7 +127,7 @@ sequenceDiagram
 | 注册者 | 收到通知后做什么 |
 |---|---|
 | 应用本体（Element Plus 与页面，含尺寸） | **不是单独注册的**：管理器自己就把 `theme.tokens` 逐项写进 `:root`，再通知其余处理器——组件库的颜色全走 CSS 变量，变量一改它就跟着变 |
-| Monaco（`monaco-env.ts`） | `defineTheme('plmanager', theme.monaco)` + `setTheme('plmanager')`，**含语法着色**（`rules`）与编辑器配色 |
+| Monaco（`monaco-env.ts`） | `defineTheme('plmanager', theme.monaco)` + `setTheme('plmanager')`，**含按作用域配置的语法着色**（`rules`）与编辑器配色 |
 
 **Element Plus 本身没有「主题 API」**：它的颜色全走 CSS 变量，所以「注册一个处理器」在这里的含义就是
 「把变量写对」——写完之后组件与页面一起变。
@@ -177,6 +178,7 @@ sequenceDiagram
 - **要在渲染进程读某个令牌的值**：不要从 DOM 里 `getComputedStyle` 刮，直接从主题对象取——那正是把值
   放 `src/common/theme/` 换来的好处。
 - **新增尺寸**：先判断它是「尺度轴上的一个值」还是一次性对齐值（见第 6 节的口径），别把令牌表撑大。
+- **改语法着色规则**：脚本编辑器的分词器是 TextMate，规则键是作用域；通用词元名规则留着给其它语言与语义高亮用，删了会同时丢掉降级色。
 - 验证：`yarn test` 里的扫描用例管颜色与键集合；其余靠人工——四个窗口各看一遍（主窗口、查看器、浮窗、各类弹窗），
   深色与浅色各一次，Windows / Linux 还要看系统按钮字形色。
 
@@ -191,5 +193,6 @@ sequenceDiagram
 
 **已知未跟**：脚本页的改动色条（新增 / 修改 / 删除三色）是建编辑器时取的，切换主题后要重新打开脚本页才刷新。
 
-**Monaco 的限制**：JS / TS 的 `//` 与 `/* */` 在 Monaco 里同属 `comment` 词元，**没法像 IDEA 那样行内一色、
-行间另一色**；能单独着色的是 `/** */`（`comment.doc`）。
+**编辑器的词法层**：脚本编辑器换成了 TextMate 词法器（`src/renderer/views/main/scripts/textmate/`），主题规则按
+**作用域**配置，`comment.line` 与 `comment.block` 因此能分开着色；其余语言仍用 Monaco 内置分词器，靠同一张表里
+保留的通用词元名规则着色。两套主题目前沿用原有色值，等 IDEA 导出的配色方案到位后再按作用域细调。

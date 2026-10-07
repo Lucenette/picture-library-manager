@@ -13,6 +13,7 @@
 | 升级模块 ups：版本目录、升级脚本与账本 | [ups.md](./ups.md) |
 | 加载服务：启动任务的登记与调度 | [loading.md](./loading.md) |
 | 脚本管理：用户目录里的脚本文件库、常驻编辑器与脚本分组 | [script-management.md](./script-management.md) |
+| 编辑器词法器：TextMate 装配、作用域着色与降级 | [monaco-textmate.md](./monaco-textmate.md) |
 | 日志系统：三个文件、category、控制台来源与兜底捕获 | [logging.md](./logging.md) |
 | 排序键：派生排序列与可插拔的文字排序模块 | [sort-keys.md](./sort-keys.md) |
 | 平铺视图：两级相册式渲染、行窗口化与分片取数 | [view-layouts.md](./view-layouts.md) |

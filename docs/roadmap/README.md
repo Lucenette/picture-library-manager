@@ -21,7 +21,6 @@
 
 | 计划版本 | 主题 | 状态 | 难度 | 涉及 | 文件 |
 |---|---|---|---|---|---|
-| `1.1.2` | 编辑器语法分析器换成 TextMate | 待实施 | 中 | 渲染进程 + 依赖 + 构建 | [monaco-textmate.md](./monaco-textmate.md) |
 | `1.1.2` | 文件读写与变更监听（fs 层） | 待实施 | 中 | 主进程 + 渲染进程 + 依赖 | [file-watch.md](./file-watch.md) |
 | `1.1.2` | 渲染进程权限收口：IPC 收进 preload | 待实施 | 中 | 渲染进程 + preload + 构建配置 | [renderer-preload.md](./renderer-preload.md) |
 | `1.2.0` | 任务剩余耗时估算 | 待实施 | 低 | 主进程 + IPC | [task-eta.md](./task-eta.md) |
