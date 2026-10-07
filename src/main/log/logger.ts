@@ -89,15 +89,34 @@ export function withScriptLogChannel<T>(action: () => T): T {
 // 配置
 // ------------------------------------------------------------
 
-/** 从环境变量读级别；不认识的值退回默认 */
-function readLevel(name: string, fallback: LogLevel): LogLevel {
+/** 从环境变量读级别；没给、给空或不认识都是 null，由调用方决定退回什么 */
+function readEnvLevel(name: string): LogLevel | null {
   const raw = process.env[name] === undefined ? '' : String(process.env[name]).trim().toLowerCase();
-  return LEVELS.includes(raw) ? (raw as LogLevel) : fallback;
+  return LEVELS.includes(raw) ? (raw as LogLevel) : null;
 }
 
-/** 主进程自己的日志级别：开发态 debug、打包态 info */
+/** 从环境变量读级别；不认识的值退回默认 */
+function readLevel(name: string, fallback: LogLevel): LogLevel {
+  return readEnvLevel(name) ?? fallback;
+}
+
+/**
+ * 当前生效的根日志级别与它的来源。
+ *
+ * 级别在启动配 log4js 时就固化了（改它要重启），所以设置页只能展示、不能改；环境变量给了
+ * 不认识的取值时按默认值算，界面上也这么显示——不静默换成另一个级别。
+ */
+export function getRootLevel(): { level: LogLevel; source: string } {
+  const fromEnv = readEnvLevel('PLM_LOG_LEVEL');
+  if (fromEnv !== null) {
+    return { level: fromEnv, source: '环境变量 PLM_LOG_LEVEL' };
+  }
+  return { level: app.isPackaged ? 'info' : 'debug', source: '默认值' };
+}
+
+/** 主进程自己的日志级别：开发态 debug、打包态 info；环境变量优先 */
 function rootLevel(): LogLevel {
-  return readLevel('PLM_LOG_LEVEL', app.isPackaged ? 'info' : 'debug');
+  return getRootLevel().level;
 }
 
 /**

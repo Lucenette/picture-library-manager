@@ -9,5 +9,6 @@
 ## 已写在别处的操作
 
 - 新增一种任务：见 [ARCHITECTURE.md](../ARCHITECTURE.md) 末尾的五步配方。
+- 接一条路线图需求并落地：见 [.agents/skills/roadmap-delivery/](../../.agents/skills/roadmap-delivery/SKILL.md)。
 - 写版本升级脚本、改动数据库结构：见 [.agents/skills/db-maintenance/](../../.agents/skills/db-maintenance/SKILL.md)。
 - 发一个版本：见 [.agents/skills/gitflow-release/](../../.agents/skills/gitflow-release/SKILL.md)。

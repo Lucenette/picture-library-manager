@@ -118,6 +118,8 @@ SQLite 直接报 cannot start a transaction within a transaction。
 - **中文信息不要用 `git commit -m` 拼**：Windows 命令行按代码页处理参数，中文可能变成乱码。把信息写进临时文件
   （如 `dist/commit-msg.txt`，`dist/` 已被忽略）再 `git commit -F <文件>`，提交后用 `git log -1 --format=%B` 回读核对，最后删掉它。
 - 只改信息用 `git commit --amend -F <文件>`；**未推送**时才是安全的。
+- **同一笔的后续修补并回原提交**：刚提交完又发现该改的地方（补一条规矩、修个错字、调一下预算），`git reset --soft HEAD~1`
+  之后连同原文重提；别让「新增某物」与「给它补一条」留成两笔——历史是一笔一件事，不是一串补丁。同样只在未推送时做。
 
 ## 交稿前自检
 

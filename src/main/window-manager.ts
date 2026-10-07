@@ -4,9 +4,10 @@ import { pathToFileURL } from 'url';
 import { app, BrowserWindow, nativeTheme, type WebPreferences } from 'electron';
 
 import { IPC } from '@common/ipcChannels';
-import { DEFAULT_THEME, resolveTheme, type TokenName } from '@common/theme';
+import { resolveTheme, type TokenName } from '@common/theme';
 
 import { createLogger } from '@/log';
+import { getSettings } from '@/settings/store';
 
 /** 本模块的日志（category `main.window`） */
 const log = createLogger('window');
@@ -18,11 +19,12 @@ const log = createLogger('window');
 /**
  * 当前这套主题的令牌。
  *
- * 「跟随系统」时每次调用都按系统的明暗重新解析，所以系统一切换就拿到新值。主进程读不到 CSS 变量，
- * 窗口底色与系统按钮字形色只能在建窗口（或系统切换）时给。
+ * 偏好来自设置（`settings.yml`，「跟随系统」时每次调用都按系统的明暗重新解析，所以系统一切换就
+ * 拿到新值）；主进程读不到 CSS 变量，窗口底色与系统按钮字形色只能在建窗口（或主题变化）时给。
+ * 设置在建任何窗口之前就已读进内存，所以这里取的必然是本轮启动的偏好。
  */
 function palette(): Record<string, string | undefined> {
-  return resolveTheme(DEFAULT_THEME, nativeTheme.shouldUseDarkColors).tokens;
+  return resolveTheme(getSettings().theme, nativeTheme.shouldUseDarkColors).tokens;
 }
 
 /** 渲染进程入口名 → 构建产物里的 HTML 文件；每个窗口类一份，见 docs/design/window-management.md 第 4 节 */
@@ -102,15 +104,18 @@ const windows = new Map<string, BrowserWindow>();
 const chromeSources = new WeakMap<BrowserWindow, { backgroundToken?: TokenName; overlayToken?: TokenName; height: number }>();
 
 /**
- * 系统明暗切换时把已开的窗口也改过来。
+ * 把当前主题的配色重新写到已开的窗口上。
  *
- * 界面本体由渲染进程自己听 matchMedia 改（四个入口都会挂），主进程这边只有两处：窗口底色
- * （文档绘制前的兜底色，已加载的窗口看不见）与 Windows / Linux 的系统按钮字形色——不改就会在
- * 浅色标题栏上留着浅色字形。没有 WCO 的窗口（macOS、无边框弹窗）调 setTitleBarOverlay 会抛，忽略即可。
+ * 两条触发路径：系统明暗变了（只有偏好是「跟随系统」时才会真的换色），以及设置页改了偏好——
+ * 后者必须显式调：系统明暗可能压根没变（系统亮色下把偏好从「深色」改成「浅色」），
+ * 那时等不到 `nativeTheme` 的 `updated`。
+ *
+ * 要改的是两处：窗口底色（文档绘制前的兜底色，已加载的窗口看不见）与 Windows / Linux 的系统按钮
+ * 字形色——不改就会在浅色标题栏上留着浅色字形。没有 WCO 的窗口（macOS、无边框弹窗）调
+ * `setTitleBarOverlay` 会抛，忽略即可。
  */
-function syncSystemAppearance(): void {
+export function applyWindowPalette(): void {
   const tokens = palette();
-  log.info('system appearance changed, refreshing windows: ' + (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
   for (const window of windows.values()) {
     if (window.isDestroyed()) {
       continue;
@@ -133,7 +138,10 @@ function syncSystemAppearance(): void {
   }
 }
 
-nativeTheme.on('updated', syncSystemAppearance);
+nativeTheme.on('updated', () => {
+  log.info('system appearance changed, refreshing windows: ' + (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
+  applyWindowPalette();
+});
 
 // ------------------------------------------------------------
 // 窗口管理
@@ -473,11 +481,18 @@ export function createSimilar(): BrowserWindow {
 /**
  * 渲染进程地址：开发态走 Vite 服务，打包后走本地文件。
  *
- * 顺带把窗口自己的底色作为查询参数带上，渲染进程的首帧就能用它作背景，
- * 不必等组件样式到位（否则下拉浮窗、图片查看器会先闪一下默认色）。
+ * 顺带把窗口自己的底色与主题偏好作为查询参数带上：
+ * - `bg`：首帧就能用它作背景，不必等组件样式到位（否则下拉浮窗、图片查看器会先闪一下默认色）；
+ * - `theme`：渲染进程在**首帧之前**要按偏好决定画哪一套主题，挂载后再去问主进程就会先闪一下
+ *   系统主题（见 entries/shell/theme.ts）。
  */
 function getWindowUrl(entry: RendererEntry, route: string, background?: string): string {
-  const query = background ? `?bg=${encodeURIComponent(background)}` : '';
+  const params = new URLSearchParams();
+  if (background !== undefined) {
+    params.set('bg', background);
+  }
+  params.set('theme', getSettings().theme);
+  const query = `?${params.toString()}`;
   const file = ENTRY_HTML[entry];
   if (process.env.ELECTRON_RENDERER_URL) {
     return `${process.env.ELECTRON_RENDERER_URL}/${file}${query}#${route}`;

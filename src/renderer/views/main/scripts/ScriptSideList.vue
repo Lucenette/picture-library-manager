@@ -9,10 +9,10 @@
         </button>
 
         <el-tooltip content="搜索脚本" placement="bottom" :show-after="300">
-          <el-button text class="icon-btn" :icon="Search" @click="startSearch" />
+          <el-button text class="icon-btn" :icon="ICONS.search" @click="startSearch" />
         </el-tooltip>
         <el-tooltip content="新建分组" placement="bottom" :show-after="300">
-          <el-button text class="icon-btn" :icon="FolderAdd" @click="emit('group-new')" />
+          <el-button text class="icon-btn" :icon="ICONS.folderPlus" @click="emit('group-new')" />
         </el-tooltip>
       </div>
 
@@ -43,7 +43,7 @@
         <div class="group-head" @contextmenu.prevent="onGroupContextMenu(group.id)">
           <button type="button" class="group-toggle" @click="emit('group-toggle', group.id)">
             <el-icon class="group-icon">
-              <component :is="isCollapsed(group) ? Folder : FolderOpened" />
+              <AppIcon :name="isCollapsed(group) ? 'folder' : 'folderOpen'" />
             </el-icon>
             <span class="group-name">{{ group.name }}</span>
             <span class="group-count">({{ countOf(group) }})</span>
@@ -52,10 +52,10 @@
           <!-- 每个分组自己的动作：悬停或键盘进入时才露出来 -->
           <div class="group-actions">
             <el-tooltip content="新增脚本" placement="bottom" :show-after="300">
-              <el-button text class="icon-btn" :icon="Plus" @click="emit('create', group.id)" />
+              <el-button text class="icon-btn" :icon="ICONS.plus" @click="emit('create', group.id)" />
             </el-tooltip>
             <el-tooltip content="加载文件" placement="bottom" :show-after="300">
-              <el-button text class="icon-btn" :icon="FolderOpened" @click="emit('import', group.id)" />
+              <el-button text class="icon-btn" :icon="ICONS.folderOpen" @click="emit('import', group.id)" />
             </el-tooltip>
           </div>
         </div>
@@ -84,13 +84,15 @@
 </template>
 
 <script setup lang="ts">
-import { Folder, FolderAdd, FolderOpened, Plus, Search } from '@element-plus/icons-vue';
 import { ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { InputInstance } from 'element-plus';
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 
 import { IPC } from '@common/ipcChannels';
 import type { ScriptType, TypeFilterOpenData } from '@common/types';
+
+import AppIcon from '@/components/AppIcon.vue';
+import { ICONS } from '@/components/icons';
 
 import { TYPE_LABELS, type ScriptGroupView, type SideItem } from './script-list';
 

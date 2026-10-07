@@ -89,7 +89,9 @@
 ### 界面
 - 自绘标题栏 + 左侧导航栏，失焦时整条 chrome 同步压暗
 - 确认、输入、文件查看、批量处理、扫描配置等一律原生弹窗，不用页面内弹窗
-- JetBrains 风格主题（明 / 暗两套），默认跟随系统；Element Plus 组件全覆盖
+- JetBrains 风格主题（明 / 暗两套），默认跟随系统，也可在设置页手动指定，切换后所有已开窗口一起换
+- 图标统一取 Lucide（编译期按需打包），跟主题令牌变色
+- 设置页：主题立即生效；日志级别与设置文件位置可见，设置文件可手改
 
 ## 工作流程
 
@@ -154,7 +156,8 @@ shrink-on-load（1/2、1/4、1/8），不把整图铺成 RGBA 位图。sharp 是
 |---|---|---|
 | 桌面壳 | Electron 44 | `nodeIntegration` + `contextIsolation: false`，渲染进程直接用 Node 能力 |
 | 前端 | Vue 3 + Vite 7 + TypeScript 5 | Composition API + `<script setup>` |
-| UI 组件 | Element Plus 2 | 主题令牌全覆盖，明暗两套、可跟随系统 |
+| UI 组件 | Element Plus 2 | 主题令牌全覆盖，明暗两套、可跟随系统或在设置页指定 |
+| 图标 | Lucide + `unplugin-icons` | 编译期按需产出单个 SVG，语义名映射在 `src/renderer/components/icons.ts` |
 | 数据库 | SQLite（`node:sqlite`） | Electron 内置，真实文件 + WAL，单条写入毫秒级落盘 |
 | 图片解码 | sharp（libvips） | 按需缩放解码 + 裁剪；原生依赖，各平台各自安装预编译包 |
 | 并发 | Node `worker_threads` | 解码跑在工作线程，不阻塞主进程 |

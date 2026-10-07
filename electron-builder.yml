@@ -5,6 +5,9 @@ copyright: MIT
 directories:
   output: dist
 
+# 装进包里的 node_modules 只有 dependencies。渲染进程那一套（element-plus / monaco-editor /
+# vue / vue-router）因此放在 devDependencies：Vite 已经把它们的代码打进 out/renderer，
+# 再按 dependencies 装一份就是安装目录里躺着两份。规则见 AGENTS.md 的「依赖分区」。
 files:
   - out/**/*
   - package.json

@@ -2,7 +2,7 @@
   <div class="source-page">
     <div class="toolbar">
       <el-button type="primary" @click="addSource">
-        <el-icon><Plus /></el-icon> 添加来源
+        <el-icon><AppIcon name="plus" /></el-icon> 添加来源
       </el-button>
       <el-button type="success" :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
         批量扫描 ({{ selectedIds.length }})
@@ -50,7 +50,6 @@
 </template>
 
 <script setup lang="ts">
-import { Plus } from '@element-plus/icons-vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import { computed, onMounted, ref } from 'vue';
@@ -58,6 +57,7 @@ import { computed, onMounted, ref } from 'vue';
 import { IPC } from '@common/ipcChannels';
 import type { Source, ProcessScript, ScanConfigInitData, ScanConfigResult } from '@common/types';
 
+import AppIcon from '@/components/AppIcon.vue';
 import { useIpcListener } from '@/composables/useIpcListener';
 import { useTasks } from '@/composables/useTasks';
 import {

@@ -78,6 +78,12 @@ export const IPC = {
   // 日志：渲染进程把记录交给主进程落盘（文件只有主进程一个写者）
   LOG_WRITE: 'log:write',
 
+  // 设置：文件只有主进程一个写者，渲染进程拿快照、提交改动
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+  /** 改动生效后广播给所有窗口，载荷是整份设置 */
+  SETTINGS_CHANGED: 'settings:changed',
+
   // 后台任务
   TASK_SUBMIT: 'task:submit',
   TASK_CANCEL: 'task:cancel',

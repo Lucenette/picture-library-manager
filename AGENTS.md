@@ -251,6 +251,7 @@ Windows / Linux 的左端是 40×40 图标槽（图标 16×16），**macOS 不�
   （实测 103 MB、25066 条记录）。删掉不会有任何报错、构建照样成功，只是数据没了，而且 `dist/` 被 `.gitignore` 忽略、没法从 git 找回。
   要清理只点具体产物：`dist/win-unpacked`、`dist/*.exe`、`dist/*.yml`。
 - **依赖可复现**：`yarn.lock` 已入库，CI 用 `yarn install --frozen-lockfile` 安装；Node 版本由 `.nvmrc`（`22`）与 `package.json` 的 `engines.node`（`>=22.12`）固定。
+- **依赖分区**：渲染进程用到的包进 `devDependencies`（Vite 会把它们打进 `out/renderer`），只有主进程 `require` 的才进 `dependencies`——electron-builder 只装 `dependencies`，放错就是安装目录里躺着第二份（实测 element-plus + monaco-editor 共 132 MB）。
 - **`?nodeWorker` 是 electron-vite 的虚拟模块**：静态的"导入路径是否存在"检查工具会把它报成无法解析，这是正常的，不是错误。
 - **`ReplaceFileW EIO (Win32 32)`**：`yarn dev` 或 IDE 正在占用该文件，稍后重试即可。
 
