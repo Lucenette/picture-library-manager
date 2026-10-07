@@ -101,42 +101,45 @@ export const light: Theme<typeof darkTokens> = {
     base: 'vs',
     rules: [
       // 通用词元名：内置词法器与 TextMate 失败时的降级路径，以及 TS 语义高亮都走它们
-      { token: 'comment', foreground: '8c8c8c' },
+      { token: 'comment', foreground: '8c8c8c', fontStyle: 'italic' },
       { token: 'keyword', foreground: '0033b3' },
       { token: 'string', foreground: '067d17' },
       { token: 'number', foreground: '1750eb' },
-      { token: 'constant', foreground: '871094' },
+      { token: 'constant', foreground: '871094', fontStyle: 'italic' },
       { token: 'function', foreground: '00627a' },
       { token: 'type', foreground: '00627a' },
       { token: 'variable', foreground: '000000' },
       { token: 'operator', foreground: '080808' },
       { token: 'delimiter', foreground: '080808' },
-      // TextMate 作用域（source.js）：色值取自 WebStorm 的 Light 配色（editor/Light.json），
-      // 行尾注释是对应的 JetBrains 属性名；方案没给值的属性落到默认前景。
-      { token: 'comment.line', foreground: '8c8c8c' }, // DEFAULT_LINE_COMMENT
-      { token: 'comment.block', foreground: '8c8c8c' }, // DEFAULT_BLOCK_COMMENT
-      { token: 'comment.block.documentation', foreground: '8c8c8c' }, // DEFAULT_DOC_COMMENT
+      // TextMate 作用域（source.js）：色值与字形取自 WebStorm 的 Light 配色（editor/Light.json）；
+      // 行尾注释是对应的 JetBrains 属性名，font 是它的 FONT_TYPE（1 粗体、2 斜体、3 粗斜体）。
+      // 这套方案区分度的很大一部分来自斜体/粗体，不只是颜色——只取色会显得比暗色平。
+      { token: 'comment.line', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_LINE_COMMENT
+      { token: 'comment.block', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_BLOCK_COMMENT
+      { token: 'comment.block.documentation', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_DOC_COMMENT
       { token: 'storage.type', foreground: '0033b3' }, // DEFAULT_KEYWORD
       { token: 'storage.modifier', foreground: '0033b3' }, // DEFAULT_KEYWORD
       { token: 'keyword.operator', foreground: '000000' }, // DEFAULT_OPERATION_SIGN 未设
       { token: 'string.regexp', foreground: '264eff' }, // JS.REGEXP
       { token: 'constant.numeric', foreground: '1750eb' }, // DEFAULT_NUMBER
-      { token: 'constant.character.escape', foreground: '0037a6' }, // DEFAULT_VALID_STRING_ESCAPE
-      { token: 'constant.language', foreground: '871094' }, // DEFAULT_CONSTANT
+      { token: 'constant.character.escape', foreground: '0037a6', fontStyle: 'bold' }, // DEFAULT_VALID_STRING_ESCAPE
+      { token: 'constant.language', foreground: '871094', fontStyle: 'italic' }, // DEFAULT_CONSTANT
       { token: 'entity.name.function', foreground: '00627a' }, // DEFAULT_FUNCTION_DECLARATION
-      { token: 'support.function', foreground: '00627a' }, // DEFAULT_STATIC_METHOD
+      { token: 'support.function', foreground: '00627a', fontStyle: 'italic' }, // DEFAULT_STATIC_METHOD
       { token: 'entity.name.type', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
       { token: 'entity.other.inherited-class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
       { token: 'support.class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
-      { token: 'variable.other.property', foreground: '871094' }, // DEFAULT_INSTANCE_FIELD
+      { token: 'variable.other.property', foreground: '871094', fontStyle: 'bold' }, // DEFAULT_INSTANCE_FIELD
       { token: 'variable.other', foreground: '2a8c7c' }, // JS.LOCAL_VARIABLE
       { token: 'variable.parameter', foreground: '000000' }, // JS.PARAMETER 未设
-      { token: 'variable.language', foreground: '830091' }, // JS.GLOBAL_VARIABLE
-      { token: 'storage.type.class.jsdoc', foreground: '8c8c8c' }, // DEFAULT_DOC_COMMENT_TAG 未设，跟注释同色
-      { token: 'entity.name.type.instance.jsdoc', foreground: '8c8c8c' }, // DEFAULT_DOC_MARKUP 未设，跟注释同色
-      { token: 'variable.other.jsdoc', foreground: '3d3d3d' }, // DEFAULT_DOC_COMMENT_TAG_VALUE
+      { token: 'variable.language', foreground: '830091', fontStyle: 'bold italic' }, // JS.GLOBAL_VARIABLE
+      { token: 'storage.type.class.jsdoc', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_DOC_COMMENT_TAG 未设，跟注释
+      { token: 'entity.name.type.instance.jsdoc', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_DOC_MARKUP 未设，跟注释
+      { token: 'variable.other.jsdoc', foreground: '3d3d3d', fontStyle: 'italic' }, // DEFAULT_DOC_COMMENT_TAG_VALUE
     ],
     colors: {
+      // 编辑区底色取 Light 方案自己的 attributes.TEXT.BACKGROUND（#ffffff，界面对应 --app-bg-surface）；
+      // 暗色那套方案写的是 #191a1c（对应 --app-bg-page）——两套在这点上不一样，别拿同一个界面令牌去套
       'editor.background': '#ffffff',
       // 未命中规则的文字用方案里的标识符色
       'editor.foreground': '#000000',

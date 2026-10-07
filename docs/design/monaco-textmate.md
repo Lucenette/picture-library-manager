@@ -86,6 +86,8 @@ adapter：只取最具体的一段作用域 ──► monaco.languages.setTokens
 - JSS 把 `let` / `const` / `function` 归 `storage.*`，类型归 `entity.name.*` 与 `support.*`；这些不以通用词元名开头，必须单独给。
 - 色值取自 WebStorm 导出的配色方案：暗色是 Islands Dark（`editor/Islands-Dark.json`），浅色是 Light（`editor/Light.json`，Islands Light UI 声明的编辑器方案）。规则里行尾写着对应的 JetBrains 属性名，改色对着导出文件核。
 - `comment.line` 与 `comment.block` 在 Islands Dark 里同为灰、只有 `comment.block.documentation` 是绿；Light 方案三者同灰——这是方案本身的选择，不是漏配。方案没给值的属性（如浅色的 `DEFAULT_CLASS_REFERENCE`）落到 `editor.foreground`。
+- 字形也按方案的 FONT_TYPE（1 粗体、2 斜体、3 粗斜体）：注释与常量斜体，`storage.*` 粗体，`this` 粗斜体，JSDoc 的标签与取值粗斜体。浅色方案的区分度有相当一部分来自字形，只取颜色会明显比暗色平。
+- 编辑器底色取**该套编辑器方案自己写的** `attributes.TEXT.BACKGROUND`：Islands Dark 是 `#191a1c`、Light 是 `#ffffff`。两套方案在这点上不一致（暗色的编辑器与窗口同底，浅色的编辑器是白面板），所以不能拿同一个界面令牌去套。
 
 ## 7. 机械守卫
 

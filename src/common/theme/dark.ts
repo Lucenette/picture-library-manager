@@ -153,12 +153,12 @@ export const dark: Theme<typeof darkTokens> = {
     rules: [
       // 通用词元名：内置词法器（json 等其它语言）与 TextMate 失败时的降级路径都走它们；
       // function / type / variable 还给 TS 语义高亮供色（语义 token 匹配的也是这张表）。
-      { token: "comment", foreground: "7a7e85" },
-      { token: "comment.doc", foreground: "5f826b" },
-      { token: "keyword", foreground: "cf8e6d" },
+      { token: "comment", foreground: "7a7e85", fontStyle: "italic" },
+      { token: "comment.doc", foreground: "5f826b", fontStyle: "italic" },
+      { token: "keyword", foreground: "cf8e6d", fontStyle: "bold" },
       { token: "string", foreground: "6aab73" },
       { token: "number", foreground: "2aacb8" },
-      { token: "constant", foreground: "c77dbb" },
+      { token: "constant", foreground: "c77dbb", fontStyle: "italic" },
       { token: "function", foreground: "56a8f5" },
       { token: "type", foreground: "56a8f5" },
       { token: "variable", foreground: "bcbec4" },
@@ -168,39 +168,44 @@ export const dark: Theme<typeof darkTokens> = {
       { token: "attribute.name", foreground: "bcbec4" },
       { token: "key", foreground: "bcbec4" },
       { token: "invalid", foreground: "cf8e6d" },
-      // TextMate 作用域（source.js）：色值取自 WebStorm 的 Islands Dark 配色（editor/Islands-Dark.json），
-      // 行尾注释是对应的 JetBrains 属性名，改色时对着 dist/webstorm-themes 里的导出核。
+      // TextMate 作用域（source.js）：色值与字形取自 WebStorm 的 Islands Dark 配色
+      // （editor/Islands-Dark.json）；行尾注释是对应的 JetBrains 属性名，font 是它的 FONT_TYPE
+      // （1 粗体、2 斜体、3 粗斜体），改色或改字形时对着 dist/webstorm-themes 里的导出核。
       // Monaco 的主题是一棵按 . 分段的 trie：通用词元名靠前缀能命中一部分，但 JSS 把 let/const/function
       // 归 storage.*、类型归 entity.name.* / support.*，还有 JetBrains 特有的局部变量与 JSDoc 属性，要单独给。
-      { token: "comment.line", foreground: "7a7e85" }, // DEFAULT_LINE_COMMENT
-      { token: "comment.block", foreground: "7a7e85" }, // DEFAULT_BLOCK_COMMENT
-      { token: "comment.block.documentation", foreground: "5f826b" }, // DEFAULT_DOC_COMMENT
-      { token: "storage.type", foreground: "cf8e6d" }, // DEFAULT_KEYWORD
-      { token: "storage.modifier", foreground: "cf8e6d" }, // DEFAULT_KEYWORD
+      { token: "comment.line", foreground: "7a7e85", fontStyle: "italic" }, // DEFAULT_LINE_COMMENT
+      { token: "comment.block", foreground: "7a7e85", fontStyle: "italic" }, // DEFAULT_BLOCK_COMMENT
+      { token: "comment.block.documentation", foreground: "5f826b", fontStyle: "italic" }, // DEFAULT_DOC_COMMENT
+      { token: "storage.type", foreground: "cf8e6d", fontStyle: "bold" }, // DEFAULT_KEYWORD
+      { token: "storage.modifier", foreground: "cf8e6d", fontStyle: "bold" }, // DEFAULT_KEYWORD
       { token: "keyword.operator", foreground: "bcbec4" }, // DEFAULT_OPERATION_SIGN
       { token: "string.regexp", foreground: "42c3d4" }, // JS.REGEXP
       { token: "constant.numeric", foreground: "2aacb8" }, // DEFAULT_NUMBER（不加会被上面的 constant 抢走）
-      { token: "constant.character.escape", foreground: "cf8e6d" }, // DEFAULT_VALID_STRING_ESCAPE
-      { token: "constant.language", foreground: "c77dbb" }, // DEFAULT_CONSTANT
+      { token: "constant.character.escape", foreground: "cf8e6d", fontStyle: "bold" }, // DEFAULT_VALID_STRING_ESCAPE
+      { token: "constant.language", foreground: "c77dbb", fontStyle: "italic" }, // DEFAULT_CONSTANT
       { token: "entity.name.function", foreground: "56a8f5" }, // DEFAULT_FUNCTION_DECLARATION
-      { token: "support.function", foreground: "57aaf7" }, // DEFAULT_INSTANCE_METHOD
+      { token: "support.function", foreground: "57aaf7", fontStyle: "italic" }, // DEFAULT_STATIC_METHOD
       { token: "entity.name.type", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
       { token: "entity.other.inherited-class", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
       { token: "support.class", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
       { token: "variable.other.property", foreground: "c77dbb" }, // DEFAULT_INSTANCE_FIELD
       { token: "variable.other", foreground: "a9b7c6" }, // JS.LOCAL_VARIABLE
       { token: "variable.parameter", foreground: "bcbec4" }, // DEFAULT_REASSIGNED_PARAMETER（JS.PARAMETER 未设）
-      { token: "variable.language", foreground: "c77dba" }, // JS.GLOBAL_VARIABLE
-      { token: "storage.type.class.jsdoc", foreground: "67a37c" }, // DEFAULT_DOC_COMMENT_TAG
+      { token: "variable.language", foreground: "c77dba", fontStyle: "italic" }, // JS.GLOBAL_VARIABLE
+      { token: "storage.type.class.jsdoc", foreground: "67a37c", fontStyle: "bold italic" }, // DEFAULT_DOC_COMMENT_TAG
       { token: "entity.name.type.instance.jsdoc", foreground: "68a67e" }, // DEFAULT_DOC_MARKUP
-      { token: "variable.other.jsdoc", foreground: "abadb3" }, // DEFAULT_DOC_COMMENT_TAG_VALUE
+      { token: "variable.other.jsdoc", foreground: "abadb3", fontStyle: "bold italic" }, // DEFAULT_DOC_COMMENT_TAG_VALUE
     ],
     colors: {
-      "editor.background": "#1e1f22",
+      // 编辑器底色取界面的 --app-bg-page（#191a1c）：左侧脚本列表就是页面底色本身，编辑区跟它一致。
+      // 这也正是 Islands Dark 编辑器方案自己写的底色（editor/Islands-Dark.json 的 attributes.TEXT.BACKGROUND）。
+      // 之前的 #1e1f22 来自另一套方案（editor/Dark.json），不是 Islands Dark。
+      "editor.background": "#191a1c",
       // 未命中规则的文字（标点、对象键等）用方案里的标识符色，别落到 vs-dark 的 #d4d4d4
       "editor.foreground": "#bcbec4",
-      "editorGutter.background": "#1e1f22",
-      "editor.lineHighlightBackground": "#26282e",
+      "editorGutter.background": "#191a1c",
+      // 当前行底色取方案的 CARET_ROW_COLOR
+      "editor.lineHighlightBackground": "#1f2024",
       "editorLineNumber.foreground": "#4b5059",
       "editorLineNumber.activeForeground": "#ced0d6",
       "editorIndentGuide.background1": "#313438",

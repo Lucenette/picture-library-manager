@@ -28,16 +28,17 @@ describe('resolveTheme', () => {
 interface Rule {
   readonly token: string;
   readonly foreground?: string;
+  readonly fontStyle?: string;
 }
 
 /**
- * 按 Monaco 的匹配方式取某个作用域最终拿到的颜色。
+ * 按 Monaco 的匹配方式取某个作用域最终命中的那条规则。
  *
  * Monaco 的主题是一棵按 `.` 分段的 trie：作用域逐段往下走，走到没有子节点就退回最近一条父规则。
- * 我们的规则每条都给了 foreground，于是它退化成「最长的、是作用域点分前缀的那条规则」。
+ * 我们的规则每条都是完整的 token，于是它退化成「最长的、是作用域点分前缀的那条规则」。
  */
-function foregroundFor(rules: readonly Rule[], scope: string): string | undefined {
-  let best: string | undefined;
+function ruleFor(rules: readonly Rule[], scope: string): Rule | undefined {
+  let best: Rule | undefined;
   let bestLength = -1;
   for (const rule of rules) {
     if (scope !== rule.token && !scope.startsWith(rule.token + '.')) {
@@ -45,10 +46,15 @@ function foregroundFor(rules: readonly Rule[], scope: string): string | undefine
     }
     if (rule.token.length >= bestLength) {
       bestLength = rule.token.length;
-      best = rule.foreground;
+      best = rule;
     }
   }
   return best;
+}
+
+/** 某个作用域最终拿到的颜色 */
+function foregroundFor(rules: readonly Rule[], scope: string): string | undefined {
+  return ruleFor(rules, scope)?.foreground;
 }
 
 /**
@@ -74,6 +80,13 @@ describe('Monaco 的语法着色规则', () => {
       .not.toBe(foregroundFor(darkRules, 'comment.line.double-slash.js'));
   });
 
+  test('编辑器底色取该套方案自己的值', () => {
+    // Islands Dark 的 attributes.TEXT.BACKGROUND 是 #191a1c（等于界面的页面底色），
+    // Light 的是 #ffffff（等于界面的面板底色）；两套方案不一致，别用同一个令牌去套
+    expect(dark.monaco.colors['editor.background']).toBe(dark.tokens['--app-bg-page']);
+    expect(light.monaco.colors['editor.background']).toBe(light.tokens['--app-bg-surface']);
+  });
+
   test('JS 语法里不以通用词元名开头的几族作用域都有颜色', () => {
     const scopes = [
       'storage.type.js',
@@ -97,6 +110,18 @@ describe('Monaco 的语法着色规则', () => {
         expect(foregroundFor(rules, scope), `${name}: ${scope}`).toBeDefined();
       }
     }
+  });
+
+  test('斜体与粗体字形按方案落到对应作用域', () => {
+    // 浅色方案的区分度相当一部分来自字形，只断言颜色会漏掉它
+    const darkRules = dark.monaco.rules as readonly Rule[];
+    const lightRules = light.monaco.rules as readonly Rule[];
+    expect(ruleFor(darkRules, 'comment.line.double-slash.js')?.fontStyle).toBe('italic');
+    expect(ruleFor(darkRules, 'keyword.control.flow.js')?.fontStyle).toBe('bold');
+    expect(ruleFor(darkRules, 'variable.language.this.js')?.fontStyle).toBe('italic');
+    expect(ruleFor(lightRules, 'comment.line.double-slash.js')?.fontStyle).toBe('italic');
+    expect(ruleFor(lightRules, 'constant.language.boolean.true.js')?.fontStyle).toBe('italic');
+    expect(ruleFor(lightRules, 'variable.language.this.js')?.fontStyle).toBe('bold italic');
   });
 
   test('数字不会被 constant 那条通用规则抢走', () => {
