@@ -100,6 +100,7 @@ export const light: Theme<typeof darkTokens> = {
   monaco: {
     base: 'vs',
     rules: [
+      // 通用词元名：内置词法器与 TextMate 失败时的降级路径，以及 TS 语义高亮都走它们
       { token: 'comment', foreground: '8c8c8c' },
       { token: 'keyword', foreground: '0033b3' },
       { token: 'string', foreground: '067d17' },
@@ -109,6 +110,20 @@ export const light: Theme<typeof darkTokens> = {
       { token: 'type', foreground: '00627a' },
       { token: 'operator', foreground: '080808' },
       { token: 'delimiter', foreground: '080808' },
+      // TextMate 作用域（source.js）：与暗色那份一一对应；行间注释的绿是临时值，等 Light.icls 到位后再定
+      { token: 'comment.line', foreground: '8c8c8c' },
+      { token: 'comment.block', foreground: '5f826b' },
+      { token: 'storage.type', foreground: '0033b3' },
+      { token: 'storage.modifier', foreground: '0033b3' },
+      { token: 'keyword.operator', foreground: '080808' },
+      { token: 'entity.name.function', foreground: '00627a' },
+      { token: 'support.function', foreground: '00627a' },
+      { token: 'entity.name.type', foreground: '00627a' },
+      { token: 'support.class', foreground: '00627a' },
+      { token: 'variable.parameter', foreground: '080808' },
+      { token: 'variable.language', foreground: '871094' },
+      { token: 'punctuation', foreground: '080808' },
+      { token: 'meta.brace', foreground: '080808' },
     ],
     colors: {
       'editor.background': '#ffffff',

@@ -151,6 +151,8 @@ export const dark: Theme<typeof darkTokens> = {
   monaco: {
     base: "vs-dark",
     rules: [
+      // 通用词元名：内置词法器（json 等其它语言）与 TextMate 失败时的降级路径都走它们；
+      // function / type / variable 还给 TS 语义高亮供色（语义 token 匹配的也是这张表）。
       { token: "comment", foreground: "7a7e85" },
       { token: "comment.doc", foreground: "5f826b" },
       { token: "keyword", foreground: "cf8e6d" },
@@ -166,6 +168,22 @@ export const dark: Theme<typeof darkTokens> = {
       { token: "attribute.name", foreground: "bcbec4" },
       { token: "key", foreground: "bcbec4" },
       { token: "invalid", foreground: "cf8e6d" },
+      // TextMate 作用域（source.js）：Monaco 的主题是一棵按 . 分段的 trie，上面那些词元名靠前缀能
+      // 命中一部分，但 JSS 把 let/const/function 归 storage.*、类型归 entity.name.* / support.*，
+      // 得单独给。色值先沿用原有取值，等 IDEA 配色方案到位后再细调。
+      { token: "comment.line", foreground: "7a7e85" },
+      { token: "comment.block", foreground: "5f826b" },
+      { token: "storage.type", foreground: "cf8e6d" },
+      { token: "storage.modifier", foreground: "cf8e6d" },
+      { token: "keyword.operator", foreground: "bcbec4" },
+      { token: "entity.name.function", foreground: "56a8f5" },
+      { token: "support.function", foreground: "56a8f5" },
+      { token: "entity.name.type", foreground: "56a8f5" },
+      { token: "support.class", foreground: "56a8f5" },
+      { token: "variable.parameter", foreground: "bcbec4" },
+      { token: "variable.language", foreground: "c77dbb" },
+      { token: "punctuation", foreground: "bcbec4" },
+      { token: "meta.brace", foreground: "bcbec4" },
     ],
     colors: {
       "editor.background": "#1e1f22",
