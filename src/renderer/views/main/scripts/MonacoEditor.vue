@@ -1,5 +1,12 @@
 <template>
-  <div ref="hostEl" class="monaco-host"></div>
+  <div class="monaco-wrap">
+    <!-- 词法器起不来时仍然建编辑器（走回内置词法器），但降级必须看得见，不能静默 -->
+    <div v-if="failure !== ''" class="monaco-degraded">语法着色已降级为内置词法器：{{ failure }}</div>
+    <div class="monaco-body">
+      <div ref="hostEl" class="monaco-host"></div>
+      <div v-if="!ready" class="monaco-loading">正在准备语法着色…</div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -14,6 +21,7 @@ import { onThemeChange } from '@/entries/shell/theme';
 
 import type { ScriptLineChange } from './diff';
 import { MONACO_THEME } from './monaco-env';
+import { initTextMate } from './textmate';
 
 /** 当前主题的令牌：系统切明暗后现取，概览标尺能跟着变（gutter 色条走 CSS 变量，两边一起跟） */
 function currentTokens(): ReturnType<typeof resolveTheme>['tokens'] {
@@ -68,6 +76,12 @@ const emit = defineEmits<{
 }>();
 
 const hostEl = ref<HTMLElement | null>(null);
+/** TextMate 词法器就绪前先不建编辑器：内置的 JavaScript 分词器工厂会跟它抢同一个语言 */
+const ready = ref(false);
+/** 词法器起不来时的原因；非空就在编辑区上方挂一条可见的降级提示，不静默退回 */
+const failure = ref('');
+/** 等初始化的过程中页面可能已经切走，那时候不能再建编辑器 */
+let unmounted = false;
 let editor: monacoEditor.IStandaloneCodeEditor | null = null;
 
 /** 一份文档一个 model：换脚本只换 model，撤销栈按 model 的 URI 记账，所以切走再切回来还能撤销 */
@@ -273,12 +287,16 @@ function applyChanges(): void {
   );
 }
 
-onMounted(() => {
-  if (!hostEl.value) {
+onMounted(async () => {
+  const setup = await initTextMate();
+  const host = hostEl.value;
+  if (unmounted || host === null) {
     return;
   }
+  failure.value = setup.ok ? '' : setup.reason;
+  ready.value = true;
 
-  editor = monacoEditor.create(hostEl.value, {
+  editor = monacoEditor.create(host, {
     model: modelFor(props.documentKey),
     theme: MONACO_THEME,
     // 容器尺寸随窗口变，交给 Monaco 自己观察；省掉手写 ResizeObserver
@@ -337,6 +355,7 @@ watch(() => props.error, applyMarkers, { deep: true });
 watch(() => props.changes, applyChanges, { deep: true });
 
 onBeforeUnmount(() => {
+  unmounted = true;
   themeSubscription?.();
   themeSubscription = null;
   markerSubscription?.dispose();
@@ -352,9 +371,42 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.monaco-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.monaco-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 .monaco-host {
   height: 100%;
   min-height: 0;
+}
+
+/* 词法器起不来时的提示条：占一行、不压代码；颜色走令牌 */
+.monaco-degraded {
+  flex: none;
+  padding: var(--app-space-4) var(--app-space-12);
+  background: var(--app-tag-warning-bg);
+  color: var(--app-tag-warning-text);
+  font-size: var(--app-font-sm);
+}
+
+/* 等初始化时的占位，盖在还没内容的编辑区上 */
+.monaco-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+  font-size: var(--app-font-base);
 }
 
 /* 编译失败那一行的底色；装饰画在 Monaco 自己的 DOM 里，所以要 :deep */

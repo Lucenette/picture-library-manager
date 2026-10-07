@@ -1,5 +1,5 @@
 // ============================================================
-// Monaco 的装配：worker、主题、JS 语言服务
+// Monaco 的装配：worker、主题、TextMate 词法器与 JS 语言服务
 //
 // 只被「脚本管理」页引用，所以整块（含 monaco 本体）只在你进那一页时才进依赖图。
 //
@@ -14,6 +14,8 @@ import EditorWorker from 'monaco-editor/editor/editor.worker?worker&inline';
 import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker&inline';
 
 import { onThemeChange } from '@/entries/shell/theme';
+
+import { initTextMate } from './textmate';
 
 /**
  * CommonJS 全局的声明。
@@ -96,6 +98,11 @@ const WARM_UP_TIMEOUT_MS = 5000;
  * `javascriptDefaults.*` 都发生在编辑器出现之前，不会把已经点着的 worker 停掉。
  */
 export async function warmUpTypeScript(): Promise<void> {
+  // 词法器必须赶在任何 javascript model 之前设好：内置的 JavaScript 分词器是个惰性工厂，
+  // 模型第一次要词法时才创建并注册，晚一步就会把 TextMate 顶掉（见 textmate/index.ts）。
+  // 失败也不拦这一步——它只影响着色，语言服务照常点。
+  await initTextMate();
+
   // 先订阅再建编辑器：激活是一次性的，错过就永远等不到
   const ready = new Promise<void>((resolve) => {
     const listener = languages.onLanguage('javascript', () => {
