@@ -22,7 +22,7 @@ function fakeTokenizer(
 }
 
 describe('toLineTokens', () => {
-  test('每个 token 只带最具体的那一段作用域，startIndex 原样保留', () => {
+  test('每个 token 只带一段作用域，startIndex 原样保留', () => {
     const stack = fakeStack();
     const tokenizer = fakeTokenizer(
       [
@@ -39,6 +39,23 @@ describe('toLineTokens', () => {
       { startIndex: 8, scopes: '' },
     ]);
     expect(result.stack).toBe(stack);
+  });
+
+  test('punctuation 与 meta 往外让给带颜色的外层，注释首尾才跟注释同色', () => {
+    const tokenizer = fakeTokenizer(
+      [
+        { startIndex: 0, scopes: ['source.js', 'comment.block.documentation.js', 'punctuation.definition.comment.js'] },
+        { startIndex: 4, scopes: ['source.js', 'meta.var.expr.js'] },
+        { startIndex: 8, scopes: ['source.js', 'meta.block.js', 'punctuation.definition.block.js'] },
+      ],
+      fakeStack(),
+    );
+
+    expect(toLineTokens(tokenizer, 'x', null).tokens.map((token) => token.scopes)).toEqual([
+      'comment.block.documentation.js',
+      'source.js',
+      'source.js',
+    ]);
   });
 });
 

@@ -49,11 +49,33 @@ export class TokenizerState implements MonacoState {
   }
 }
 
+/** 结构性作用域的根：只表达结构，不表达该是什么颜色，颜色在 VS Code 里由外层作用域继承 */
+const STRUCTURAL_SCOPE_ROOTS = new Set(['punctuation', 'meta']);
+
+/**
+ * 选出交给 Monaco 的那一段作用域。
+ *
+ * Monaco 只按**单个点分串**匹配主题（一棵 trie，见 `themeTrieElement.match`），没法像 VS Code 那样在整条
+ * 作用域栈上挑最合适的一条规则，所以这里替它挑：从最内层往外找第一段带颜色家族的作用域。
+ * 注释的 `/**` 是 `punctuation.definition.comment.js`、字符串的引号是
+ * `punctuation.definition.string.begin.js`——它们都该跟外层（comment / string）同色，
+ * 而不是命中一条 punctuation 规则变成底色。
+ */
+function colorScopeOf(scopes: readonly string[]): string {
+  for (let index = scopes.length - 1; index >= 0; index--) {
+    const scope = scopes[index] ?? '';
+    const root = scope.split('.', 1)[0] ?? '';
+    if (!STRUCTURAL_SCOPE_ROOTS.has(root)) {
+      return scope;
+    }
+  }
+  return scopes[scopes.length - 1] ?? '';
+}
+
 /**
  * 把一行 TextMate 分词结果翻成 Monaco 的 token 列表。
  *
- * `scopes` 只取最具体的那一段：Monaco 的主题是一棵按 `.` 分段的 trie
- * （见 `themeTrieElement.match`），喂给它空格分隔的完整作用域列表，它一段都对不上。
+ * `scopes` 只给一段（见 `colorScopeOf`）：喂空格分隔的完整作用域列表，Monaco 一段都对不上。
  */
 export function toLineTokens(
   tokenizer: LineTokenizer,
@@ -63,7 +85,7 @@ export function toLineTokens(
   const result = tokenizer.tokenizeLine(line, prevStack);
   const tokens: MonacoToken[] = result.tokens.map((token) => ({
     startIndex: token.startIndex,
-    scopes: token.scopes[token.scopes.length - 1] ?? '',
+    scopes: colorScopeOf(token.scopes),
   }));
   return { tokens, stack: result.ruleStack };
 }

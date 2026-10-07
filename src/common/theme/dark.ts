@@ -182,8 +182,6 @@ export const dark: Theme<typeof darkTokens> = {
       { token: "support.class", foreground: "56a8f5" },
       { token: "variable.parameter", foreground: "bcbec4" },
       { token: "variable.language", foreground: "c77dbb" },
-      { token: "punctuation", foreground: "bcbec4" },
-      { token: "meta.brace", foreground: "bcbec4" },
     ],
     colors: {
       "editor.background": "#1e1f22",

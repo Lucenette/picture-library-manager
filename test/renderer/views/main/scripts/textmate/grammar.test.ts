@@ -56,4 +56,24 @@ describe('JavaScript TextMate 语法', () => {
       expect(scope).not.toContain(' ');
     }
   });
+
+  test('注释首尾与字符串引号都归到外层家族，不留下 punctuation 与 meta', () => {
+    const lines = [
+      '/** doc */',
+      '/* plain */',
+      '// line',
+      'const s = "abc";',
+      'const t = `a${b}c`;',
+      'function f(a) { return a; }',
+    ];
+    for (const line of lines) {
+      for (const scope of scopesOf(line)) {
+        expect(/^(punctuation|meta)\./.test(scope), line + ' -> ' + scope).toBe(false);
+      }
+    }
+    // 文档注释的首尾必须跟正文一样落在 comment.block 上
+    for (const scope of scopesOf('/** doc */')) {
+      expect(scope.startsWith('comment.block'), scope).toBe(true);
+    }
+  });
 });

@@ -83,8 +83,6 @@ describe('Monaco 的语法着色规则', () => {
       'support.class.js',
       'variable.parameter.js',
       'variable.language.this.js',
-      'punctuation.definition.parameters.begin.js',
-      'meta.brace.round.js',
     ];
     for (const [name, theme] of themes) {
       const rules = theme.monaco.rules as readonly Rule[];

@@ -79,6 +79,9 @@ adapter：只取最具体的一段作用域 ──► monaco.languages.setTokens
 主题是一棵按 `.` 分段的 trie（`themeTrieElement.match`），规则 token 按点分前缀匹配，于是：
 
 - 通用词元名规则靠前缀自动命中同族作用域（`string` 命中 `string.quoted.double.js`）。
+- 适配层从最内层往外找第一段带颜色家族的作用域，跳过 `punctuation.*` 与 `meta.*`：注释的 `/**` 是
+  `punctuation.definition.comment.js`、字符串的引号是 `punctuation.definition.string.begin.js`，它们都该跟外层同色，
+  而不是命中一条 punctuation 规则变成底色。结构性作用域因此不在主题里单独配（没有 `punctuation` / `meta.brace` 规则）。
 - JSS 把 `let` / `const` / `function` 归 `storage.*`，类型归 `entity.name.*` 与 `support.*`；这些不以通用词元名开头，必须单独给。
 - 两套主题沿用原有色值，浅色的 `comment.block` 暂借暗色的绿；等 IDEA 导出的配色方案到位后按作用域细调，只改 `src/common/theme/` 的数据。
 
