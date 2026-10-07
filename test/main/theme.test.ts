@@ -80,11 +80,12 @@ describe('Monaco 的语法着色规则', () => {
       .not.toBe(foregroundFor(darkRules, 'comment.line.double-slash.js'));
   });
 
-  test('编辑器底色取该套方案自己的值', () => {
-    // Islands Dark 的 attributes.TEXT.BACKGROUND 是 #191a1c（等于界面的页面底色），
-    // Light 的是 #ffffff（等于界面的面板底色）；两套方案不一致，别用同一个令牌去套
-    expect(dark.monaco.colors['editor.background']).toBe(dark.tokens['--app-bg-page']);
-    expect(light.monaco.colors['editor.background']).toBe(light.tokens['--app-bg-surface']);
+  test('编辑器底色与工具窗口底色一致', () => {
+    // 脚本页的列表与编辑区靠这一条连成一片：Islands 的 ToolWindow.background 与编辑器方案的
+    // attributes.TEXT.BACKGROUND 在暗色（#191a1c）与浅色（#ffffff）下本来就相同
+    for (const [name, theme] of themes) {
+      expect(theme.monaco.colors['editor.background'], name).toBe(theme.tokens['--app-bg-tool-window']);
+    }
   });
 
   test('JS 语法里不以通用词元名开头的几族作用域都有颜色', () => {

@@ -33,6 +33,9 @@ export const light: Theme<typeof darkTokens> = {
     "--app-font-lg": "16px",
     "--app-bg-page": "#f7f8f9",
     "--app-bg-surface": "#ffffff",
+    // 工具窗口底色（Islands 的 ToolWindow.background）：脚本页的列表与编辑区都用它；
+    // 浅色下它是白，而 --app-bg-page（#f7f8f9）是窗口外框色，两者不是一回事
+    "--app-bg-tool-window": "#ffffff",
     "--app-bg-header": "#e9eaee",
     "--app-bg-hover": "#00000012",
     "--app-bg-active": "#e3ebfe",

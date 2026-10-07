@@ -23,6 +23,9 @@ export const darkTokens = {
   "--app-font-lg": "16px",
   "--app-bg-page": "#191a1c",
   "--app-bg-surface": "#26282c",
+  // 工具窗口底色（Islands 的 ToolWindow.background）：脚本页的列表与编辑区都用它，
+  // 它恰好与编辑器方案自己的底色一致（都是 #191a1c），编辑器那边由 monaco.colors 保证同步
+  "--app-bg-tool-window": "#191a1c",
   "--app-bg-header": "#26282c",
   "--app-bg-hover": "#ffffff17",
   "--app-bg-active": "#233558",

@@ -87,7 +87,7 @@ adapter：只取最具体的一段作用域 ──► monaco.languages.setTokens
 - 色值取自 WebStorm 导出的配色方案：暗色是 Islands Dark（`editor/Islands-Dark.json`），浅色是 Light（`editor/Light.json`，Islands Light UI 声明的编辑器方案）。规则里行尾写着对应的 JetBrains 属性名，改色对着导出文件核。
 - `comment.line` 与 `comment.block` 在 Islands Dark 里同为灰、只有 `comment.block.documentation` 是绿；Light 方案三者同灰——这是方案本身的选择，不是漏配。方案没给值的属性（如浅色的 `DEFAULT_CLASS_REFERENCE`）落到 `editor.foreground`。
 - 字形也按方案的 FONT_TYPE（1 粗体、2 斜体、3 粗斜体）：注释与常量斜体，`storage.*` 粗体，`this` 粗斜体，JSDoc 的标签与取值粗斜体。浅色方案的区分度有相当一部分来自字形，只取颜色会明显比暗色平。
-- 编辑器底色取**该套编辑器方案自己写的** `attributes.TEXT.BACKGROUND`：Islands Dark 是 `#191a1c`、Light 是 `#ffffff`。两套方案在这点上不一致（暗色的编辑器与窗口同底，浅色的编辑器是白面板），所以不能拿同一个界面令牌去套。
+- 编辑器底色取**该套编辑器方案自己写的** `attributes.TEXT.BACKGROUND`：Islands Dark 是 `#191a1c`、Light 是 `#ffffff`。脚本页要让列表与编辑区连成一片，所以界面里加了 `--app-bg-tool-window`（Islands 的 `ToolWindow.background`），两套主题下都与编辑器底色相等；页面外框色 `--app-bg-page`（浅色 `#f7f8f9`）不是它，别混用。
 - 浅色有意偏离方案，只为拆开 Light 自己撞在一起的色相：数字改 `#b35c00`（原与关键字同为蓝）、正则改 `#a31515`（原又是另一种蓝）、转义归回字符串绿并加粗、类与接口名改 `#267f99`（原未设值、纯黑）。其余仍照方案，这些改动以注释标在 `light.ts` 里。
 
 ## 7. 机械守卫
