@@ -123,8 +123,8 @@ PR 之前跑 [AGENTS.md](./AGENTS.md) 的「改完必须自检」清单，这里
 
 | 起步项 | 大致动什么 | 背景 |
 |---|---|---|
-| 颜色主题切换 | 渲染进程 CSS 变量 | [theme.md](./docs/roadmap/theme.md) |
-| 设置页面 | 主进程 + 渲染进程 | [settings-page.md](./docs/roadmap/settings-page.md) |
+| 任务剩余耗时估算 | 主进程 + IPC | [task-eta.md](./docs/roadmap/task-eta.md) |
+| 设置页面：其余设置项 | 主进程 + 渲染进程 | [settings-page.md](./docs/roadmap/settings-page.md) |
 | 构建目标：32 位与 arm | 只动构建配置 | [build-targets.md](./docs/roadmap/build-targets.md) |
 | 诊断：打开日志目录与收集日志 | 主进程 + 一个入口 | [diagnostics.md](./docs/roadmap/diagnostics.md) |
 | 其余窗口的自绘标题栏 | 有现成设计可照抄 | [window-chrome.md](./docs/roadmap/window-chrome.md) |

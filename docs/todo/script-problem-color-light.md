@@ -1,7 +1,7 @@
 # 浅色下脚本状态栏的问题数没有颜色
 
 **状态**：待办
-**关联**：[theme.md](../roadmap/theme.md)
+**关联**：[theme.md](../design/theme.md)
 
 ## 背景
 

@@ -1,7 +1,7 @@
 # 编辑器语法分析器换成 TextMate
 
 **状态**：待实施
-**关联**：[theme.md](./theme.md)（按作用域配色的落点）
+**关联**：[theme.md](../design/theme.md)（按作用域配色的落点）
 
 ---
 
