@@ -61,15 +61,17 @@ describe('Monaco 的语法着色规则', () => {
     ['light', light],
   ] as const;
 
-  test('两套都把行内注释与行间注释分开着色', () => {
+  test('两套都定义了行内、块与文档注释的着色，暗色下文档注释与其它两种不同色', () => {
     for (const [name, theme] of themes) {
       const rules = theme.monaco.rules as readonly Rule[];
-      const line = foregroundFor(rules, 'comment.line.double-slash.js');
-      const block = foregroundFor(rules, 'comment.block.js');
-      expect(line, name).toBeDefined();
-      expect(block, name).toBeDefined();
-      expect(line, name).not.toBe(block);
+      for (const scope of ['comment.line.double-slash.js', 'comment.block.js', 'comment.block.documentation.js']) {
+        expect(foregroundFor(rules, scope), `${name}: ${scope}`).toBeDefined();
+      }
     }
+    // Islands Dark 里只有文档注释是绿的，行内与普通块注释同为灰；Light 方案三者同灰，这是方案本身的选择
+    const darkRules = dark.monaco.rules as readonly Rule[];
+    expect(foregroundFor(darkRules, 'comment.block.documentation.js'))
+      .not.toBe(foregroundFor(darkRules, 'comment.line.double-slash.js'));
   });
 
   test('JS 语法里不以通用词元名开头的几族作用域都有颜色', () => {
@@ -77,10 +79,15 @@ describe('Monaco 的语法着色规则', () => {
       'storage.type.js',
       'storage.modifier.js',
       'keyword.operator.arithmetic.js',
+      'constant.numeric.decimal.js',
+      'constant.character.escape.js',
+      'constant.language.boolean.true.js',
       'entity.name.function.js',
       'support.function.js',
-      'entity.name.type.js',
-      'support.class.js',
+      'entity.name.type.class.js',
+      'support.class.promise.js',
+      'variable.other.readwrite.js',
+      'variable.other.property.js',
       'variable.parameter.js',
       'variable.language.this.js',
     ];
@@ -89,6 +96,14 @@ describe('Monaco 的语法着色规则', () => {
       for (const scope of scopes) {
         expect(foregroundFor(rules, scope), `${name}: ${scope}`).toBeDefined();
       }
+    }
+  });
+
+  test('数字不会被 constant 那条通用规则抢走', () => {
+    for (const [name, theme] of themes) {
+      const rules = theme.monaco.rules as readonly Rule[];
+      expect(foregroundFor(rules, 'constant.numeric.decimal.js'), name)
+        .not.toBe(foregroundFor(rules, 'constant.language.boolean.true.js'));
     }
   });
 

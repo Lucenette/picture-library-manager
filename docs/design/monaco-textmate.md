@@ -20,6 +20,7 @@
 |---|---|---|
 | 2026-10-06 | 首次定稿 | — |
 | 2026-10-08 | 核现状后修订并落地：wasm 改用 `?url&inline` 内联，首版只做 `javascript` | `file://` 页面 + `webSecurity` 下运行时取不到本地 wasm；脚本只有 `.js`，没有 `typescript` model |
+| 2026-10-08 | 色值改按 WebStorm 导出的配色方案逐作用域对齐 | 使用者导出 `dist/webstorm-themes`，有了可核对的来源 |
 
 ---
 
@@ -83,7 +84,8 @@ adapter：只取最具体的一段作用域 ──► monaco.languages.setTokens
   `punctuation.definition.comment.js`、字符串的引号是 `punctuation.definition.string.begin.js`，它们都该跟外层同色，
   而不是命中一条 punctuation 规则变成底色。结构性作用域因此不在主题里单独配（没有 `punctuation` / `meta.brace` 规则）。
 - JSS 把 `let` / `const` / `function` 归 `storage.*`，类型归 `entity.name.*` 与 `support.*`；这些不以通用词元名开头，必须单独给。
-- 两套主题沿用原有色值，浅色的 `comment.block` 暂借暗色的绿；等 IDEA 导出的配色方案到位后按作用域细调，只改 `src/common/theme/` 的数据。
+- 色值取自 WebStorm 导出的配色方案：暗色是 Islands Dark（`editor/Islands-Dark.json`），浅色是 Light（`editor/Light.json`，Islands Light UI 声明的编辑器方案）。规则里行尾写着对应的 JetBrains 属性名，改色对着导出文件核。
+- `comment.line` 与 `comment.block` 在 Islands Dark 里同为灰、只有 `comment.block.documentation` 是绿；Light 方案三者同灰——这是方案本身的选择，不是漏配。方案没给值的属性（如浅色的 `DEFAULT_CLASS_REFERENCE`）落到 `editor.foreground`。
 
 ## 7. 机械守卫
 

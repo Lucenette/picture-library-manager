@@ -195,4 +195,4 @@ sequenceDiagram
 
 **编辑器的词法层**：脚本编辑器换成了 TextMate 词法器（`src/renderer/views/main/scripts/textmate/`），主题规则按
 **作用域**配置，`comment.line` 与 `comment.block` 因此能分开着色；其余语言仍用 Monaco 内置分词器，靠同一张表里
-保留的通用词元名规则着色。两套主题目前沿用原有色值，等 IDEA 导出的配色方案到位后再按作用域细调。
+保留的通用词元名规则着色。色值按 WebStorm 导出的配色方案逐作用域对齐（暗色 Islands Dark、浅色 Light），映射见 [monaco-textmate.md](./monaco-textmate.md)。

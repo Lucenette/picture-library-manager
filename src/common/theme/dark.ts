@@ -168,23 +168,37 @@ export const dark: Theme<typeof darkTokens> = {
       { token: "attribute.name", foreground: "bcbec4" },
       { token: "key", foreground: "bcbec4" },
       { token: "invalid", foreground: "cf8e6d" },
-      // TextMate 作用域（source.js）：Monaco 的主题是一棵按 . 分段的 trie，上面那些词元名靠前缀能
-      // 命中一部分，但 JSS 把 let/const/function 归 storage.*、类型归 entity.name.* / support.*，
-      // 得单独给。色值先沿用原有取值，等 IDEA 配色方案到位后再细调。
-      { token: "comment.line", foreground: "7a7e85" },
-      { token: "comment.block", foreground: "5f826b" },
-      { token: "storage.type", foreground: "cf8e6d" },
-      { token: "storage.modifier", foreground: "cf8e6d" },
-      { token: "keyword.operator", foreground: "bcbec4" },
-      { token: "entity.name.function", foreground: "56a8f5" },
-      { token: "support.function", foreground: "56a8f5" },
-      { token: "entity.name.type", foreground: "56a8f5" },
-      { token: "support.class", foreground: "56a8f5" },
-      { token: "variable.parameter", foreground: "bcbec4" },
-      { token: "variable.language", foreground: "c77dbb" },
+      // TextMate 作用域（source.js）：色值取自 WebStorm 的 Islands Dark 配色（editor/Islands-Dark.json），
+      // 行尾注释是对应的 JetBrains 属性名，改色时对着 dist/webstorm-themes 里的导出核。
+      // Monaco 的主题是一棵按 . 分段的 trie：通用词元名靠前缀能命中一部分，但 JSS 把 let/const/function
+      // 归 storage.*、类型归 entity.name.* / support.*，还有 JetBrains 特有的局部变量与 JSDoc 属性，要单独给。
+      { token: "comment.line", foreground: "7a7e85" }, // DEFAULT_LINE_COMMENT
+      { token: "comment.block", foreground: "7a7e85" }, // DEFAULT_BLOCK_COMMENT
+      { token: "comment.block.documentation", foreground: "5f826b" }, // DEFAULT_DOC_COMMENT
+      { token: "storage.type", foreground: "cf8e6d" }, // DEFAULT_KEYWORD
+      { token: "storage.modifier", foreground: "cf8e6d" }, // DEFAULT_KEYWORD
+      { token: "keyword.operator", foreground: "bcbec4" }, // DEFAULT_OPERATION_SIGN
+      { token: "string.regexp", foreground: "42c3d4" }, // JS.REGEXP
+      { token: "constant.numeric", foreground: "2aacb8" }, // DEFAULT_NUMBER（不加会被上面的 constant 抢走）
+      { token: "constant.character.escape", foreground: "cf8e6d" }, // DEFAULT_VALID_STRING_ESCAPE
+      { token: "constant.language", foreground: "c77dbb" }, // DEFAULT_CONSTANT
+      { token: "entity.name.function", foreground: "56a8f5" }, // DEFAULT_FUNCTION_DECLARATION
+      { token: "support.function", foreground: "57aaf7" }, // DEFAULT_INSTANCE_METHOD
+      { token: "entity.name.type", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
+      { token: "entity.other.inherited-class", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
+      { token: "support.class", foreground: "bcbec4" }, // DEFAULT_CLASS_REFERENCE
+      { token: "variable.other.property", foreground: "c77dbb" }, // DEFAULT_INSTANCE_FIELD
+      { token: "variable.other", foreground: "a9b7c6" }, // JS.LOCAL_VARIABLE
+      { token: "variable.parameter", foreground: "bcbec4" }, // DEFAULT_REASSIGNED_PARAMETER（JS.PARAMETER 未设）
+      { token: "variable.language", foreground: "c77dba" }, // JS.GLOBAL_VARIABLE
+      { token: "storage.type.class.jsdoc", foreground: "67a37c" }, // DEFAULT_DOC_COMMENT_TAG
+      { token: "entity.name.type.instance.jsdoc", foreground: "68a67e" }, // DEFAULT_DOC_MARKUP
+      { token: "variable.other.jsdoc", foreground: "abadb3" }, // DEFAULT_DOC_COMMENT_TAG_VALUE
     ],
     colors: {
       "editor.background": "#1e1f22",
+      // 未命中规则的文字（标点、对象键等）用方案里的标识符色，别落到 vs-dark 的 #d4d4d4
+      "editor.foreground": "#bcbec4",
       "editorGutter.background": "#1e1f22",
       "editor.lineHighlightBackground": "#26282e",
       "editorLineNumber.foreground": "#4b5059",

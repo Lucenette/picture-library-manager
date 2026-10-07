@@ -108,23 +108,38 @@ export const light: Theme<typeof darkTokens> = {
       { token: 'constant', foreground: '871094' },
       { token: 'function', foreground: '00627a' },
       { token: 'type', foreground: '00627a' },
+      { token: 'variable', foreground: '000000' },
       { token: 'operator', foreground: '080808' },
       { token: 'delimiter', foreground: '080808' },
-      // TextMate 作用域（source.js）：与暗色那份一一对应；行间注释的绿是临时值，等 Light.icls 到位后再定
-      { token: 'comment.line', foreground: '8c8c8c' },
-      { token: 'comment.block', foreground: '5f826b' },
-      { token: 'storage.type', foreground: '0033b3' },
-      { token: 'storage.modifier', foreground: '0033b3' },
-      { token: 'keyword.operator', foreground: '080808' },
-      { token: 'entity.name.function', foreground: '00627a' },
-      { token: 'support.function', foreground: '00627a' },
-      { token: 'entity.name.type', foreground: '00627a' },
-      { token: 'support.class', foreground: '00627a' },
-      { token: 'variable.parameter', foreground: '080808' },
-      { token: 'variable.language', foreground: '871094' },
+      // TextMate 作用域（source.js）：色值取自 WebStorm 的 Light 配色（editor/Light.json），
+      // 行尾注释是对应的 JetBrains 属性名；方案没给值的属性落到默认前景。
+      { token: 'comment.line', foreground: '8c8c8c' }, // DEFAULT_LINE_COMMENT
+      { token: 'comment.block', foreground: '8c8c8c' }, // DEFAULT_BLOCK_COMMENT
+      { token: 'comment.block.documentation', foreground: '8c8c8c' }, // DEFAULT_DOC_COMMENT
+      { token: 'storage.type', foreground: '0033b3' }, // DEFAULT_KEYWORD
+      { token: 'storage.modifier', foreground: '0033b3' }, // DEFAULT_KEYWORD
+      { token: 'keyword.operator', foreground: '000000' }, // DEFAULT_OPERATION_SIGN 未设
+      { token: 'string.regexp', foreground: '264eff' }, // JS.REGEXP
+      { token: 'constant.numeric', foreground: '1750eb' }, // DEFAULT_NUMBER
+      { token: 'constant.character.escape', foreground: '0037a6' }, // DEFAULT_VALID_STRING_ESCAPE
+      { token: 'constant.language', foreground: '871094' }, // DEFAULT_CONSTANT
+      { token: 'entity.name.function', foreground: '00627a' }, // DEFAULT_FUNCTION_DECLARATION
+      { token: 'support.function', foreground: '00627a' }, // DEFAULT_STATIC_METHOD
+      { token: 'entity.name.type', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
+      { token: 'entity.other.inherited-class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
+      { token: 'support.class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
+      { token: 'variable.other.property', foreground: '871094' }, // DEFAULT_INSTANCE_FIELD
+      { token: 'variable.other', foreground: '2a8c7c' }, // JS.LOCAL_VARIABLE
+      { token: 'variable.parameter', foreground: '000000' }, // JS.PARAMETER 未设
+      { token: 'variable.language', foreground: '830091' }, // JS.GLOBAL_VARIABLE
+      { token: 'storage.type.class.jsdoc', foreground: '8c8c8c' }, // DEFAULT_DOC_COMMENT_TAG 未设，跟注释同色
+      { token: 'entity.name.type.instance.jsdoc', foreground: '8c8c8c' }, // DEFAULT_DOC_MARKUP 未设，跟注释同色
+      { token: 'variable.other.jsdoc', foreground: '3d3d3d' }, // DEFAULT_DOC_COMMENT_TAG_VALUE
     ],
     colors: {
       'editor.background': '#ffffff',
+      // 未命中规则的文字用方案里的标识符色
+      'editor.foreground': '#000000',
       'editorGutter.background': '#ffffff',
       'editor.lineHighlightBackground': '#f5f8fe',
       'editorLineNumber.foreground': '#aeb3c2',
