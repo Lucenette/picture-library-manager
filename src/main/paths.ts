@@ -38,3 +38,8 @@ export function getTempDir(): string {
 export function getLogsDir(): string {
   return join(getUserDir(), 'logs');
 }
+
+/** 设置文件：一份可手改的 YAML，与 data/ scripts/ temp/ logs/ 同级 */
+export function getSettingsPath(): string {
+  return join(getUserDir(), 'settings.yml');
+}

@@ -29,6 +29,7 @@ const router = createRouter({
     { path: '/process', name: 'process', component: () => import('@/views/main/ProcessPage.vue') },
     { path: '/library', name: 'library', component: () => import('@/views/main/LibraryPage.vue') },
     { path: '/tasks', name: 'tasks', component: () => import('@/views/main/TaskPage.vue') },
+    { path: '/settings', name: 'settings', component: () => import('@/views/main/SettingsPage.vue') },
 
     { path: '/loading', name: 'loading', component: LoadingPage },
   ],

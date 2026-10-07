@@ -1,4 +1,8 @@
-import { DEFAULT_THEME, resolveTheme, type Theme } from '@common/theme';
+import { ipcRenderer } from 'electron';
+
+import { IPC } from '@common/ipcChannels';
+import { isThemeName, type Settings } from '@common/settings';
+import { DEFAULT_THEME, resolveTheme, type Theme, type ThemeName } from '@common/theme';
 
 import { createLogger } from '@/services/log-service';
 
@@ -9,15 +13,26 @@ const log = createLogger('theme');
 export type ThemeHandler = (theme: Theme) => void;
 
 const handlers = new Set<ThemeHandler>();
+/** 当前偏好：主进程建窗口时经 URL 带进来，之后跟着设置变化走 */
+let preference: ThemeName = DEFAULT_THEME;
 let current: Theme = resolveTheme(DEFAULT_THEME, window.matchMedia('(prefers-color-scheme: dark)').matches);
 /** 上一套写进 `<html>` 的键：换主题时要把新主题没有的删掉，否则内联变量会压住新主题应有的默认值 */
 let applied: string[] = [];
+
+/** 系统是否偏好暗色：只有「跟随系统」才看它，指定了某一套时由 `resolveTheme` 自己定 */
+function systemPrefersDark(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/** 按当前偏好解析并应用 */
+function applyPreference(): void {
+  applyTheme(resolveTheme(preference, systemPrefersDark()));
+}
 
 /**
  * 应用一套主题：先把令牌写进 `:root`，再依次通知订阅者。
  *
  * 处理器之间**互不依赖**——它们从 theme 对象取值、不从 DOM 里读，所以不需要约定先后。
- * 明暗两套由 `initTheme()` 在入口初始化时挂上，系统切明暗时重跑；设置页落地前没有手动切换入口。
  */
 export function applyTheme(theme: Theme): void {
   current = theme;
@@ -61,16 +76,35 @@ export function onThemeChange(handler: ThemeHandler): () => void {
 }
 
 /**
- * 入口初始化：按偏好挂上主题，并在系统切换明暗时**立刻**跟着换。
+ * 入口初始化：按主进程带的偏好挂上主题，之后跟着设置变化与系统明暗走。
  *
- * 「跟随系统」在这里落成一条 matchMedia 监听：系统一切换就重新解析并应用，已注册的处理器
- * （编辑器等）跟着重定义——不需要重启，也不需要主进程广播，两端各自听同一个系统事件。
+ * 偏好经窗口 URL 的 `?theme=` 带进来（见 `window-manager` 的 `getWindowUrl`）：它必须在首帧之前
+ * 就有值，挂载后再去问主进程会先闪一下系统主题。缺参数只可能是有人直接打开了那个 HTML，
+ * 按默认值兜底并记一条 warn。
+ *
+ * 四个入口都要调它（经 `initWindowChrome`），所以每个窗口——含查看器、浮窗与各类弹窗——都会
+ * 收到设置广播，切换主题不需要重启、也不会漏掉哪个窗口。
  */
 export function initTheme(): void {
+  const fromUrl = new URLSearchParams(window.location.search).get('theme');
+  if (fromUrl === null) {
+    log.warn('window url has no theme parameter, falling back to ' + DEFAULT_THEME);
+  }
+  preference = isThemeName(fromUrl) ? fromUrl : DEFAULT_THEME;
+  applyPreference();
+
   const query = window.matchMedia('(prefers-color-scheme: dark)');
-  applyTheme(resolveTheme(DEFAULT_THEME, query.matches));
   query.addEventListener('change', (event) => {
+    // 只有「跟随系统」才理会系统明暗：指定了某一套时系统怎么变都与界面无关
+    if (preference !== 'system') {
+      return;
+    }
     log.info('system appearance changed, reapplying theme: ' + (event.matches ? 'dark' : 'light'));
-    applyTheme(resolveTheme(DEFAULT_THEME, event.matches));
+    applyPreference();
+  });
+
+  ipcRenderer.on(IPC.SETTINGS_CHANGED, (_event, settings: Settings) => {
+    preference = settings.theme;
+    applyPreference();
   });
 }

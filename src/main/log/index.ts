@@ -19,7 +19,7 @@ export function setupLogging(): void {
 }
 
 export {
-  CATEGORY, createLogger, flushLogging, getLogChannel, initLogging, isConsoleWriteFromLogger, withScriptLogChannel,
-  writeRecord,
+  CATEGORY, createLogger, flushLogging, getLogChannel, getRootLevel, initLogging, isConsoleWriteFromLogger,
+  withScriptLogChannel, writeRecord,
 } from '@/log/logger';
 export type { LogChannel, Logger } from '@/log/logger';

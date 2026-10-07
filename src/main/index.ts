@@ -8,6 +8,8 @@ import { warmPopup } from '@/dialogs/control/popup';
 import { initLoadingIpc, registerLoadTask, startLoading, waitLoadQuit } from '@/loading';
 import { createLogger, flushLogging, setupLogging } from '@/log';
 import { initScriptIpc } from '@/script/ipc';
+import { initSettingsIpc } from '@/settings/ipc';
+import { initSettings } from '@/settings/store';
 import { initTaskIpc } from '@/task/ipc';
 import { taskManager } from '@/task/manager';
 import { initUps } from '@/ups';
@@ -58,6 +60,10 @@ function configureCommandLine(): void {
 async function bootstrap(): Promise<void> {
   log.info('bootstrap started');
 
+  // 设置必须在建任何窗口之前读进内存：窗口底色、系统按钮字形色与 URL 上的主题偏好都在建窗口时
+  // 就定了，晚一步会先闪一下系统主题（异步小文件一次，见 settings/store.ts 的 initSettings）
+  await initSettings();
+
   const mainWindow = createMain('/loading');
 
   // 通道先挂上：渲染进程一挂载就会 invoke 状态快照，那同时是它的「就绪」信号
@@ -82,6 +88,7 @@ function initRest(mainWindow: BrowserWindow): void {
   initTaskIpc();
   initDialogs();
   initScriptIpc();
+  initSettingsIpc();
 
   taskManager.init(mainWindow);
 
