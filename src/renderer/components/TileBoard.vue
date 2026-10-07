@@ -30,7 +30,7 @@
                   :src="cover"
                   :alt="item.title"
                 />
-                <el-icon v-if="item.covers.length === 0" class="tile-cover-empty" :size="28"><PictureFilled /></el-icon>
+                <el-icon v-if="item.covers.length === 0" class="tile-cover-empty" :size="28"><AppIcon name="emptyCover" /></el-icon>
 
                 <span v-if="item.count !== null" class="tile-count">{{ item.count }}</span>
 
@@ -72,11 +72,11 @@
 </template>
 
 <script setup lang="ts">
-import { PictureFilled } from '@element-plus/icons-vue';
 import type { ScrollbarInstance } from 'element-plus';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 
+import AppIcon from './AppIcon.vue';
 import type { TileItem, TileSelectState } from './TileBoard.types';
 
 /**

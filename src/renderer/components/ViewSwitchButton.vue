@@ -2,17 +2,16 @@
   <el-tooltip :content="tooltip" placement="top">
     <el-button class="view-switch" text @click="emit('toggle')">
       <el-icon :size="18">
-        <Grid v-if="mode === 'list'" />
-        <List v-else />
+        <AppIcon :name="mode === 'list' ? 'tile' : 'list'" />
       </el-icon>
     </el-button>
   </el-tooltip>
 </template>
 
 <script setup lang="ts">
-import { Grid, List } from '@element-plus/icons-vue';
 import { computed } from 'vue';
 
+import AppIcon from '@/components/AppIcon.vue';
 import type { ViewMode } from '@/composables/useViewMode';
 
 const props = defineProps<{ mode: ViewMode }>();

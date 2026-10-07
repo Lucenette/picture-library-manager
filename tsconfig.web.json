@@ -11,7 +11,7 @@
     "isolatedModules": false,
     "esModuleInterop": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node"],
+    "types": ["node", "unplugin-icons/types/vue"],
     "skipLibCheck": true,
     "noEmit": true,
     "baseUrl": ".",

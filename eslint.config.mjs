@@ -78,7 +78,25 @@ export default tseslint.config(
     files: RENDERER_FILES,
     languageOptions: { globals: { ...globals.browser } },
     rules: {
-      'no-restricted-imports': ['error', { patterns: [{ group: BUILTINS, message: '渲染进程不得引用 Node 内置模块（electron 除外）' }] }],
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: '@element-plus/icons-vue',
+          message: '图标统一走 @/components/icons.ts 的语义名映射（组件里用 <AppIcon name="…" />）',
+        }],
+        patterns: [
+          { group: BUILTINS, message: '渲染进程不得引用 Node 内置模块（electron 除外）' },
+          { group: ['~icons/*'], message: '图标集只允许在 @/components/icons.ts 里引用' },
+        ],
+      }],
+    },
+  },
+  {
+    // 图标映射表是全仓唯一引用图标集的地方，其余约束与渲染进程相同
+    files: ['src/renderer/components/icons.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{ group: BUILTINS, message: '渲染进程不得引用 Node 内置模块（electron 除外）' }],
+      }],
     },
   },
   {

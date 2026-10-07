@@ -17,7 +17,7 @@
         >
           <el-tooltip :content="item.label" placement="right" :show-after="300">
             <router-link :to="item.path" class="rail-link" :class="{ active: activeMenu === item.path }">
-              <el-icon><component :is="item.icon" /></el-icon>
+              <el-icon><AppIcon :name="item.icon" /></el-icon>
               <span v-if="item.badge && activeTaskCount > 0" class="task-badge">{{ activeTaskCount }}</span>
             </router-link>
           </el-tooltip>
@@ -32,11 +32,12 @@
 </template>
 
 <script setup lang="ts">
-import { FolderOpened, Grid, List, PictureFilled, Setting, User } from '@element-plus/icons-vue';
 import appIcon from '@static/icon.png';
-import { computed, type Component } from 'vue';
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
+import AppIcon from '@/components/AppIcon.vue';
+import type { IconName } from '@/components/icons';
 import { useTasks } from '@/composables/useTasks';
 import { isMac } from '@/entries/shell/window-chrome';
 
@@ -44,21 +45,22 @@ import { isMac } from '@/entries/shell/window-chrome';
 interface NavItem {
   path: string;
   label: string;
-  icon: Component;
+  icon: IconName;
   /** 任务管理要在图标右上角挂运行中的数量 */
   badge?: boolean;
-  /** 贴到栏底（脚本与任务），最后一项在最下面 */
+  /** 贴到栏底（脚本、任务与设置），最后一项在最下面 */
   bottom?: boolean;
 }
 
-/** 左侧导航栏，顺序即视觉顺序：上面是数据流的四个页面，脚本与任务贴底 */
+/** 左侧导航栏，顺序即视觉顺序：上面是数据流的四个页面，脚本、任务与设置贴底 */
 const NAV_ITEMS: NavItem[] = [
-  { path: '/', label: '来源管理', icon: FolderOpened },
-  { path: '/characters', label: '角色管理', icon: User },
-  { path: '/process', label: '图组管理', icon: Grid },
-  { path: '/library', label: '图库', icon: PictureFilled },
-  { path: '/scripts', label: '脚本管理', icon: Setting, bottom: true },
-  { path: '/tasks', label: '任务管理', icon: List, badge: true, bottom: true },
+  { path: '/', label: '来源管理', icon: 'source' },
+  { path: '/characters', label: '角色管理', icon: 'character' },
+  { path: '/process', label: '图组管理', icon: 'group' },
+  { path: '/library', label: '图库', icon: 'library' },
+  { path: '/scripts', label: '脚本管理', icon: 'script', bottom: true },
+  { path: '/tasks', label: '任务管理', icon: 'task', badge: true, bottom: true },
+  { path: '/settings', label: '设置', icon: 'settings', bottom: true },
 ];
 
 /** 栏底那组的起点：它上面撑开弹性空白，把这组顶到底部 */

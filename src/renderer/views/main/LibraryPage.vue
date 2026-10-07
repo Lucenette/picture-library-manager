@@ -12,7 +12,7 @@
           删除选中 ({{ selectedIds.length }})
         </el-button>
         <el-button type="success" :disabled="indexRows.length === 0" @click="exportImages">
-          <el-icon><Download /></el-icon> 导出 ({{ selectedIds.length || indexRows.length }})
+          <el-icon><AppIcon name="download" /></el-icon> 导出 ({{ selectedIds.length || indexRows.length }})
         </el-button>
       </div>
     </div>
@@ -99,7 +99,6 @@
 </template>
 
 <script setup lang="ts">
-import { Download } from '@element-plus/icons-vue';
 import { ipcRenderer } from 'electron';
 import { ElMessage } from 'element-plus';
 import type { TableInstance } from 'element-plus';
@@ -111,6 +110,7 @@ import type {
   ProcessScript, Source, TaskView, ViewerOpenRequest,
 } from '@common/types';
 
+import AppIcon from '@/components/AppIcon.vue';
 import type { FilterItem, FilterSection } from '@/components/CategorySearch.types';
 import CategorySearch from '@/components/CategorySearch.vue';
 import type { TileItem, TileSelectState } from '@/components/TileBoard.types';

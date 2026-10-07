@@ -2,6 +2,7 @@ import { resolve } from 'path';
 
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'electron-vite';
+import Icons from 'unplugin-icons/vite';
 import type { Plugin } from 'vite';
 import renderer from 'vite-plugin-electron-renderer';
 
@@ -34,7 +35,9 @@ export default defineConfig({
   },
   renderer: {
     // 渲染进程需要直接使用 fs/crypto 等 Node 能力
-    plugins: [vue(), renderer(), firstPaint()],
+    // Icons：`~icons/<集合>/<图标>` 在编译期变成单个 SVG 组件，只把用到的打进产物；
+    // 引用只允许出现在 components/icons.ts（见 eslint.config.mjs）
+    plugins: [vue(), renderer(), firstPaint(), Icons({ compiler: 'vue3' })],
     resolve: {
       alias: {
         ...aliases,
