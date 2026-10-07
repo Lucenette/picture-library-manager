@@ -13,7 +13,6 @@
 | 事项 | 状态 | 卡在谁 | 文件 |
 |---|---|---|---|
 | 被上游卡住的依赖升级 | 等上游 | `typescript-eslint` 的 peer 上限、`electron-vite` 的 Vite peer 上限 | [blocked-upgrades.md](./blocked-upgrades.md) |
-| 脚本未保存改动在关闭应用后会丢 | 待办 | 无 | [script-draft-lost-on-exit.md](./script-draft-lost-on-exit.md) |
 | 平铺视图悬停放大被裁、无阴影 | 待办 | 无 | [tile-view-hover-clip.md](./tile-view-hover-clip.md) |
 | 平铺/列表切换按钮尺寸优化 | 待办 | 无 | [view-switch-button-size.md](./view-switch-button-size.md) |
 
