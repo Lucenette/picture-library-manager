@@ -132,6 +132,25 @@ describe('Monaco 的语法着色规则', () => {
     }
   });
 
+  test('浅色的关键字、数字、正则与类型各占一色', () => {
+    // Light 方案里这几个族有三种是蓝的、类型没设值，是浅色看着平的主因；这条守住拆分结果
+    const rules = light.monaco.rules as readonly Rule[];
+    const scopes = [
+      'keyword.control.flow.js',
+      'constant.numeric.decimal.js',
+      'string.regexp.js',
+      'entity.name.type.class.js',
+    ];
+    const colors = scopes.map((scope) => foregroundFor(rules, scope));
+    for (const [index, color] of colors.entries()) {
+      expect(color, scopes[index]).toBeDefined();
+    }
+    expect(new Set(colors).size).toBe(scopes.length);
+    // 转义归字符串一族，靠粗体跟普通字符串区分
+    expect(foregroundFor(rules, 'constant.character.escape.js')).toBe(foregroundFor(rules, 'string.quoted.double.js'));
+    expect(ruleFor(rules, 'constant.character.escape.js')?.fontStyle).toBe('bold');
+  });
+
   test('两套都保留内置词法器与语义高亮用的通用词元名规则', () => {
     // 这些既是 TextMate 失败后的降级色，也是 TS 语义高亮（function / type 等）的取色来源，删不得
     const common = ['comment', 'keyword', 'string', 'number', 'constant', 'function', 'type', 'operator', 'delimiter'];

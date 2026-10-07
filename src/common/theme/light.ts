@@ -104,31 +104,36 @@ export const light: Theme<typeof darkTokens> = {
       { token: 'comment', foreground: '8c8c8c', fontStyle: 'italic' },
       { token: 'keyword', foreground: '0033b3' },
       { token: 'string', foreground: '067d17' },
-      { token: 'number', foreground: '1750eb' },
+      { token: 'number', foreground: 'b35c00' },
       { token: 'constant', foreground: '871094', fontStyle: 'italic' },
       { token: 'function', foreground: '00627a' },
-      { token: 'type', foreground: '00627a' },
+      { token: 'type', foreground: '267f99' },
       { token: 'variable', foreground: '000000' },
       { token: 'operator', foreground: '080808' },
       { token: 'delimiter', foreground: '080808' },
       // TextMate 作用域（source.js）：色值与字形取自 WebStorm 的 Light 配色（editor/Light.json）；
       // 行尾注释是对应的 JetBrains 属性名，font 是它的 FONT_TYPE（1 粗体、2 斜体、3 粗斜体）。
       // 这套方案区分度的很大一部分来自斜体/粗体，不只是颜色——只取色会显得比暗色平。
+      //
+      // 有四处不照抄方案，用来拆开 Light 自己撞在一起的色相（下面标了「改」）：
+      //   · 关键字 #0033b3 与数字 #1750eb 几乎同一种蓝 → 数字改暖橙 #b35c00
+      //   · 正则 #264eff 与转义 #0037a6 又是两种蓝 → 正则收成暗红 #a31515、转义归回字符串绿并加粗
+      //   · 类 / 接口名方案里没设值、落到纯黑 → 给青蓝 #267f99，与函数 #00627a 分开
       { token: 'comment.line', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_LINE_COMMENT
       { token: 'comment.block', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_BLOCK_COMMENT
       { token: 'comment.block.documentation', foreground: '8c8c8c', fontStyle: 'italic' }, // DEFAULT_DOC_COMMENT
       { token: 'storage.type', foreground: '0033b3' }, // DEFAULT_KEYWORD
       { token: 'storage.modifier', foreground: '0033b3' }, // DEFAULT_KEYWORD
       { token: 'keyword.operator', foreground: '000000' }, // DEFAULT_OPERATION_SIGN 未设
-      { token: 'string.regexp', foreground: '264eff' }, // JS.REGEXP
-      { token: 'constant.numeric', foreground: '1750eb' }, // DEFAULT_NUMBER
-      { token: 'constant.character.escape', foreground: '0037a6', fontStyle: 'bold' }, // DEFAULT_VALID_STRING_ESCAPE
+      { token: 'string.regexp', foreground: 'a31515' }, // JS.REGEXP（改：原 #264eff 与数字同蓝）
+      { token: 'constant.numeric', foreground: 'b35c00' }, // DEFAULT_NUMBER（改：原 #1750eb 与关键字同蓝）
+      { token: 'constant.character.escape', foreground: '067d17', fontStyle: 'bold' }, // DEFAULT_VALID_STRING_ESCAPE（改：归到字符串绿、加粗，原 #0037a6 与关键字同蓝）
       { token: 'constant.language', foreground: '871094', fontStyle: 'italic' }, // DEFAULT_CONSTANT
       { token: 'entity.name.function', foreground: '00627a' }, // DEFAULT_FUNCTION_DECLARATION
       { token: 'support.function', foreground: '00627a', fontStyle: 'italic' }, // DEFAULT_STATIC_METHOD
-      { token: 'entity.name.type', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
-      { token: 'entity.other.inherited-class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
-      { token: 'support.class', foreground: '000000' }, // DEFAULT_CLASS_REFERENCE 未设
+      { token: 'entity.name.type', foreground: '267f99' }, // DEFAULT_CLASS_REFERENCE 未设（改：原为纯黑）
+      { token: 'entity.other.inherited-class', foreground: '267f99' }, // DEFAULT_CLASS_REFERENCE 未设（改）
+      { token: 'support.class', foreground: '267f99' }, // DEFAULT_CLASS_REFERENCE 未设（改）
       { token: 'variable.other.property', foreground: '871094', fontStyle: 'bold' }, // DEFAULT_INSTANCE_FIELD
       { token: 'variable.other', foreground: '2a8c7c' }, // JS.LOCAL_VARIABLE
       { token: 'variable.parameter', foreground: '000000' }, // JS.PARAMETER 未设
