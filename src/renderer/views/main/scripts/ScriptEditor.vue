@@ -137,12 +137,14 @@ const problemTitle = computed(() => {
 
 .status-problem {
   flex: none;
-  color: var(--el-color-success-light-2);
+  /* 用两套主题都给了值的语义文字色：--el-color-*-light-2 只在暗色主题里定义，
+     浅色下会落到 Element Plus 自己的浅色档，在状态栏底色上几乎看不见 */
+  color: var(--app-tag-success-text);
   cursor: default;
 }
 
 .status-problem.has-problem {
-  color: var(--el-color-danger-light-2);
+  color: var(--app-tag-danger-text);
 }
 
 .editor-body {
