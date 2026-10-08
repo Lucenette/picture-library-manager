@@ -12,6 +12,7 @@
 
 | 事项 | 状态 | 卡在谁 | 文件 |
 |---|---|---|---|
+| 读取图片目录时窗口拖动受阻（同步 I/O） | 待办 | 无 | [walk-sync-io.md](./walk-sync-io.md) |
 | 被上游卡住的依赖升级 | 等上游 | `typescript-eslint` 的 peer 上限、`electron-vite` 的 Vite peer 上限 | [blocked-upgrades.md](./blocked-upgrades.md) |
 | 平铺视图悬停放大被裁、无阴影 | 待办 | 无 | [tile-view-hover-clip.md](./tile-view-hover-clip.md) |
 | 平铺/列表切换按钮尺寸优化 | 待办 | 无 | [view-switch-button-size.md](./view-switch-button-size.md) |
