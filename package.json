@@ -30,7 +30,7 @@
     "@element-plus/icons-vue": "^2.3.0",
     "@xmldom/xmldom": "^0.9.12",
     "element-plus": "^2.9.0",
-    "image-size": "^1.2.0",
+    "image-size": "^2.0.4",
     "log4js": "^6.9.1",
     "monaco-editor": "^0.57.0",
     "pinyin-pro": "^3.29.4",
