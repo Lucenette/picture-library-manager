@@ -199,13 +199,13 @@ body {
 
 .rail-link:hover {
   color: var(--app-text-regular);
-  background: var(--app-bg-surface);
+  background: var(--app-bg-hover);
 }
 
-/* 激活态：左边一道竖条 + 提亮 */
+/* 激活态：左边一道竖条 + 选中底色；暗色下 surface 与栏底色同为 #26282c，不能用它 */
 .rail-link.active {
-  color: var(--app-primary);
-  background: var(--app-bg-surface);
+  color: var(--app-text-primary);
+  background: var(--app-bg-active);
   border-left-color: var(--app-primary);
 }
 
