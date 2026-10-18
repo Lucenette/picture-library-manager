@@ -38,6 +38,9 @@
   --el-fill-color-lighter: var(--app-bg-disabled);
   --el-fill-color-blank: var(--app-bg-surface);
   --el-font-size-base: 14px;
+  /* 控件高度统一取令牌：Element Plus 的默认尺寸由这两个变量决定 */
+  --el-component-size: var(--app-control-h);
+  --el-component-size-small: var(--app-control-h-sm);
   --page-gap: 16px;
   --page-padding: var(--page-gap) var(--page-gap) 0;
 }
@@ -50,6 +53,8 @@
 body {
   color: var(--app-text-regular);
   background: var(--app-bg-page);
+  font-size: var(--app-font-base);
+  line-height: 1.5;
 }
 
 /* ======== 表格 ======== */
@@ -360,4 +365,20 @@ body {
   background: var(--app-bg-active);
   border-color: var(--app-border-hover);
   color: var(--app-text-primary);
+}
+
+/* ======== 键盘焦点 ======== */
+/* 所有可交互元素都要有可见焦点；输入类已经有 2px 主色内描边，不再叠外框 */
+.el-button:focus-visible,
+.el-pagination button:focus-visible,
+.el-pager li:focus-visible,
+.rail-link:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--app-border-highlight);
+  outline-offset: 1px;
+}
+
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible {
+  outline: none;
 }

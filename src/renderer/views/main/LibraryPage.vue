@@ -36,7 +36,7 @@
               :src="row.selectedFileThumbnail"
               @click="openImageViewer(row)"
             />
-            <span v-else style="font-size: 24px">🖼</span>
+            <span v-else style="font-size: var(--app-icon-xl)">🖼</span>
           </template>
         </el-table-column>
         <el-table-column prop="characterName" label="角色" width="160" sortable="custom" />

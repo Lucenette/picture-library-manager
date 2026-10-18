@@ -123,7 +123,7 @@ const imgStyle = computed(() => ({
   height: 'auto',
   transform: `translate(${offsetX.value}px, ${offsetY.value}px) scale(${realScale.value})`,
   cursor: cssScale.value > 0 ? (dragging.value ? 'grabbing' : 'grab') : 'default',
-  transition: dragging.value ? 'none' : 'transform 0.1s ease',
+  transition: dragging.value ? 'none' : 'transform var(--app-duration-fast) var(--app-ease)',
 }));
 
 /** 围绕当前图前后各取一段，形成可滚动的缩略图条 */
@@ -467,7 +467,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   user-select: none;
   z-index: 5;
   padding: 40px var(--app-space-12);
-  transition: color 0.15s;
+  transition: color var(--app-duration-fast) var(--app-ease);
 }
 
 .viewer-nav-left {
@@ -529,7 +529,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   justify-content: center;
   border-radius: var(--app-radius-4);
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform var(--app-duration) var(--app-ease), box-shadow var(--app-duration) var(--app-ease);
 }
 
 .thumb-item.empty {

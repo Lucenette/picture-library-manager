@@ -301,7 +301,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   border-radius: var(--app-radius-8);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
-  transition: border-color 0.15s;
+  transition: border-color var(--app-duration-fast) var(--app-ease);
   min-height: 32px;
 }
 

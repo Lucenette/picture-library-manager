@@ -12,7 +12,7 @@
               :alt="row.fileName"
               @click="openViewer(row)"
             />
-            <span v-else style="font-size: 24px">🖼</span>
+            <span v-else style="font-size: var(--app-icon-xl)">🖼</span>
           </template>
         </el-table-column>
         <el-table-column label="相对路径" min-width="280" show-overflow-tooltip sortable :sort-method="comparePath">
@@ -113,8 +113,8 @@ onMounted(loadInitData);
 }
 
 .fv-header {
-  height: 36px;
-  line-height: 36px;
+  height: var(--app-dialog-title-h);
+  line-height: var(--app-dialog-title-h);
   padding: 0 var(--app-space-16);
   font-size: var(--app-font-md);
   color: var(--app-text-primary);
@@ -122,7 +122,7 @@ onMounted(loadInitData);
 }
 
 .fv-body {
-  height: calc(100vh - 36px);
+  height: calc(100vh - var(--app-dialog-title-h));
   overflow: hidden;
   -webkit-app-region: no-drag;
 }

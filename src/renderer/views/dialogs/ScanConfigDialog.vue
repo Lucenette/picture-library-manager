@@ -75,8 +75,8 @@ onMounted(loadInitData);
 }
 
 .config-header {
-  height: 36px;
-  line-height: 36px;
+  height: var(--app-dialog-title-h);
+  line-height: var(--app-dialog-title-h);
   padding: 0 var(--app-space-16);
   font-size: var(--app-font-lg);
   font-weight: 400;

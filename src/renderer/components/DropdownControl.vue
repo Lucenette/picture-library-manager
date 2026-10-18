@@ -69,7 +69,7 @@ function open(): void {
   border: 1px solid var(--app-border-strong);
   cursor: pointer;
   font-size: var(--app-font-base);
-  transition: border-color 0.15s;
+  transition: border-color var(--app-duration-fast) var(--app-ease);
 }
 
 .select-btn:hover {

@@ -377,7 +377,7 @@ function onItemDragEnd(): void {
   max-width: 100%;
   overflow: hidden;
   opacity: 1;
-  transition: max-width 0.18s ease, opacity 0.12s ease;
+  transition: max-width var(--app-duration-slow) var(--app-ease), opacity var(--app-duration-fast) var(--app-ease);
 }
 
 .side-head.is-searching .head-bar {
@@ -393,7 +393,7 @@ function onItemDragEnd(): void {
   max-width: 0;
   overflow: hidden;
   opacity: 0;
-  transition: max-width 0.18s ease, opacity 0.12s ease;
+  transition: max-width var(--app-duration-slow) var(--app-ease), opacity var(--app-duration-fast) var(--app-ease);
 }
 
 .side-head.is-searching .search-input {
@@ -527,7 +527,7 @@ function onItemDragEnd(): void {
   flex: none;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s;
+  transition: opacity var(--app-duration-fast) var(--app-ease);
 }
 
 .group-head:hover .group-actions,

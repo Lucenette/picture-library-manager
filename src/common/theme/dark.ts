@@ -21,6 +21,20 @@ export const darkTokens = {
   "--app-font-base": "13px",
   "--app-font-md": "14px",
   "--app-font-lg": "16px",
+  // 控件与图标的固定尺寸：Element Plus 的默认控件尺寸也挂在这里（见 styles/theme.css）
+  "--app-control-h": "32px",
+  "--app-control-h-sm": "28px",
+  "--app-icon-sm": "14px",
+  "--app-icon": "16px",
+  "--app-icon-lg": "18px",
+  "--app-icon-xl": "24px",
+  // 弹窗类窗口自绘的标题条高度；主窗口那条是 40（见 App.vue 的 --title-bar-height）
+  "--app-dialog-title-h": "36px",
+  // 动效：颜色 120、位移 160、展开收起 200，缓动统一
+  "--app-duration-fast": "120ms",
+  "--app-duration": "160ms",
+  "--app-duration-slow": "200ms",
+  "--app-ease": "cubic-bezier(0.2, 0, 0, 1)",
   "--app-bg-page": "#191a1c",
   "--app-bg-surface": "#26282c",
   // 工具窗口底色（Islands 的 ToolWindow.background）：脚本页的列表与编辑区都用它，

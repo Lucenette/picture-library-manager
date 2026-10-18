@@ -521,7 +521,7 @@ defineExpose({ scrollToTop });
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius-6);
   background: var(--app-bg-surface);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform var(--app-duration) var(--app-ease), box-shadow var(--app-duration) var(--app-ease);
 }
 
 /* 三张封面叠着放：第 0 张在最上面，另外两张往两侧错开并稍作旋转 */
@@ -589,7 +589,7 @@ defineExpose({ scrollToTop });
   z-index: 5;
   min-width: 18px;
   padding: 0 var(--app-space-4);
-  border-radius: 9px;
+  border-radius: var(--app-radius-8);
   background: var(--app-overlay-scrim);
   color: var(--app-on-primary);
   font-size: var(--app-font-xs);
@@ -604,7 +604,7 @@ defineExpose({ scrollToTop });
   z-index: 5;
   height: auto;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--app-duration-fast) var(--app-ease);
 }
 
 /* 没勾选任何东西时只在悬停的那张卡片上出现；一旦有勾选，所有复选框都常显 */

@@ -78,7 +78,7 @@ onMounted(async () => {
 }
 
 .similar-bar {
-  height: 36px;
+  height: var(--app-dialog-title-h);
   display: flex;
   align-items: center;
   gap: var(--app-space-12);

@@ -139,8 +139,8 @@ body {
 
 .title-bar-icon img {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: var(--app-icon);
+  height: var(--app-icon);
 }
 
 .title-bar-text {
@@ -187,11 +187,14 @@ body {
   justify-content: center;
   width: 40px;
   height: 40px;
-  font-size: 18px;
+  font-size: var(--app-icon-lg);
   color: var(--app-text-soft);
   text-decoration: none;
   border-left: 2px solid transparent;
-  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+  transition:
+    color var(--app-duration-fast) var(--app-ease),
+    background-color var(--app-duration-fast) var(--app-ease),
+    border-color var(--app-duration-fast) var(--app-ease);
 }
 
 .rail-link:hover {
@@ -215,8 +218,8 @@ body {
   border-radius: var(--app-radius-8);
   background: var(--app-primary);
   color: var(--app-on-primary);
-  font-size: 10px;
-  line-height: 14px;
+  font-size: var(--app-font-xs);
+  line-height: 1.2;
 }
 
 .app-main {
