@@ -1,15 +1,17 @@
 <template>
   <div class="source-page">
     <div class="toolbar">
-      <el-button type="primary" @click="addSource">
-        <el-icon><AppIcon name="plus" /></el-icon> 添加来源
-      </el-button>
-      <el-button :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
-        批量扫描 ({{ selectedIds.length }})
-      </el-button>
-      <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
-        批量删除 ({{ selectedIds.length }})
-      </el-button>
+      <div class="toolbar-right">
+        <el-button :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
+          批量扫描 ({{ selectedIds.length }})
+        </el-button>
+        <el-button type="danger" plain :disabled="selectedIds.length === 0" @click="batchDelete">
+          批量删除 ({{ selectedIds.length }})
+        </el-button>
+        <el-button type="primary" @click="addSource">
+          <el-icon><AppIcon name="plus" /></el-icon> 添加来源
+        </el-button>
+      </div>
     </div>
 
     <div class="table-wrap">
@@ -247,9 +249,16 @@ onMounted(loadSources);
 .toolbar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--app-space-12);
   margin-bottom: var(--app-space-12);
   flex-shrink: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-12);
 }
 
 .table-wrap {

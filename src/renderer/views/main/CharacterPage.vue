@@ -4,9 +4,11 @@
       <div class="toolbar-left">
         <CategorySearch :sections="filterSections" :order="filterOrder" />
       </div>
-      <el-button type="primary" :disabled="selectedIds.length === 0" @click="openBatchRename">
-        批量重命名 ({{ selectedIds.length }})
-      </el-button>
+      <div class="toolbar-right">
+        <el-button type="primary" :disabled="selectedIds.length === 0" @click="openBatchRename">
+          批量重命名 ({{ selectedIds.length }})
+        </el-button>
+      </div>
     </div>
 
     <div class="table-wrap">
@@ -274,6 +276,12 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   flex: 1;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-12);
 }
 
 .table-wrap {

@@ -5,11 +5,11 @@
         <CategorySearch :sections="filterSections" :order="filterOrder" />
       </div>
       <div class="toolbar-right">
+        <el-button :disabled="selectedIds.length === 0" @click="excludeSelected">标记排除</el-button>
+        <el-button :disabled="selectedIds.length === 0" @click="unexcludeSelected">取消排除</el-button>
         <el-button type="primary" @click="openBatchDialog">
           批量处理 ({{ selectedIds.length || groupTotal }})
         </el-button>
-        <el-button :disabled="selectedIds.length === 0" @click="excludeSelected">标记排除</el-button>
-        <el-button :disabled="selectedIds.length === 0" @click="unexcludeSelected">取消排除</el-button>
       </div>
     </div>
 

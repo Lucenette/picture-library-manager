@@ -63,4 +63,36 @@ describe('颜色的唯一来源', () => {
       Object.keys(tokens).filter((key) => key.startsWith('--app-')).sort();
     expect(appKeys(light.tokens)).toEqual(appKeys(dark.tokens));
   });
+
+  /**
+   * 字号、圆角与过渡时长也必须有令牌出处：散着写字面量时，同一种语义会漂成好几个值。
+   *
+   * 确实需要一次性取值的（展示性字形等），在那一行写明 `style-literal-ok` 与理由——
+   * 例外要能被 review 看见，而不是悄悄放行。
+   */
+  test('字号、圆角与过渡时长只允许取令牌', () => {
+    const rules = [
+      { name: '字号', re: /font-size:\s*\d+(?:\.\d+)?px/ },
+      { name: '圆角', re: /border-radius:\s*\d+(?:\.\d+)?px/ },
+      { name: '过渡时长', re: /transition:[^;]*\d+(?:\.\d+)?(?:s|ms)\b/ },
+    ];
+    const files = collect(join(process.cwd(), 'src', 'renderer')).filter((file) => /\.(vue|css)$/.test(file));
+    expect(files.length).toBeGreaterThan(20);
+
+    const offenders: string[] = [];
+    for (const full of files) {
+      const file = relative(process.cwd(), full).split('\\').join('/');
+      readFileSync(full, 'utf8').split('\n').forEach((line, index) => {
+        if (line.includes('style-literal-ok')) {
+          return;
+        }
+        for (const rule of rules) {
+          if (rule.re.test(line)) {
+            offenders.push(file + ':' + (index + 1) + ' ' + rule.name + ' ' + line.trim());
+          }
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
 });

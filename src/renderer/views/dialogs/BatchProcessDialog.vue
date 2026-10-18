@@ -6,9 +6,9 @@
 
       <DropdownControl v-model="scriptId" :items="scripts" placeholder="选择处理脚本" />
 
-      <el-button type="primary" :disabled="!scriptId" style="width: 100%; margin-top: var(--app-space-20)" @click="confirm">
-        开始处理
-      </el-button>
+    </div>
+    <div class="dialog-actions">
+      <el-button type="primary" :disabled="!scriptId" @click="confirm">开始处理</el-button>
     </div>
   </div>
 </template>
@@ -88,5 +88,14 @@ onMounted(loadInitData);
   margin-bottom: var(--app-space-16);
   font-size: var(--app-font-base);
   color: var(--app-text-secondary);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--app-space-10);
+  padding: var(--app-space-12) var(--app-space-24) var(--app-space-24);
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
 }
 </style>

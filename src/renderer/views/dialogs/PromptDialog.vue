@@ -3,9 +3,9 @@
     <div class="prompt-header">{{ title }}</div>
     <div class="prompt-body">
       <el-input ref="inputEl" v-model="value" :placeholder="placeholder" @keyup.enter="confirm" />
-      <el-button type="primary" :disabled="!value.trim()" style="width: 100%; margin-top: var(--app-space-20)" @click="confirm">
-        确定
-      </el-button>
+    </div>
+    <div class="dialog-actions">
+      <el-button type="primary" :disabled="!value.trim()" @click="confirm">确定</el-button>
     </div>
   </div>
 </template>
@@ -90,7 +90,16 @@ onMounted(loadInitData);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 var(--app-space-24) var(--app-space-24);
+  padding: 0 var(--app-space-24);
   -webkit-app-region: no-drag;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--app-space-10);
+  padding: var(--app-space-12) var(--app-space-24) var(--app-space-24);
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
 }
 </style>

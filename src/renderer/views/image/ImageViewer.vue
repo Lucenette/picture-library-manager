@@ -461,7 +461,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 56px;
+  font-size: 56px; /* style-literal-ok: 翻页箭头是展示性字形，不参与字号阶梯 */
   color: var(--app-viewer-text-dim);
   cursor: pointer;
   user-select: none;

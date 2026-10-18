@@ -75,7 +75,7 @@ function hide(): void {
   display: flex;
   align-items: center;
   gap: var(--app-space-8);
-  height: 32px;
+  height: var(--app-row-h);
   padding: 0 var(--app-space-12);
   cursor: pointer;
   font-size: var(--app-font-base);
@@ -83,7 +83,7 @@ function hide(): void {
 }
 
 .filter-item:hover {
-  background: var(--app-bg-active);
+  background: var(--app-bg-hover);
 }
 
 /* 复选框：这个窗口刻意不引 Element Plus，所以按它的样子手画一个 */

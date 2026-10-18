@@ -8,7 +8,7 @@
         <el-button :disabled="recognizing" @click="recognizeSimilar">
           {{ recognizing ? '识别中…' : '识别相似图片' }}
         </el-button>
-        <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
+        <el-button type="danger" plain :disabled="selectedIds.length === 0" @click="batchDelete">
           删除选中 ({{ selectedIds.length }})
         </el-button>
         <el-button type="primary" :disabled="indexRows.length === 0" @click="exportImages">

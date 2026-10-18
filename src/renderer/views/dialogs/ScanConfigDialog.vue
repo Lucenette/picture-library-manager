@@ -7,9 +7,9 @@
 
       <DropdownControl v-model="scriptId" :items="scripts" placeholder="目录结构识别脚本" />
 
-      <el-button type="primary" :disabled="!scriptId" style="width: 100%" @click="confirm">
-        开始扫描
-      </el-button>
+    </div>
+    <div class="dialog-actions">
+      <el-button type="primary" :disabled="!scriptId" @click="confirm">开始扫描</el-button>
     </div>
   </div>
 </template>
@@ -102,5 +102,14 @@ onMounted(loadInitData);
 
 .config-body .el-button {
   margin-top: var(--app-space-20);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--app-space-10);
+  padding: var(--app-space-12) var(--app-space-24) var(--app-space-24);
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
 }
 </style>
