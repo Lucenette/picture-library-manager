@@ -78,7 +78,7 @@
 | 图标 | `--app-icon-sm` 14、`--app-icon` 16、`--app-icon-lg` 18、`--app-icon-xl` 24 | 内联 / 常规 / 导航 / 占位字形 |
 | 控件 | `--app-control-h` 32、`--app-control-h-sm` 28 | 按钮与输入 32、紧凑 28；Element Plus 的默认尺寸也挂这两个 |
 | 弹窗标题条 | `--app-dialog-title-h` 36 | 弹窗类窗口自绘的标题条；主窗口 40 见 `--title-bar-height` |
-| 行 | 32（列表与表格批次统一时再加 `--app-row-h`） | 表格行、列表项、树的行 |
+| 行 | `--app-row-h` 32 | 表格行、列表项、树的行；表格行含行内控件时约 33 |
 | 动效 | `--app-duration-fast` 120ms、`--app-duration` 160ms、`--app-duration-slow` 200ms、`--app-ease` | 颜色 120、位移 160、展开收起 200 |
 | 阴影 | 对话框 / 浮层 / 平铺卡片 / 查看器缩略图 | 见主题对象 | 密集界面不加投影 |
 

@@ -37,6 +37,7 @@ export const light: Theme<typeof darkTokens> = {
     "--app-icon": "16px",
     "--app-icon-lg": "18px",
     "--app-icon-xl": "24px",
+    "--app-row-h": "32px",
     "--app-dialog-title-h": "36px",
     "--app-duration-fast": "120ms",
     "--app-duration": "160ms",

@@ -135,7 +135,7 @@ onMounted(load);
   padding: var(--page-padding);
   display: flex;
   flex-direction: column;
-  gap: var(--app-space-16);
+  gap: var(--app-space-24);
   /* 一行一条设置项，宽屏下不要拉成一条长横线 */
   max-width: 720px;
 }
@@ -148,9 +148,9 @@ onMounted(load);
 }
 
 .group-title {
-  margin-bottom: var(--app-space-12);
+  margin-bottom: var(--app-space-8);
   color: var(--app-text-primary);
-  font-size: var(--app-font-md);
+  font-size: var(--app-font-lg);
   font-weight: 600;
 }
 

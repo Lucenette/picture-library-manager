@@ -11,7 +11,7 @@
         <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
           删除选中 ({{ selectedIds.length }})
         </el-button>
-        <el-button type="success" :disabled="indexRows.length === 0" @click="exportImages">
+        <el-button type="primary" :disabled="indexRows.length === 0" @click="exportImages">
           <el-icon><AppIcon name="download" /></el-icon> 导出 ({{ selectedIds.length || indexRows.length }})
         </el-button>
       </div>

@@ -28,6 +28,8 @@ export const darkTokens = {
   "--app-icon": "16px",
   "--app-icon-lg": "18px",
   "--app-icon-xl": "24px",
+  // 列表与树的单行高度；表格行由 Element Plus 的内边距决定，约 33
+  "--app-row-h": "32px",
   // 弹窗类窗口自绘的标题条高度；主窗口那条是 40（见 App.vue 的 --title-bar-height）
   "--app-dialog-title-h": "36px",
   // 动效：颜色 120、位移 160、展开收起 200，缓动统一

@@ -371,7 +371,7 @@ function onItemDragEnd(): void {
 .head-bar {
   display: flex;
   align-items: center;
-  gap: var(--app-space-10);
+  gap: var(--app-space-12);
   flex: 1;
   min-width: 0;
   max-width: 100%;
@@ -406,7 +406,7 @@ function onItemDragEnd(): void {
 .icon-btn {
   padding: 0;
   border-radius: var(--el-border-radius-base);
-  font-size: var(--app-font-lg);
+  font-size: var(--app-icon);
   color: var(--el-text-color-secondary);
 
   &:hover {
@@ -423,8 +423,8 @@ function onItemDragEnd(): void {
   gap: var(--app-space-6);
   flex: 1;
   min-width: 0;
-  height: 32px;
-  padding: 0 11px;
+  height: var(--app-control-h);
+  padding: 0 var(--app-space-12);
   border: none;
   border-radius: var(--app-radius-4);
   background: var(--app-bg-surface);
@@ -463,7 +463,7 @@ function onItemDragEnd(): void {
 }
 
 /* 段间距 4px、段内行距 2px：与 DSH 的 `.groupSection + .groupSection` / `.groupSection > * + *`
-   同一条规则。高亮背景因此是 32px/34px 一个独立的圆角块，不会和邻行连成一片 */
+   同一条规则。高亮背景因此是 32px 一个独立的圆角块，不会和邻行连成一片 */
 .side-list :deep(.el-scrollbar__view) > * + * {
   margin-top: var(--app-space-4);
 }
@@ -484,7 +484,7 @@ function onItemDragEnd(): void {
   align-items: center;
   gap: var(--app-space-6);
   width: 100%;
-  height: 34px;
+  height: var(--app-row-h);
   padding: 0 var(--app-space-8) 0 var(--app-space-12);
   border-radius: var(--el-border-radius-base);
 }
@@ -544,7 +544,7 @@ function onItemDragEnd(): void {
 .group-icon {
   flex: none;
   color: var(--app-text-muted);
-  font-size: var(--app-font-lg);
+  font-size: var(--app-icon);
 }
 
 /* 名称按内容宽：后面的计数直接跟在它后面（不再被顶到最右）。名字太长时才由它自己省略 */
@@ -565,13 +565,13 @@ function onItemDragEnd(): void {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 32px;
-  padding: var(--app-space-8) var(--app-space-12) var(--app-space-8) 34px;
+  height: var(--app-row-h);
+  padding: 0 var(--app-space-12) 0 34px;
   border: none;
   border-radius: var(--el-border-radius-base);
   background: none;
   color: var(--el-text-color-regular);
-  font-size: var(--el-font-size-base);
+  font-size: var(--app-font-base);
   text-align: left;
   cursor: pointer;
 }
