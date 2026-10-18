@@ -546,18 +546,21 @@ function logWindowTiming(window: BrowserWindow, id: string, startedAt: number): 
 }
 
 /**
- * 开发态自动打开开发者工具，并支持 F12 切换。
+ * 开发态的开发者工具：按需打开，F12 随时可切。
  *
- * 每个窗口都自动开一个 detached DevTools 是**有意为之**（使用者的开发习惯），不是性能疏忽，
- * 不要当成"窗口慢"的原因删掉：它只在开发态生效，打包后完全不执行。
+ * 默认不开 detached DevTools 窗口——自动化冒烟时多一个窗口会挡住截图与焦点，
+ * 需要时用 `yarn dev:debug`（即 `--devtools`）打开。F12 不受影响。
+ * 打包后完全不执行。
  */
 function enableDevTools(window: BrowserWindow, isControl: boolean): void {
   if (app.isPackaged || isControl) {
     return;
   }
-  window.webContents.once('did-finish-load', () => {
-    window.webContents.openDevTools({ mode: 'detach' });
-  });
+  if (process.argv.includes('--devtools')) {
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.openDevTools({ mode: 'detach' });
+    });
+  }
   window.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       window.webContents.toggleDevTools();

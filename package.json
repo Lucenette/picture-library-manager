@@ -8,6 +8,7 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js",
     "dev": "electron-vite dev",
+    "dev:debug": "electron-vite dev -- --devtools",
     "preview": "electron-vite preview",
     "build": "electron-vite build && electron-builder --publish never",
     "build:win": "yarn build --win",

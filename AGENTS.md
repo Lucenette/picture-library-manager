@@ -15,7 +15,8 @@
 
 | 命令 | 作用 | 备注 |
 |---|---|---|
-| `yarn dev` | 启动开发环境 | 主进程/preload 由 electron-vite 构建，渲染进程走 Vite |
+| `yarn dev` | 启动开发环境 | 主进程/preload 由 electron-vite 构建，渲染进程走 Vite；**默认不打开开发者工具** |
+| `yarn dev:debug` | 启动开发环境并打开开发者工具 | 等价于 `yarn dev -- --devtools`；自动化冒烟用 `yarn dev` |
 | `yarn typecheck` | `tsc`（主进程与 `common`）+ `vue-tsc`（渲染进程，含 `.vue`） | **`.vue` 的类型错误只有 `vue-tsc` 能发现**，只跑 `tsc` 会漏 |
 | `yarn build` | 打包**当前平台**（Windows → NSIS，macOS → dmg，Linux → AppImage / deb） | 产物在 `dist/`；指定平台用 `yarn build:win` / `build:mac` / `build:linux` |
 | `yarn preview` | 构建后启动 Electron，预览**生产产物**（不打包） | 它自己会先构建；要跳过用 `yarn preview --skipBuild` |
