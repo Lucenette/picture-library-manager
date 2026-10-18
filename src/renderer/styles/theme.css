@@ -28,16 +28,21 @@
   --el-text-color-primary: var(--app-text-primary);
   --el-text-color-regular: var(--app-text-regular);
   --el-text-color-secondary: var(--app-text-secondary);
+  --el-text-color-disabled: var(--app-text-disabled);
+  --el-text-color-placeholder: var(--app-text-muted);
   --el-border-color: var(--app-border);
-  --el-border-color-light: var(--app-bg-hover);
-  --el-border-color-lighter: var(--app-bg-surface);
-  --el-border-color-extra-light: var(--app-bg-hover);
+  --el-border-color-light: var(--app-border-subtle);
+  --el-border-color-lighter: var(--app-border-subtle);
+  --el-border-color-extra-light: var(--app-border-subtle);
   --el-border-color-dark: var(--app-border-strong);
   --el-fill-color: var(--app-bg-hover);
   --el-fill-color-light: var(--app-bg-header);
   --el-fill-color-lighter: var(--app-bg-disabled);
   --el-fill-color-blank: var(--app-bg-surface);
-  --el-font-size-base: 14px;
+  --el-border-radius-base: var(--app-radius-4);
+  --el-scrollbar-bg-color: var(--app-border-strong);
+  --el-scrollbar-hover-bg-color: var(--app-border-hover);
+  --el-font-size-base: var(--app-font-md);
   /* 控件高度统一取令牌：Element Plus 的默认尺寸由这两个变量决定 */
   --el-component-size: var(--app-control-h);
   --el-component-size-small: var(--app-control-h-sm);
@@ -72,10 +77,15 @@ body {
   color: var(--app-text-secondary) !important;
   font-weight: 600;
   font-size: var(--app-font-base);
+  padding: var(--app-space-6) 0;
   border-bottom: 1px solid var(--app-border) !important;
 }
 .el-table td.el-table__cell {
+  padding: var(--app-space-6) 0;
   border-bottom: 1px solid var(--app-border-subtle);
+}
+.el-table .cell {
+  line-height: 1.5;
 }
 .el-table tr:hover > td {
   background: var(--app-bg-hover) !important;
@@ -85,12 +95,17 @@ body {
 }
 .el-table .el-table__empty-text {
   color: var(--app-text-muted);
+  font-size: var(--app-font-sm);
 }
 
 /* ======== 按钮 ======== */
 .el-button {
   font-weight: 500;
   margin-left: 0;
+  transition:
+    background-color var(--app-duration-fast) var(--app-ease),
+    border-color var(--app-duration-fast) var(--app-ease),
+    color var(--app-duration-fast) var(--app-ease);
 }
 .el-button + .el-button {
   margin-left: 0;
@@ -152,11 +167,19 @@ body {
   border-color: var(--app-border-subtle) !important;
   color: var(--app-text-disabled) !important;
 }
+.el-button.is-text.is-disabled,
+.el-button.is-text.is-disabled:hover {
+  background: transparent !important;
+  color: var(--app-text-disabled) !important;
+}
 
 /* ======== 标签 ======== */
 .el-tag {
-  font-weight: 500;
+  height: 20px;
+  padding: 0 var(--app-space-6);
   border-radius: var(--app-radius-4);
+  font-size: var(--app-font-xs);
+  font-weight: 500;
 }
 .el-tag--success {
   background: var(--app-tag-success-bg);
@@ -214,6 +237,37 @@ body {
   background: var(--app-bg-disabled);
   box-shadow: 0 0 0 1px var(--app-border-subtle) inset;
 }
+/* 选择框沿用同一套输入外观（Element Plus 2.9 的 select 自己有一层 wrapper） */
+.el-select__wrapper {
+  background: var(--app-bg-surface);
+  box-shadow: 0 0 0 1px var(--app-border) inset;
+  border-radius: var(--app-radius-4);
+  min-height: var(--app-control-h);
+}
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--app-border-strong) inset;
+}
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 2px var(--app-primary) inset !important;
+}
+.el-select__wrapper.is-disabled {
+  background: var(--app-bg-disabled);
+  box-shadow: 0 0 0 1px var(--app-border-subtle) inset;
+}
+
+.el-textarea__inner {
+  background: var(--app-bg-surface);
+  box-shadow: 0 0 0 1px var(--app-border) inset;
+  border-radius: var(--app-radius-4);
+  color: var(--app-text-regular);
+}
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--app-border-strong) inset;
+}
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 2px var(--app-primary) inset;
+}
+
 .el-input__inner {
   color: var(--app-text-regular);
 }
@@ -223,12 +277,19 @@ body {
 .el-pagination .btn-next {
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-4);
   color: var(--app-text-regular);
 }
 .el-pagination .btn-prev:hover,
 .el-pagination .btn-next:hover {
-  border-color: var(--app-primary);
-  color: var(--app-primary);
+  background: var(--app-bg-hover);
+  border-color: var(--app-border-hover);
+  color: var(--app-text-primary);
+}
+.el-pagination .btn-prev:focus-visible,
+.el-pagination .btn-next:focus-visible {
+  outline: 2px solid var(--app-border-highlight);
+  outline-offset: 1px;
 }
 .el-pagination .btn-prev:disabled,
 .el-pagination .btn-next:disabled {
@@ -238,11 +299,13 @@ body {
 }
 .el-pager li {
   background: var(--app-bg-surface);
+  border-radius: var(--app-radius-4);
   color: var(--app-text-regular);
   font-weight: 500;
 }
 .el-pager li:hover {
-  color: var(--app-primary);
+  background: var(--app-bg-hover);
+  color: var(--app-text-primary);
 }
 .el-pager li.is-active {
   background: var(--app-primary);
@@ -260,6 +323,8 @@ body {
 .el-select-dropdown {
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-6);
+  box-shadow: var(--app-shadow-popup);
 }
 .el-select-dropdown__item {
   color: var(--app-text-regular);
@@ -268,7 +333,9 @@ body {
   background: var(--app-bg-hover);
 }
 .el-select-dropdown__item.selected {
-  color: var(--app-primary);
+  background: var(--app-bg-active);
+  color: var(--app-text-primary);
+  font-weight: 500;
 }
 
 /* ======== 对话框 ======== */
@@ -282,6 +349,8 @@ body {
 }
 .el-dialog__title {
   color: var(--app-text-primary);
+  font-size: var(--app-font-lg);
+  font-weight: 600;
 }
 .el-dialog__body {
   padding: var(--app-space-20) var(--app-space-24);
