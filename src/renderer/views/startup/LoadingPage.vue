@@ -87,7 +87,7 @@ watch(
 .loading-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--app-space-12);
   padding: 0 var(--app-space-32);
 }
 

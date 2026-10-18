@@ -90,7 +90,7 @@ onMounted(loadInitData);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 var(--app-space-32) var(--app-space-24);
+  padding: 0 var(--app-space-24) var(--app-space-24);
   -webkit-app-region: no-drag;
 }
 

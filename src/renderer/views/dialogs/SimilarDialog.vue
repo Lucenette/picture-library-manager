@@ -88,7 +88,7 @@ onMounted(async () => {
 }
 
 .similar-title {
-  font-size: var(--app-font-base);
+  font-size: var(--app-font-lg);
 }
 
 .similar-summary {
@@ -109,7 +109,7 @@ onMounted(async () => {
 
 .similar-group {
   margin-bottom: var(--app-space-16);
-  border: 1px solid var(--app-bg-surface);
+  border: 1px solid var(--app-border-subtle);
   border-radius: var(--app-radius-4);
 }
 
@@ -117,7 +117,7 @@ onMounted(async () => {
   padding: var(--app-space-6) var(--app-space-10);
   font-size: var(--app-font-sm);
   color: var(--app-text-muted);
-  border-bottom: 1px solid var(--app-bg-surface);
+  border-bottom: 1px solid var(--app-border-subtle);
 }
 
 .similar-group-body {

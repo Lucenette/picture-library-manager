@@ -116,7 +116,7 @@ onMounted(loadInitData);
   height: var(--app-dialog-title-h);
   line-height: var(--app-dialog-title-h);
   padding: 0 var(--app-space-16);
-  font-size: var(--app-font-md);
+  font-size: var(--app-font-lg);
   color: var(--app-text-primary);
   -webkit-app-region: drag;
 }

@@ -4,7 +4,7 @@
       <el-button type="primary" @click="addSource">
         <el-icon><AppIcon name="plus" /></el-icon> 添加来源
       </el-button>
-      <el-button type="success" :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
+      <el-button :disabled="selectedIds.length === 0" @click="openScanConfigForSelection">
         批量扫描 ({{ selectedIds.length }})
       </el-button>
       <el-button type="danger" :disabled="selectedIds.length === 0" @click="batchDelete">
