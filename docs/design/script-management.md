@@ -232,6 +232,8 @@ import TsWorker from 'monaco-editor/language/typescript/ts.worker?worker&inline'
 
 worker 由 `MonacoEnvironment.getWorker` 决定：`javascript` 与 `typescript` 用 `ts.worker`，其余语言退回编辑器 worker。两者都走 inline（blob），为的是绕开打包后 `file://` 页面构造 Worker 的限制。Monaco 的 JS/TS 是**同一个 worker**，没有单独的 JS worker。
 
+**词法器换成了 TextMate**：`javascript` 的分词由 `src/renderer/views/main/scripts/textmate/` 装配（`vscode-textmate` + `vscode-oniguruma`，语法取自 VS Code 的 `source.js`），主题规则因此是作用域而不是词元名。两条硬约束：**必须在任何 `javascript` model 之前设好**（Monaco 内置的 JavaScript 分词器是惰性工厂，晚一步就会把它顶掉），**wasm 不能运行时 fetch**（打包后是 `file://` 页面且开着 `webSecurity`，改用 `?url&inline` 内联成 data URL）。失败只影响着色：编辑器照常可编辑，界面上有一行可见提示，日志里有原因。
+
 **语言服务的挂载点在 0.57 变了**：`monaco.languages.typescript` 只剩一个 deprecated 壳，整套语言服务（`javascriptDefaults`、`ScriptTarget`、`ModuleKind`、`getJavaScriptWorker()`）挂在包根的 `typescript` 导出上。只配 JS 一侧、不碰 `typescriptDefaults`：
 
 ```ts
@@ -278,6 +280,7 @@ monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.t
 - 动 `process_script` 的列或 `1.1.0` 的脚本，注意三段顺序：`preups` 在 `dbups.xml` 之前、`postups` 在之后；接管的幂等标记是「`code` 列还在不在」，落盘自校验过不了就绝不能走到删列那一条。
 - 动迁移前先看 [ups.md](./ups.md) 的记账规则：身份是 `(author, id, filename)`，**改了已经执行过的 changeSet 不会生效**；预演要覆盖全新库与现有库两条路径。
 - 改编辑器就注意 0.57 的三处：语言服务在包根的 `typescript` 上（不是 `monaco.languages.typescript`）、深导入不写 `esm/vs` 前缀、worker 必须 inline。
+- 动词法器先读 [monaco-textmate.md](./monaco-textmate.md)：`setTokensProvider` 必须排在任何 `javascript` model 之前，wasm 只走内联、别改成运行时 `fetch`。
 - 渲染进程不直接读文件：脚本正文与草稿一律走 `SCRIPT_*` 通道。
 
 静态检查与迁移预演的命令见 [AGENTS.md](../../AGENTS.md) 的「改完必须自检」。
@@ -289,6 +292,7 @@ monaco.typescript.javascriptDefaults.addExtraLib(CJS_GLOBALS, 'plmanager-cjs.d.t
 | 正文放用户目录的 `scripts/`，库里只留索引 | 文件被外部删掉时脚本就没有正文，只能看到「脚本文件不存在」；备份要连用户目录一起备 |
 | 每次调用重新读文件并编译 | 每个图片组都要编译一次，脚本顶层代码做的事会重复发生；读盘那一层虽按 path + mtime + size 缓存，编译结果不缓存 |
 | worker 用 `?worker&inline` | 两个 worker 以 base64 内联进页面 chunk，脚本页 chunk 因此十几 MB；换来的是打包后 `file://` 页面里 Worker 能用 |
+| 语法与 wasm 也内联进脚本页 chunk | 再多约 0.9 MB（语法 227 KB + wasm base64 约 631 KB）；换来的是 `file://` 页面里同样取得到 wasm |
 | 预热把 Monaco 与 TS 语言服务常驻渲染进程 | 从不打开脚本页也占一块堆内存（见 [loading.md](./loading.md) 的取舍表） |
 | 分组名允许重复 | 同一个名字可以有好几个分组，只能靠位置与内容区分，也可以建一个和默认分组同名的具名分组 |
 | 「未分组」不占行 | 它没有名字与折叠状态可存：名字写死在界面里，折叠只在本次停留期间有效 |

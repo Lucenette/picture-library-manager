@@ -475,8 +475,8 @@ function onItemDragEnd(): void {
 /* 拖脚本时悬停到的分组：整段亮一下（落下只改归属，所以没有"插到某两行之间"的落点线） */
 .group-section.is-drop-target {
   border-radius: var(--el-border-radius-base);
-  background: var(--app-bg-header);
-  box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  background: var(--app-bg-active);
+  box-shadow: inset 0 0 0 1px var(--app-border-highlight);
 }
 
 .group-head {
@@ -490,9 +490,11 @@ function onItemDragEnd(): void {
 }
 
 /* 组头也要有悬停底色（DSH 那边 projectRow 与 sessionRow 是同一条 hover 规则），
-   底色与脚本项一致，形状也跟着项的圆角 */
+   底色与脚本项一致，形状也跟着项的圆角。
+   高亮一律走悬停 / 选中令牌，不要用 --app-bg-surface：浅色下 surface 与工具窗口色同为 #ffffff，
+   叠上去等于没叠（暗色两者不同才一直没露出问题） */
 .group-head:hover {
-  background: var(--app-bg-surface);
+  background: var(--app-bg-hover);
 }
 
 /* 折叠开关：图标 + 组名 + 计数，占满剩下的宽度 */
@@ -575,12 +577,12 @@ function onItemDragEnd(): void {
 }
 
 .side-item:hover {
-  background: var(--app-bg-surface);
+  background: var(--app-bg-hover);
 }
 
-/* 选中态：一块圆角底色 + 提亮（与悬停同一块底色，只是文字更亮） */
+/* 选中态：一块圆角底色 + 提亮，与悬停用同一套令牌（选中是实色、悬停是覆盖层） */
 .side-item.active {
-  background: var(--app-bg-surface);
+  background: var(--app-bg-active);
   color: var(--app-text-regular);
 }
 

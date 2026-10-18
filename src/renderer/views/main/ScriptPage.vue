@@ -861,6 +861,8 @@ async function moveScript(key: string, groupId: number | null): Promise<void> {
   display: flex;
   height: 100%;
   min-height: 0;
+  /* 左栏自己不设底色，透出来的就是这一层；用工具窗口色，与编辑区同色 */
+  background: var(--app-bg-tool-window);
 }
 
 .empty {
