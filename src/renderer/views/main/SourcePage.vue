@@ -247,7 +247,7 @@ onMounted(loadSources);
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--app-space-10);
+  gap: var(--app-space-12);
   margin-bottom: var(--app-space-12);
   flex-shrink: 0;
 }

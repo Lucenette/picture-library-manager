@@ -841,7 +841,7 @@ function toFilterItems(values: string[]): FilterItem[] {
   align-items: center;
   margin-bottom: var(--app-space-12);
   flex-wrap: wrap;
-  gap: var(--app-space-10);
+  gap: var(--app-space-12);
   flex-shrink: 0;
 }
 
@@ -854,7 +854,7 @@ function toFilterItems(values: string[]): FilterItem[] {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: var(--app-space-10);
+  gap: var(--app-space-12);
 }
 
 .table-wrap {

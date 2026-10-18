@@ -537,7 +537,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 }
 
 .thumb-item.active {
-  box-shadow: 0 2px 12px var(--app-shadow-viewer-thumb);
+  box-shadow: var(--app-shadow-viewer-thumb);
   border: 2px solid var(--app-primary);
   z-index: 4;
   position: relative;

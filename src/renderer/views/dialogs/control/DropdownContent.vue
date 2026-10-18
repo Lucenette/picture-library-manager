@@ -68,25 +68,27 @@ function hide(): void {
 }
 
 .script-item {
-  padding: var(--app-space-8) 14px;
+  height: var(--app-control-h);
+  padding: 0 var(--app-space-12);
+  line-height: var(--app-control-h);
   cursor: pointer;
   font-size: var(--app-font-base);
   color: var(--app-text-regular);
-  height: 34px;
-  line-height: 18px;
   box-sizing: border-box;
 }
 
 .script-item:hover {
-  background: var(--app-bg-active);
+  background: var(--app-bg-hover);
 }
 
 .script-item.selected {
-  color: var(--app-primary);
+  background: var(--app-bg-active);
+  color: var(--app-text-primary);
+  font-weight: 500;
 }
 
 .script-empty {
-  padding: var(--app-space-12) 14px;
+  padding: var(--app-space-12);
   color: var(--app-text-muted);
   font-size: var(--app-font-base);
 }

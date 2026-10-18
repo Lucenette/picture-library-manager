@@ -554,12 +554,12 @@ defineExpose({ scrollToTop });
 }
 
 .tile-cover:hover .tile-cover-img {
-  box-shadow: 0 10px 26px var(--app-shadow-tile);
+  box-shadow: var(--app-shadow-tile);
 }
 
 .tile-cover:hover .tile-cover-img.layer-0 {
   transform: scale(1.14);
-  box-shadow: 0 12px 30px var(--app-shadow-tile-hover);
+  box-shadow: var(--app-shadow-tile-hover);
 }
 
 .tile-cover:hover .tile-cover-img.layer-1 {
@@ -644,7 +644,7 @@ defineExpose({ scrollToTop });
 
 .tile-panel {
   margin-top: var(--app-space-12);
-  padding: 14px var(--app-space-16) var(--app-space-16) var(--app-space-16);
+  padding: var(--app-space-16);
   border: 1px solid var(--app-primary);
   border-radius: var(--app-radius-8);
   background: var(--app-bg-selected);
@@ -674,7 +674,7 @@ defineExpose({ scrollToTop });
 }
 
 .tile-empty {
-  padding: 40px;
+  padding: var(--app-space-32);
   text-align: center;
   color: var(--app-text-faint);
   font-size: var(--app-font-base);

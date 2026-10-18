@@ -298,11 +298,11 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   flex-wrap: wrap;
   gap: var(--app-space-4);
   padding: var(--app-space-4) var(--app-space-8);
-  border-radius: var(--app-radius-8);
+  border-radius: var(--app-radius-4);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
   transition: border-color var(--app-duration-fast) var(--app-ease);
-  min-height: 32px;
+  min-height: var(--app-control-h);
 }
 
 .search-input-wrap.focused {
@@ -312,7 +312,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
 .search-tag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--app-space-4);
   padding: var(--app-space-2) var(--app-space-8);
   border-radius: var(--app-radius-4);
   background: var(--app-bg-highlight);
@@ -356,8 +356,8 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   margin-top: var(--app-space-4);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-8);
-  box-shadow: 0 8px 24px var(--app-shadow-popup);
+  border-radius: var(--app-radius-6);
+  box-shadow: var(--app-shadow-popup);
 }
 
 .section-title {
@@ -382,7 +382,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px var(--app-space-12);
+  padding: var(--app-space-6) var(--app-space-12);
   cursor: pointer;
   font-size: var(--app-font-base);
   color: var(--app-text-regular);
@@ -393,8 +393,8 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside));
 }
 
 .panel-item.highlighted {
-  background: var(--app-bg-hover);
-  color: var(--app-primary);
+  background: var(--app-bg-active);
+  color: var(--app-text-primary);
 }
 
 .item-arrow {

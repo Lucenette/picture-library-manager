@@ -45,7 +45,7 @@ function open(): void {
     scripts: props.items.map((item) => ({ id: item.id, name: item.name })),
     selectedId: props.modelValue,
     controlRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-    listHeight: Math.max(34, Math.min(300, props.items.length * 34)),
+    listHeight: Math.max(32, Math.min(300, props.items.length * 32)),
   };
 
   ipcRenderer.removeAllListeners(IPC.DROPDOWN_SELECTED);
@@ -63,8 +63,9 @@ function open(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--app-space-8) var(--app-space-12);
-  border-radius: var(--app-radius-6);
+  height: var(--app-control-h);
+  padding: 0 var(--app-space-12);
+  border-radius: var(--app-radius-4);
   background: var(--app-bg-surface);
   border: 1px solid var(--app-border-strong);
   cursor: pointer;
